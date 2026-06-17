@@ -9,7 +9,6 @@ services/trip-service/       Trip catalog/search service
 services/seat-inventory-service/ Seat map, holds, Redis TTL
 services/booking-service/    Booking state machine
 services/payment-service/    Payment simulation
-services/notification-service/ Notification boundary
 services/analytics-service/  Kafka consumers and aggregate reports
 services/mcp-server/         MCP tools/resources
 workers/ticket-worker/       Ticket generation
@@ -27,6 +26,8 @@ scripts/                     Helper scripts
 ## File Placement Rule
 
 If a change spans more than one service or contract area, update the relevant docs in the same task.
+
+The current repository is intentionally a baseline with mostly README files inside module folders. Future implementation tasks should add code files only inside their assigned module boundaries.
 
 Examples:
 

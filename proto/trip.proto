@@ -7,6 +7,30 @@ service TripService {
   rpc SearchTrips(SearchTripsRequest) returns (SearchTripsResponse);
   rpc GetTripDetail(GetTripDetailRequest) returns (GetTripDetailResponse);
   rpc ListPopularRoutes(ListPopularRoutesRequest) returns (ListPopularRoutesResponse);
+  rpc CreateRoute(RouteMutationRequest) returns (RouteResponse);
+  rpc UpdateRoute(RouteMutationRequest) returns (RouteResponse);
+  rpc DeleteRoute(DeleteEntityRequest) returns (DeleteEntityResponse);
+  rpc CreateStop(StopMutationRequest) returns (StopResponse);
+  rpc UpdateStop(StopMutationRequest) returns (StopResponse);
+  rpc DeleteStop(DeleteEntityRequest) returns (DeleteEntityResponse);
+  rpc CreateVehicle(VehicleMutationRequest) returns (VehicleResponse);
+  rpc UpdateVehicle(VehicleMutationRequest) returns (VehicleResponse);
+  rpc DeleteVehicle(DeleteEntityRequest) returns (DeleteEntityResponse);
+  rpc ConfigureVehicleSeats(ConfigureVehicleSeatsRequest) returns (ConfigureVehicleSeatsResponse);
+  rpc CreateTrip(TripMutationRequest) returns (TripResponse);
+  rpc UpdateTrip(TripMutationRequest) returns (TripResponse);
+  rpc DeleteTrip(DeleteEntityRequest) returns (DeleteEntityResponse);
+  rpc UpdateTripStatus(UpdateTripStatusRequest) returns (TripResponse);
+}
+
+enum TripStatus {
+  TRIP_STATUS_UNSPECIFIED = 0;
+  DRAFT = 1;
+  ACTIVE = 2;
+  LOCKED = 3;
+  DEPARTED = 4;
+  COMPLETED = 5;
+  CANCELLED = 6;
 }
 
 message AutocompleteLocationsRequest {
@@ -21,16 +45,21 @@ message SearchTripsRequest {
   string origin = 1;
   string destination = 2;
   string departure_date = 3;
-  int32 min_price = 4;
-  int32 max_price = 5;
-  string operator_name = 6;
-  string vehicle_type = 7;
-  int32 min_available_seats = 8;
-  string sort_by = 9;
+  string departure_time_from = 4;
+  string departure_time_to = 5;
+  int32 min_price = 6;
+  int32 max_price = 7;
+  string operator_name = 8;
+  string vehicle_type = 9;
+  int32 min_available_seats = 10;
+  string sort_by = 11;
 }
 
 message SearchTripsResponse {
   repeated Trip trips = 1;
+  repeated string suggested_dates = 2;
+  string seo_title = 3;
+  bool cache_hit = 4;
 }
 
 message GetTripDetailRequest {
@@ -41,7 +70,9 @@ message GetTripDetailResponse {
   Trip trip = 1;
   repeated Stop pickup_points = 2;
   repeated Stop dropoff_points = 3;
-  string cancellation_policy = 4;
+  repeated Seat seats = 4;
+  string cancellation_policy = 5;
+  string checkin_policy = 6;
 }
 
 message ListPopularRoutesRequest {
@@ -56,12 +87,15 @@ message Location {
   string id = 1;
   string name = 2;
   string type = 3;
+  string address = 4;
 }
 
 message Stop {
   string id = 1;
   string name = 2;
   string address = 3;
+  string stop_type = 4;
+  int32 stop_order = 5;
 }
 
 message Route {
@@ -69,21 +103,125 @@ message Route {
   Location origin = 2;
   Location destination = 3;
   int32 distance_km = 4;
+  repeated Stop stops = 5;
+}
+
+message VehicleSeat {
+  string id = 1;
+  string label = 2;
+  int32 deck = 3;
+  int32 row = 4;
+  int32 column = 5;
+}
+
+message Vehicle {
+  string id = 1;
+  string operator_name = 2;
+  string vehicle_code = 3;
+  string license_plate = 4;
+  string vehicle_type = 5;
+  int32 seat_count = 6;
+  repeated VehicleSeat seats = 7;
+}
+
+message Seat {
+  string id = 1;
+  string label = 2;
+  int32 deck = 3;
+  int32 row = 4;
+  int32 column = 5;
+  string status = 6;
 }
 
 message Trip {
   string id = 1;
   Route route = 2;
-  string operator_name = 3;
-  string vehicle_type = 4;
-  string departure_time = 5;
-  string arrival_time = 6;
-  int32 price = 7;
-  int32 available_seats = 8;
+  Vehicle vehicle = 3;
+  string operator_name = 4;
+  string vehicle_type = 5;
+  string departure_time = 6;
+  string arrival_time = 7;
+  int32 duration_minutes = 8;
+  int32 price = 9;
+  int32 available_seats = 10;
+  TripStatus status = 11;
+  string seo_title = 12;
 }
 
 message PopularRoute {
   string origin = 1;
   string destination = 2;
   int32 search_count = 3;
+}
+
+message RouteMutationRequest {
+  string id = 1;
+  string origin_location_id = 2;
+  string destination_location_id = 3;
+  int32 distance_km = 4;
+}
+
+message RouteResponse {
+  Route route = 1;
+}
+
+message StopMutationRequest {
+  string id = 1;
+  string route_id = 2;
+  string location_id = 3;
+  string stop_type = 4;
+  int32 stop_order = 5;
+}
+
+message StopResponse {
+  Stop stop = 1;
+}
+
+message VehicleMutationRequest {
+  string id = 1;
+  string operator_name = 2;
+  string vehicle_code = 3;
+  string license_plate = 4;
+  string vehicle_type = 5;
+  int32 seat_count = 6;
+}
+
+message VehicleResponse {
+  Vehicle vehicle = 1;
+}
+
+message ConfigureVehicleSeatsRequest {
+  string vehicle_id = 1;
+  repeated VehicleSeat seats = 2;
+}
+
+message ConfigureVehicleSeatsResponse {
+  repeated VehicleSeat seats = 1;
+}
+
+message TripMutationRequest {
+  string id = 1;
+  string route_id = 2;
+  string vehicle_id = 3;
+  string departure_time = 4;
+  string arrival_time = 5;
+  int32 price = 6;
+  TripStatus status = 7;
+}
+
+message TripResponse {
+  Trip trip = 1;
+}
+
+message UpdateTripStatusRequest {
+  string trip_id = 1;
+  TripStatus status = 2;
+}
+
+message DeleteEntityRequest {
+  string id = 1;
+}
+
+message DeleteEntityResponse {
+  bool deleted = 1;
 }

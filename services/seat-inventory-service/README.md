@@ -6,6 +6,9 @@ Owns:
 - Redis TTL holds
 - Seat confirmation
 - Admin blocked seats
+- Optional block reason
+- Expired hold release behavior
+- Seat state change events for GraphQL subscriptions
 
 Contract:
 

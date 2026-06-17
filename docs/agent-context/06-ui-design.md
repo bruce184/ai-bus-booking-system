@@ -8,15 +8,19 @@ The app is an operational travel booking system. It should feel clear, fast, and
 
 - Search page
 - Search results
+- SEO route pages for popular routes
 - Trip detail and seat map
 - Checkout
 - Payment simulation
 - Booking confirmation
 - Booking lookup
 - Customer booking history
+- Saved passenger profiles
 - Admin dashboard
 - Admin routes/stops/vehicles/trips
+- Admin vehicle seat layout
 - Admin bookings/check-in
+- Admin event logs
 - Chatbot panel
 
 ## UI Rules
@@ -28,3 +32,6 @@ The app is an operational travel booking system. It should feel clear, fast, and
 5. Do not hide required booking lookup privacy fields.
 6. Keep mobile usable for customer flow.
 7. Keep admin dashboard optimized for laptop/desktop.
+8. Show nearby-date suggestions when no trips match.
+9. Admin tables should support filtering by trip/status/code where relevant.
+10. Chatbot policy answers should display a short source label.

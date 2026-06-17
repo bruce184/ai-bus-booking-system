@@ -22,3 +22,7 @@ bus://system/health
 ```
 
 Booking status lookup must require booking code and email.
+
+MCP tools must call internal service/tool boundaries and must not fabricate trip inventory, booking status, seat state, or revenue.
+
+Admin revenue tools are demo/admin-only and need auth enforcement when auth is implemented.

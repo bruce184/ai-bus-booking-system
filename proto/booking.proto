@@ -5,9 +5,14 @@ package bus.booking.v1;
 service BookingService {
   rpc CreateBooking(CreateBookingRequest) returns (BookingResponse);
   rpc GetBookingStatus(GetBookingStatusRequest) returns (BookingResponse);
+  rpc ListCustomerBookings(ListCustomerBookingsRequest) returns (ListBookingsResponse);
+  rpc ListAdminBookings(ListAdminBookingsRequest) returns (ListBookingsResponse);
   rpc SimulatePayment(SimulatePaymentRequest) returns (BookingResponse);
   rpc CancelBooking(CancelBookingRequest) returns (BookingResponse);
   rpc CheckInPassenger(CheckInPassengerRequest) returns (BookingResponse);
+  rpc SavePassengerProfile(SavePassengerProfileRequest) returns (SavedPassengerResponse);
+  rpc DeletePassengerProfile(DeletePassengerProfileRequest) returns (DeletePassengerProfileResponse);
+  rpc ListPassengerProfiles(ListPassengerProfilesRequest) returns (ListPassengerProfilesResponse);
 }
 
 enum BookingStatus {
@@ -44,6 +49,24 @@ message GetBookingStatusRequest {
   string email = 2;
 }
 
+message ListCustomerBookingsRequest {
+  string customer_user_id = 1;
+}
+
+message ListAdminBookingsRequest {
+  string trip_id = 1;
+  BookingStatus status = 2;
+  string email = 3;
+  string booking_code = 4;
+  int32 limit = 5;
+  int32 offset = 6;
+}
+
+message ListBookingsResponse {
+  repeated BookingResponse bookings = 1;
+  int32 total = 2;
+}
+
 message SimulatePaymentRequest {
   string booking_code = 1;
   bool success = 2;
@@ -67,5 +90,62 @@ message BookingResponse {
   string contact_email = 5;
   string contact_phone = 6;
   int32 total_amount = 7;
-  repeated string seat_ids = 8;
+  repeated PassengerInput passengers = 8;
+  repeated Ticket tickets = 9;
+}
+
+message Ticket {
+  string id = 1;
+  string ticket_code = 2;
+  string booking_code = 3;
+  string passenger_name = 4;
+  string route_label = 5;
+  string pickup_point = 6;
+  string dropoff_point = 7;
+  string departure_time = 8;
+  string seat_id = 9;
+  string vehicle_code = 10;
+  string qr_payload = 11;
+  string checkin_policy = 12;
+  string html = 13;
+  string pdf_url = 14;
+}
+
+message SavedPassenger {
+  string id = 1;
+  string customer_user_id = 2;
+  string full_name = 3;
+  string phone = 4;
+  string email = 5;
+  string document_number = 6;
+}
+
+message SavePassengerProfileRequest {
+  string customer_user_id = 1;
+  string id = 2;
+  string full_name = 3;
+  string phone = 4;
+  string email = 5;
+  string document_number = 6;
+}
+
+message SavedPassengerResponse {
+  SavedPassenger passenger = 1;
+}
+
+message DeletePassengerProfileRequest {
+  string customer_user_id = 1;
+  string id = 2;
+}
+
+message DeletePassengerProfileResponse {
+  bool deleted = 1;
+}
+
+message ListPassengerProfilesRequest {
+  string customer_user_id = 1;
+}
+
+message ListPassengerProfilesResponse {
+  repeated SavedPassenger passengers = 1;
 }

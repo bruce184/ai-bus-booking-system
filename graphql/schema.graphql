@@ -24,10 +24,41 @@ enum BookingStatus {
   CANCELLED
 }
 
+enum TripStatus {
+  DRAFT
+  ACTIVE
+  LOCKED
+  DEPARTED
+  COMPLETED
+  CANCELLED
+}
+
+type User {
+  id: ID!
+  email: String!
+  fullName: String!
+  role: UserRole!
+}
+
+type AuthPayload {
+  token: String!
+  user: User!
+  expiresAt: DateTime!
+}
+
 type Location {
   id: ID!
   name: String!
   type: String!
+  address: String
+}
+
+type Stop {
+  id: ID!
+  name: String!
+  address: String
+  stopType: String!
+  stopOrder: Int!
 }
 
 type Route {
@@ -35,17 +66,56 @@ type Route {
   origin: Location!
   destination: Location!
   distanceKm: Int
+  stops: [Stop!]!
+}
+
+type VehicleSeat {
+  id: ID!
+  label: String!
+  deck: Int!
+  row: Int!
+  column: Int!
+}
+
+type Vehicle {
+  id: ID!
+  operatorName: String!
+  vehicleCode: String!
+  licensePlate: String
+  vehicleType: String!
+  seatCount: Int!
+  seats: [VehicleSeat!]!
 }
 
 type Trip {
   id: ID!
   route: Route!
+  vehicle: Vehicle!
   operatorName: String!
   vehicleType: String!
   departureTime: DateTime!
   arrivalTime: DateTime!
+  durationMinutes: Int!
   price: Int!
   availableSeats: Int!
+  status: TripStatus!
+  seoTitle: String
+}
+
+type TripDetail {
+  trip: Trip!
+  pickupPoints: [Stop!]!
+  dropoffPoints: [Stop!]!
+  cancellationPolicy: String!
+  checkinPolicy: String!
+  seats: [Seat!]!
+}
+
+type TripSearchResult {
+  trips: [Trip!]!
+  suggestedDates: [String!]!
+  seoTitle: String
+  cacheHit: Boolean!
 }
 
 type Seat {
@@ -72,12 +142,29 @@ type Passenger {
   seatId: ID!
 }
 
+type SavedPassenger {
+  id: ID!
+  fullName: String!
+  phone: String
+  email: String
+  documentNumber: String
+}
+
 type Ticket {
   id: ID!
   ticketCode: String!
+  bookingCode: String!
   passengerName: String!
+  routeLabel: String!
+  pickupPoint: String!
+  dropoffPoint: String!
+  departureTime: DateTime!
   seatId: ID!
+  vehicleCode: String!
   qrPayload: String!
+  checkinPolicy: String!
+  html: String
+  pdfUrl: String
 }
 
 type Booking {
@@ -92,12 +179,32 @@ type Booking {
   tickets: [Ticket!]!
 }
 
+type BookingConnection {
+  items: [Booking!]!
+  total: Int!
+}
+
 type RevenueSummary {
   from: String!
   to: String!
   totalRevenue: Int!
   paidBookings: Int!
   ticketsSold: Int!
+  successfulBookingRate: Float!
+}
+
+type DailyRevenue {
+  date: String!
+  revenue: Int!
+  paidBookings: Int!
+  ticketsSold: Int!
+}
+
+type RouteSales {
+  origin: String!
+  destination: String!
+  ticketsSold: Int!
+  revenue: Int!
 }
 
 type PopularRoute {
@@ -106,10 +213,33 @@ type PopularRoute {
   searchCount: Int!
 }
 
+type AnalyticsDashboard {
+  revenueSummary: RevenueSummary!
+  dailyRevenue: [DailyRevenue!]!
+  ticketsByRoute: [RouteSales!]!
+  popularRoutes: [PopularRoute!]!
+}
+
+type EventLog {
+  id: ID!
+  eventType: String!
+  entityType: String
+  entityId: ID
+  payload: String!
+  createdAt: DateTime!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
 input SearchTripsInput {
   origin: String!
   destination: String!
   departureDate: String!
+  departureTimeFrom: String
+  departureTimeTo: String
   minPrice: Int
   maxPrice: Int
   operatorName: String
@@ -135,6 +265,13 @@ input PassengerInput {
   seatId: ID!
 }
 
+input SavedPassengerInput {
+  fullName: String!
+  phone: String
+  email: String
+  documentNumber: String
+}
+
 input CreateBookingInput {
   tripId: ID!
   holdToken: String!
@@ -153,29 +290,120 @@ input CancelBookingInput {
   email: String!
 }
 
+input AdminRouteInput {
+  originLocationId: ID!
+  destinationLocationId: ID!
+  distanceKm: Int
+}
+
+input AdminStopInput {
+  routeId: ID!
+  locationId: ID!
+  stopType: String!
+  stopOrder: Int!
+}
+
+input AdminVehicleInput {
+  operatorName: String!
+  vehicleCode: String!
+  licensePlate: String
+  vehicleType: String!
+  seatCount: Int!
+}
+
+input AdminVehicleSeatInput {
+  label: String!
+  deck: Int!
+  row: Int!
+  column: Int!
+}
+
+input AdminTripInput {
+  routeId: ID!
+  vehicleId: ID!
+  departureTime: DateTime!
+  arrivalTime: DateTime!
+  price: Int!
+  status: TripStatus = DRAFT
+}
+
+input AdminTripStatusInput {
+  tripId: ID!
+  status: TripStatus!
+}
+
+input AdminBlockSeatsInput {
+  tripId: ID!
+  seatIds: [ID!]!
+  reason: String
+}
+
+input AdminCheckInInput {
+  code: String!
+}
+
+input AdminBookingFilterInput {
+  tripId: ID
+  status: BookingStatus
+  email: String
+  bookingCode: String
+  limit: Int = 20
+  offset: Int = 0
+}
+
 input AdminRevenueSummaryInput {
   from: String!
   to: String!
 }
 
+input AdminEventLogFilterInput {
+  eventType: String
+  entityType: String
+  limit: Int = 20
+  offset: Int = 0
+}
+
 type Query {
+  me: User
   autocompleteLocations(keyword: String!): [Location!]!
-  searchTrips(input: SearchTripsInput!): [Trip!]!
-  trip(id: ID!): Trip
+  searchTrips(input: SearchTripsInput!): TripSearchResult!
+  trip(id: ID!): TripDetail
   seatMap(tripId: ID!): [Seat!]!
   bookingStatus(bookingCode: String!, email: String!): Booking
   myBookings: [Booking!]!
+  mySavedPassengers: [SavedPassenger!]!
   adminRevenueSummary(input: AdminRevenueSummaryInput!): RevenueSummary!
+  adminAnalyticsDashboard(input: AdminRevenueSummaryInput!): AnalyticsDashboard!
+  adminBookings(input: AdminBookingFilterInput!): BookingConnection!
+  adminEventLogs(input: AdminEventLogFilterInput): [EventLog!]!
   popularRoutes(limit: Int = 5): [PopularRoute!]!
 }
 
 type Mutation {
+  login(input: LoginInput!): AuthPayload!
+  savePassengerProfile(input: SavedPassengerInput!): SavedPassenger!
+  deleteSavedPassenger(id: ID!): Boolean!
   holdSeats(input: HoldSeatsInput!): SeatHold!
   releaseSeatHold(input: ReleaseSeatHoldInput!): Boolean!
   createBooking(input: CreateBookingInput!): Booking!
   simulatePayment(input: SimulatePaymentInput!): Booking!
   cancelBooking(input: CancelBookingInput!): Booking!
-  adminCheckIn(code: String!): Booking!
+  adminCreateRoute(input: AdminRouteInput!): Route!
+  adminUpdateRoute(id: ID!, input: AdminRouteInput!): Route!
+  adminDeleteRoute(id: ID!): Boolean!
+  adminCreateStop(input: AdminStopInput!): Stop!
+  adminUpdateStop(id: ID!, input: AdminStopInput!): Stop!
+  adminDeleteStop(id: ID!): Boolean!
+  adminCreateVehicle(input: AdminVehicleInput!): Vehicle!
+  adminUpdateVehicle(id: ID!, input: AdminVehicleInput!): Vehicle!
+  adminDeleteVehicle(id: ID!): Boolean!
+  adminConfigureVehicleSeats(vehicleId: ID!, seats: [AdminVehicleSeatInput!]!): [VehicleSeat!]!
+  adminCreateTrip(input: AdminTripInput!): Trip!
+  adminUpdateTrip(id: ID!, input: AdminTripInput!): Trip!
+  adminDeleteTrip(id: ID!): Boolean!
+  adminUpdateTripStatus(input: AdminTripStatusInput!): Trip!
+  adminBlockSeats(input: AdminBlockSeatsInput!): [Seat!]!
+  adminCheckIn(input: AdminCheckInInput!): Booking!
 }
 
 type Subscription {

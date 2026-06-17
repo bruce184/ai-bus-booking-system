@@ -2,7 +2,7 @@
 
 Intercity Bus Booking AI is a student microservices project for searching intercity bus trips, selecting seats, holding seats with Redis TTL, simulating checkout, issuing e-tickets, supporting admin operations, providing analytics, and exposing AI/MCP tools.
 
-The repository is set up with a local-demo-first strategy. The baseline focuses on clear ownership, reviewable work, and source-of-truth contracts before feature implementation expands.
+The repository is set up with a local-demo-first strategy. The current state is a contract and documentation baseline: folders, README files, source-of-truth docs, GraphQL schema, gRPC proto files, database schema, and Docker infrastructure are prepared so members can later add implementation files inside their assigned areas.
 
 ## Required Stack
 
@@ -25,15 +25,16 @@ The repository is set up with a local-demo-first strategy. The baseline focuses 
 The MVP includes:
 
 - Public trip search and autocomplete
-- Trip filters, sorting, detail page, and SEO route pages
+- Trip filters, sorting, nearby-date suggestion, detail page, and SEO route pages
 - Seat map, seat hold, Redis TTL, and seat state updates
 - Guest checkout and registered checkout
+- Registered customer saved passenger profiles
 - Simulated payment
-- E-ticket generation and simulated email notification
+- E-ticket generation with HTML/PDF-ready content and simulated email notification
 - Booking lookup by booking code and email
 - Customer booking history
-- Admin route, stop, vehicle, trip, booking, check-in, and revenue views
-- Kafka analytics events and revenue/search summaries
+- Admin login, route, stop, vehicle, seat-layout, trip, booking, check-in, seat-block, event-log, and revenue views
+- Kafka analytics events, revenue/search summaries, tickets by route, popular routes, and booking success rate
 - AI chatbot for policy Q&A, trip suggestions, and booking status lookup
 - MCP Server tools for trip, booking, revenue, and popular route lookup
 
@@ -56,7 +57,6 @@ intercity-bus-booking-ai/
 +-- services/booking-service/    # Booking lifecycle and payment simulation
 +-- services/seat-inventory-service/ # Seat state, Redis holds, gRPC API
 +-- services/payment-service/    # Simulated payment boundary
-+-- services/notification-service/ # Email/log notification boundary
 +-- services/analytics-service/  # Kafka consumers and reporting aggregates
 +-- services/mcp-server/         # MCP tools/resources for AI clients
 +-- workers/ticket-worker/       # Ticket generation worker
@@ -76,7 +76,7 @@ intercity-bus-booking-ai/
 
 ## Quick Start
 
-This baseline does not install full app dependencies yet. It prepares the repository for team work.
+This baseline does not install full app dependencies yet. It prepares the repository for team work and contract-first development.
 
 Check required documents:
 
@@ -99,6 +99,30 @@ GraphQL WS:       ws://localhost:4000/graphql
 MCP Server:       http://localhost:4010/mcp
 Nginx:            http://localhost:8080
 ```
+
+## Baseline Status
+
+Implemented now:
+
+- Source-of-truth documentation for the teacher's project specification
+- GraphQL schema contract in `graphql/schema.graphql`
+- gRPC proto contracts in `proto/`
+- PostgreSQL schema baseline in `database/schema.sql`
+- Bootstrap seed placeholders in `database/seed.sql`
+- Docker Compose infrastructure for PostgreSQL, Redis, RabbitMQ, Kafka, Zookeeper, and Nginx
+- Assignment and AI-agent workflow docs
+
+Not implemented yet:
+
+- Next.js app code
+- GraphQL Gateway runtime
+- Node.js service runtimes
+- Workers
+- AI SDK chatbot runtime
+- MCP Server runtime
+- Full demo seed dataset
+
+Members should add implementation files only inside their assigned module and keep the matching docs/contracts updated.
 
 ## Project Documents
 

@@ -5,17 +5,23 @@
 - Trip search by origin, destination, date
 - Autocomplete locations/stations
 - Trip filters and sorting
+- Empty search nearby-date suggestions
+- SEO metadata for popular route pages
 - Trip detail and seat map
 - Seat hold with Redis TTL
 - Real-time-ish seat updates via GraphQL Subscription
 - Guest and registered checkout
+- Registered customer saved passenger profiles
 - Simulated payment success/failure
-- E-ticket generation
+- E-ticket generation with ticket code, QR payload, policy snapshot, and HTML/PDF-ready content
 - Simulated email/log notification
 - Booking lookup by booking code and email
 - Admin CRUD for route/stop/vehicle/trip
-- Admin booking list and check-in
-- Revenue and booking dashboard
+- Admin vehicle seat layout configuration
+- Admin trip activate/lock/depart/complete/cancel state changes
+- Admin seat blocking
+- Admin booking list, event logs, and check-in by booking/ticket/QR payload
+- Revenue, booking, tickets-by-route, popular-route, and conversion dashboards
 - Kafka analytics events
 - Chatbot AI with internal tools
 - MCP Server tools/resources
@@ -24,7 +30,7 @@
 
 - Better admin charts
 - QR image generation instead of text QR payload
-- PDF ticket export
+- Persisted PDF file storage beyond the optional contract URL
 - Dark mode
 - More realistic auth/permissions
 

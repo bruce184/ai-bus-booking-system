@@ -1,6 +1,13 @@
 # GraphQL Gateway
 
-Owns public GraphQL schema, auth context, orchestration, and subscriptions.
+Owns public GraphQL schema, demo auth context, orchestration, and subscriptions.
+
+Must expose:
+
+- Public/customer search, seat, checkout, booking, and saved-passenger operations
+- Admin route/stop/vehicle/trip/booking/check-in/analytics/event-log operations
+- Seat and booking subscriptions
+- AI chatbot tool endpoints when the AI task is assigned
 
 Source contract:
 

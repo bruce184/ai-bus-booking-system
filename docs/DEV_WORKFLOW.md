@@ -35,6 +35,14 @@ Admin Operations
 Analytics, AI Chatbot, MCP Server
 ```
 
+Current baseline status:
+
+```text
+Implementation is intentionally not scaffolded yet.
+Members should add files/folders only inside their assigned module after task assignment.
+Contracts and source-of-truth docs define the required behavior before code exists.
+```
+
 ## 3. Required Docs
 
 | File | Purpose |
@@ -133,12 +141,12 @@ git push -u origin <member>/<scope>
 |---|---|
 | Frontend | `apps/web/`, GraphQL client docs if needed |
 | GraphQL Gateway | `services/graphql-gateway/`, `graphql/schema.graphql`, API docs |
-| Trip Service | `services/trip-service/`, `proto/trip.proto`, database/API docs |
+| Trip Service | `services/trip-service/`, `proto/trip.proto`, route/stop/vehicle/trip database/API docs |
 | Seat Inventory | `services/seat-inventory-service/`, `proto/seat_inventory.proto`, Redis docs |
-| Booking | `services/booking-service/`, `proto/booking.proto`, booking DB/API docs |
+| Booking | `services/booking-service/`, `proto/booking.proto`, booking/passenger/ticket DB/API docs |
 | Payment | `services/payment-service/`, payment events/API docs |
 | Workers | `workers/`, RabbitMQ event docs |
-| Analytics | `services/analytics-service/`, Kafka event docs |
+| Analytics | `services/analytics-service/`, Kafka event docs, analytics aggregate docs |
 | AI Chatbot | `apps/web/` and gateway tool APIs |
 | MCP Server | `services/mcp-server/`, MCP section in API docs |
 | Database | `database/`, `docs/DATABASE_SCHEMA.md` |
@@ -181,6 +189,16 @@ Suggested team split:
 | Analytics dashboard | Data/backend owner |
 | AI chatbot and MCP Server | AI/backend owner |
 | QA/demo | QA owner |
+
+Suggested finer-grained split when the team is ready:
+
+| Spec module | Suggested task slice |
+|---|---|
+| Module 1 | Search UI, SEO route pages, Trip Service search/catalog, Redis search cache, search analytics event |
+| Module 2 | Seat map UI, hold countdown, Seat Inventory Service, Redis TTL atomic hold, subscription updates, double-booking test |
+| Module 3 | Checkout UI, Booking Service, Payment simulation, Ticket Worker, Email Worker, customer booking lookup/history |
+| Module 4 | Admin UI, demo auth, route/stop/vehicle/trip CRUD, trip status, seat block, check-in, event log |
+| Module 5 | Analytics consumer/dashboard, AI SDK chatbot tools/resources, MCP Server tools/resources |
 
 ## 9. Agent Scope Lock
 

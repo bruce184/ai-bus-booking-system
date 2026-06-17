@@ -69,6 +69,7 @@ create table if not exists trip_seats (
   trip_id uuid not null references trips(id) on delete cascade,
   seat_label text not null,
   status text not null default 'AVAILABLE' check (status in ('AVAILABLE', 'HELD', 'BOOKED', 'BLOCKED')),
+  block_reason text,
   booking_id uuid,
   updated_at timestamptz not null default now(),
   unique (trip_id, seat_label)
@@ -101,12 +102,25 @@ create table if not exists booking_passengers (
   seat_label text not null
 );
 
+create table if not exists saved_passengers (
+  id uuid primary key default gen_random_uuid(),
+  customer_user_id uuid not null references users(id) on delete cascade,
+  full_name text not null,
+  phone text,
+  email text,
+  document_number text,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists tickets (
   id uuid primary key default gen_random_uuid(),
   booking_id uuid not null references bookings(id) on delete cascade,
   passenger_id uuid not null references booking_passengers(id) on delete cascade,
   ticket_code text not null unique,
   qr_payload text not null,
+  ticket_html text,
+  ticket_pdf_url text,
+  checkin_policy_snapshot text,
   checked_in_at timestamptz,
   created_at timestamptz not null default now()
 );
@@ -128,6 +142,7 @@ create table if not exists analytics_daily (
   paid_booking_count integer not null default 0,
   tickets_sold integer not null default 0,
   revenue integer not null default 0,
+  search_to_paid_rate numeric(5, 2) not null default 0,
   unique (metric_date, route_label)
 );
 
@@ -137,5 +152,6 @@ create index if not exists idx_trips_route_departure on trips(route_id, departur
 create index if not exists idx_trip_seats_trip_label on trip_seats(trip_id, seat_label);
 create index if not exists idx_bookings_code on bookings(booking_code);
 create index if not exists idx_bookings_email on bookings(contact_email);
+create index if not exists idx_saved_passengers_user on saved_passengers(customer_user_id);
 create index if not exists idx_tickets_code on tickets(ticket_code);
 create index if not exists idx_analytics_daily_date on analytics_daily(metric_date);

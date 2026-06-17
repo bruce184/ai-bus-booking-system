@@ -127,6 +127,7 @@ Rules:
 7. Use Redis for temporary seat holds.
 8. Use RabbitMQ for workflow events and Kafka for analytics events.
 9. Use fake demo data only.
+10. If a required implementation file/folder does not exist yet, create it only inside the assigned module.
 
 ## 7. Frontend Guidelines
 
@@ -144,7 +145,9 @@ Rules:
 4. Seat map must show `AVAILABLE`, `HELD`, `BOOKED`, `BLOCKED`.
 5. Checkout must require passenger details per seat.
 6. Booking lookup must require booking code and email.
-7. Keep screens responsive for laptop and mobile demo.
+7. Search results must support empty-state nearby-date suggestions.
+8. Route pages must support SEO metadata for popular routes.
+9. Keep screens responsive for laptop and mobile demo.
 
 ## 8. Backend / Service Guidelines
 
@@ -164,6 +167,8 @@ Rules:
 4. Publish documented events only.
 5. Keep idempotency in payment/ticket/email worker tasks where possible.
 6. Do not invent live data in AI or MCP responses.
+7. Ticket output must include the fields documented in `docs/API_CONTRACT.md`.
+8. Admin operations must respect role boundaries and service ownership.
 
 ## 9. Database Rules
 
@@ -214,6 +219,7 @@ Update docs when:
 | Event/topic | `docs/API_CONTRACT.md`, `docs/ARCHITECTURE.md` |
 | Service boundary | `docs/ARCHITECTURE.md` |
 | Setup/env/ports | `docs/README_SETUP.md`, `.env.example` |
+| Teacher spec alignment | `README.md`, relevant `docs/agent-context/*`, and source-of-truth docs |
 
 ## 13. Definition of Done
 

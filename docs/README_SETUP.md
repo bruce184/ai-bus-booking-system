@@ -13,7 +13,14 @@ Use this file when:
 
 ## 2. Project Summary
 
-Intercity Bus Booking AI lets customers search trips, select seats, hold seats, checkout, receive e-tickets, and ask an AI chatbot for trip/policy/booking help. Admin users manage operations and reports. External AI clients can use the MCP Server tools.
+Intercity Bus Booking AI lets customers search trips, select seats, hold seats, checkout, receive e-tickets, and ask an AI chatbot for trip/policy/booking help. Admin users manage routes, stops, vehicles, seat layouts, trips, bookings, check-in, seat blocks, logs, and reports. External AI clients can use the MCP Server tools.
+
+Current repository status:
+
+```text
+Baseline setup only. Docs, contracts, schema, proto files, and infrastructure are prepared.
+Application/service implementation files will be added later by assigned members.
+```
 
 Local demo is required. Online deployment is optional.
 
@@ -78,7 +85,6 @@ services/trip-service/       Routes, stops, vehicles, trips, search
 services/booking-service/    Booking lifecycle
 services/seat-inventory-service/ Seat state and Redis TTL holds
 services/payment-service/    Payment simulation
-services/notification-service/ Notification boundary
 services/analytics-service/  Kafka consumers and aggregates
 services/mcp-server/         MCP tools and resources
 workers/ticket-worker/       Ticket generation from booking.paid
@@ -147,6 +153,12 @@ Expected:
 - Required docs and contracts are present.
 - Docker Compose config is valid.
 
+On Windows PowerShell, if `npm run check:docs` is blocked by execution policy, use:
+
+```bash
+npm.cmd run check:docs
+```
+
 ## 9. Future Local Run Targets
 
 When implementations exist, keep these commands updated:
@@ -174,17 +186,31 @@ Nginx:            http://localhost:8080
 [ ] Web app loads
 [ ] Trip search works
 [ ] Filters and sorting work
+[ ] Empty search suggests nearby dates
+[ ] SEO metadata exists for popular route pages
 [ ] Trip detail shows pickup/dropoff/policy/seat map
 [ ] holdSeats prevents double booking
 [ ] Seat hold expires after TTL
+[ ] Seat state changes are broadcast to other clients
 [ ] Guest checkout creates PENDING_PAYMENT booking
+[ ] Registered checkout links booking to user
+[ ] Registered customer can save passenger profiles
 [ ] Payment success confirms seats
 [ ] Ticket worker creates ticket
+[ ] Ticket content includes booking code, ticket code, passenger, route, pickup/dropoff, departure, seat, vehicle, QR payload, and check-in policy
 [ ] Email worker logs simulated email
 [ ] Booking lookup requires booking code and email
-[ ] Admin CRUD and check-in demo work
-[ ] Analytics dashboard shows fake demo summaries
+[ ] Admin login works
+[ ] Admin CRUD for routes, stops, vehicles, seat layouts, and trips works
+[ ] Admin can activate/lock/depart/complete trips
+[ ] Admin can block seats from sale
+[ ] Admin can list bookings by trip/status
+[ ] Admin/staff check-in works by booking code, ticket code, or simulated QR payload
+[ ] Admin event logs show main actions
+[ ] Analytics dashboard shows revenue by day, tickets by route, popular routes, and booking success rate
 [ ] Chatbot calls tools instead of inventing inventory
+[ ] Chatbot cites internal policy resources
+[ ] Chatbot refuses booking details without booking code and email
 [ ] MCP tools return demo data
 ```
 
@@ -224,6 +250,7 @@ Update:
 [ ] Branch/PR workflow is documented
 [ ] Task template exists
 [ ] Backlog/handoff docs exist
+[ ] README states the repo is baseline-only until members add implementation files
 ```
 
 ## 13. Security Rules

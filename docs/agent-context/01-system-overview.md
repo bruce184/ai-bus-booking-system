@@ -7,18 +7,21 @@ Build a local-demo-ready intercity bus booking system with AI support and an MCP
 Users can:
 
 - Search trips by origin, destination, and departure date.
-- Filter and sort trips.
+- Filter, sort, and see nearby-date suggestions.
 - View trip detail and seat map.
 - Hold seats temporarily.
 - Checkout as guest or registered customer.
 - Simulate payment.
-- Receive an e-ticket.
+- Receive an HTML/PDF-ready e-ticket.
 - Lookup booking status with booking code and email.
+- Save passenger profiles when registered.
 
 Admins/staff can:
 
-- Manage routes, stops, vehicles, trips, seats, bookings, and check-in.
-- View revenue and analytics dashboards.
+- Log in through local demo auth.
+- Manage routes, stops, vehicles, seat layouts, trips, seats, bookings, and check-in.
+- Activate, lock, depart, complete, or cancel trips.
+- View revenue, booking, route, popular-search, conversion, and event-log dashboards.
 
 AI clients can:
 
@@ -52,3 +55,7 @@ MCP Server
 ## Product Boundary
 
 Local demo first. Do not implement real payment, real email/SMS delivery, or production auth beyond the assigned task without approval.
+
+## Baseline Status
+
+This repo currently contains docs, contracts, schema/proto files, and infrastructure only. Service and UI implementation files should be added later inside assigned modules.

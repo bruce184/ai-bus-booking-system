@@ -10,3 +10,11 @@ booking-events
 payment-events
 checkin-events
 ```
+
+Required MVP aggregates:
+
+- Revenue by day
+- Paid booking count
+- Tickets sold by route
+- Popular searched routes
+- Booking success rate compared with search count

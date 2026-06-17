@@ -6,10 +6,6 @@ Current baseline:
 
 ```text
 nginx/nginx.conf
-rabbitmq/
-kafka/
-redis/
-postgres/
 ```
 
 Docker Compose is the source for local services:

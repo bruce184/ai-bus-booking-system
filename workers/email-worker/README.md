@@ -11,3 +11,5 @@ email.requested
 ```
 
 MVP must not require real SMTP delivery.
+
+The demo worker should log enough email content to prove the customer would receive booking/ticket details. Do not add real SMTP credentials unless a later task explicitly changes scope.

@@ -46,3 +46,22 @@ ADMIN
 STAFF
 CUSTOMER
 ```
+
+Trip status:
+
+```text
+DRAFT
+ACTIVE
+LOCKED
+DEPARTED
+COMPLETED
+CANCELLED
+```
+
+## Baseline Contract Notes
+
+- `searchTrips` returns `TripSearchResult` so empty-date suggestions and SEO metadata can travel with results.
+- Admin route/stop/vehicle/trip CRUD belongs to Trip Service.
+- Seat holding and blocking belong to Seat Inventory Service.
+- Booking lookup, saved passengers, cancellation, and check-in belong to Booking Service.
+- Analytics dashboard data comes from Kafka-derived aggregates.
