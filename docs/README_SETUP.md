@@ -249,7 +249,6 @@ Update:
 [ ] .env.example has placeholders only
 [ ] Branch/PR workflow is documented
 [ ] Task template exists
-[ ] Backlog/handoff docs exist
 [ ] README states the repo is baseline-only until members add implementation files
 ```
 

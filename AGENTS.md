@@ -43,7 +43,7 @@ For any non-trivial task, read these files first:
 11. Do not rewrite architecture without approval.
 12. Keep changes small and focused.
 13. If behavior is unclear, document assumptions or ask before changing scope.
-14. If you find an issue outside the assigned task, record it in the completion report or `docs/implementation/handoff/issues_backlog.md`; do not fix it silently.
+14. If you find an issue outside the assigned task, record it in the completion report; do not fix it silently.
 
 ## Common Commands
 

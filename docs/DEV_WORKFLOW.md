@@ -56,7 +56,6 @@ Contracts and source-of-truth docs define the required behavior before code exis
 | `docs/CODING_GUIDELINES.md` | Code, branch, commit, PR, security rules |
 | `docs/implementation/02_task_template.md` | Copy/paste task template |
 | `docs/prompts/00-agent-router.md` | Parent prompt for role-based AI Agent workflows |
-| `docs/implementation/handoff/issues_backlog.md` | Out-of-scope issues found during work |
 
 ## 4. Assignment Task Input
 

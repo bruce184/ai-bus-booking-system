@@ -1,6 +1,6 @@
 # Known Risks and Backlog
 
-Use this file to orient future tasks. Use `docs/implementation/handoff/issues_backlog.md` for concrete out-of-scope issues found during implementation.
+Use this file to orient future tasks. Out-of-scope issues found during implementation should be recorded in the completion report.
 
 ## Known Risks
 
