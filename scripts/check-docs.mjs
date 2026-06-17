@@ -22,7 +22,6 @@ const requiredFiles = [
   "docs/agent-context/08-agent-task-playbook.md",
   "docs/agent-context/09-known-risks-and-backlog.md",
   "docs/implementation/02_task_template.md",
-  "docs/implementation/handoff/issues_backlog.md",
   "docs/prompts/00-agent-router.md",
   "graphql/schema.graphql",
   "proto/seat_inventory.proto",
