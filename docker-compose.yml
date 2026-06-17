@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bus-postgres
+    environment:
+      POSTGRES_DB: bus_booking
+      POSTGRES_USER: bus_app
+      POSTGRES_PASSWORD: change_me_local_only
+    ports:
+      - "5432:5432"
+    volumes:
+      - bus_postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+
+  redis:
+    image: redis:7-alpine
+    container_name: bus-redis
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: bus-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: bus-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: bus-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: bus-nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  bus_postgres_data:

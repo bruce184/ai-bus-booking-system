@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package bus.trip.v1;
+
+service TripService {
+  rpc AutocompleteLocations(AutocompleteLocationsRequest) returns (AutocompleteLocationsResponse);
+  rpc SearchTrips(SearchTripsRequest) returns (SearchTripsResponse);
+  rpc GetTripDetail(GetTripDetailRequest) returns (GetTripDetailResponse);
+  rpc ListPopularRoutes(ListPopularRoutesRequest) returns (ListPopularRoutesResponse);
+}
+
+message AutocompleteLocationsRequest {
+  string keyword = 1;
+}
+
+message AutocompleteLocationsResponse {
+  repeated Location locations = 1;
+}
+
+message SearchTripsRequest {
+  string origin = 1;
+  string destination = 2;
+  string departure_date = 3;
+  int32 min_price = 4;
+  int32 max_price = 5;
+  string operator_name = 6;
+  string vehicle_type = 7;
+  int32 min_available_seats = 8;
+  string sort_by = 9;
+}
+
+message SearchTripsResponse {
+  repeated Trip trips = 1;
+}
+
+message GetTripDetailRequest {
+  string trip_id = 1;
+}
+
+message GetTripDetailResponse {
+  Trip trip = 1;
+  repeated Stop pickup_points = 2;
+  repeated Stop dropoff_points = 3;
+  string cancellation_policy = 4;
+}
+
+message ListPopularRoutesRequest {
+  int32 limit = 1;
+}
+
+message ListPopularRoutesResponse {
+  repeated PopularRoute routes = 1;
+}
+
+message Location {
+  string id = 1;
+  string name = 2;
+  string type = 3;
+}
+
+message Stop {
+  string id = 1;
+  string name = 2;
+  string address = 3;
+}
+
+message Route {
+  string id = 1;
+  Location origin = 2;
+  Location destination = 3;
+  int32 distance_km = 4;
+}
+
+message Trip {
+  string id = 1;
+  Route route = 2;
+  string operator_name = 3;
+  string vehicle_type = 4;
+  string departure_time = 5;
+  string arrival_time = 6;
+  int32 price = 7;
+  int32 available_seats = 8;
+}
+
+message PopularRoute {
+  string origin = 1;
+  string destination = 2;
+  int32 search_count = 3;
+}

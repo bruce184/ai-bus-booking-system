@@ -1,0 +1,14 @@
+{
+  "name": "intercity-bus-booking-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Student microservices project for intercity bus booking with AI and MCP Server",
+  "type": "module",
+  "scripts": {
+    "check:docs": "node scripts/check-docs.mjs",
+    "compose:config": "docker compose config",
+    "dev": "echo \"Baseline repo is ready. Implement service package scripts before running all services.\"",
+    "dev:web": "echo \"apps/web Next.js implementation is not scaffolded yet.\"",
+    "dev:gateway": "echo \"services/graphql-gateway implementation is not scaffolded yet.\""
+  }
+}

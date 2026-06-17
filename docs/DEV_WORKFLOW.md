@@ -1,0 +1,223 @@
+# DEV WORKFLOW - Intercity Bus Booking AI
+
+## 1. Purpose
+
+This file is the main workflow guide for team members and AI Agents.
+
+It explains how to:
+
+- Read the right documents
+- Pick up assigned tasks
+- Create branches
+- Implement within MVP scope
+- Verify locally
+- Report completion
+- Avoid AI Agent scope drift
+
+## 2. Project Context
+
+| Item | Value |
+|---|---|
+| Project name | Intercity Bus Booking AI |
+| Product type | Microservices web app |
+| Main users | Guest customer, registered customer, admin, check-in staff |
+| Main goal | Book intercity bus tickets with AI and MCP support |
+| Demo strategy | Local demo required; online deploy optional |
+| Stable branch | `main` |
+
+MVP modules:
+
+```text
+Trip Search and Catalog
+Seat Inventory and Real-time Seat Hold
+Booking, Payment Simulation, Ticket, Notification
+Admin Operations
+Analytics, AI Chatbot, MCP Server
+```
+
+## 3. Required Docs
+
+| File | Purpose |
+|---|---|
+| `AGENTS.md` | Root rules for AI Agents |
+| `docs/agent-context/00-index.md` | Agent reading guide |
+| `docs/README_SETUP.md` | Local setup, env, Docker, troubleshooting |
+| `docs/ARCHITECTURE.md` | Service boundaries and workflows |
+| `docs/API_CONTRACT.md` | GraphQL, gRPC, events, MCP contracts |
+| `docs/DATABASE_SCHEMA.md` | Database schema and seed source of truth |
+| `docs/CODING_GUIDELINES.md` | Code, branch, commit, PR, security rules |
+| `docs/implementation/02_task_template.md` | Copy/paste task template |
+| `docs/prompts/00-agent-router.md` | Parent prompt for role-based AI Agent workflows |
+| `docs/implementation/handoff/issues_backlog.md` | Out-of-scope issues found during work |
+
+## 4. Assignment Task Input
+
+Each task should come from the assignment sheet.
+
+Expected assignment sheet fields:
+
+```text
+Feature group:
+Feature/task:
+Owner:
+Status:
+Output expected:
+Priority:
+Deadline:
+Notes:
+```
+
+Optional fields:
+
+```text
+Allowed files/area:
+Acceptance criteria:
+Verification required:
+Branch:
+Task ID:
+```
+
+If optional fields are missing, infer conservatively. If scope overlaps another member or requires contract/schema changes outside the assigned task, stop and ask before coding.
+
+Status values:
+
+```text
+Not started
+In progress
+Review
+Done
+Blocked
+```
+
+Priority values:
+
+```text
+Must
+Should
+Could
+```
+
+## 5. Standard Development Flow
+
+1. Read the assigned row.
+2. Read the relevant docs.
+3. Pull latest `main`.
+4. Create a branch using `<member>/<scope>`.
+5. Implement only the assigned scope.
+6. Run relevant local verification.
+7. Update docs if API/schema/setup/workflow changed.
+8. Update assignment sheet status/note.
+9. Push branch.
+10. Open Pull Request into `main`.
+
+Commands:
+
+```bash
+git checkout main
+git pull origin main
+git checkout -b <member>/<scope>
+```
+
+After implementation:
+
+```bash
+git status
+git add .
+git commit -m "feat(scope): short description"
+git push -u origin <member>/<scope>
+```
+
+## 6. Scope By Area
+
+| Assignment area | Normal scope |
+|---|---|
+| Frontend | `apps/web/`, GraphQL client docs if needed |
+| GraphQL Gateway | `services/graphql-gateway/`, `graphql/schema.graphql`, API docs |
+| Trip Service | `services/trip-service/`, `proto/trip.proto`, database/API docs |
+| Seat Inventory | `services/seat-inventory-service/`, `proto/seat_inventory.proto`, Redis docs |
+| Booking | `services/booking-service/`, `proto/booking.proto`, booking DB/API docs |
+| Payment | `services/payment-service/`, payment events/API docs |
+| Workers | `workers/`, RabbitMQ event docs |
+| Analytics | `services/analytics-service/`, Kafka event docs |
+| AI Chatbot | `apps/web/` and gateway tool APIs |
+| MCP Server | `services/mcp-server/`, MCP section in API docs |
+| Database | `database/`, `docs/DATABASE_SCHEMA.md` |
+| Infrastructure | `docker-compose.yml`, `infrastructure/`, setup docs |
+
+## 7. Local Verification
+
+Baseline:
+
+```bash
+npm run check:docs
+docker compose config
+```
+
+Minimum verification by task type:
+
+| Task type | Verification |
+|---|---|
+| Docs/setup | `npm run check:docs` |
+| Docker/infra | `docker compose config` |
+| GraphQL | Schema validation once tooling exists |
+| gRPC | Proto lint/generation once tooling exists |
+| Database | Apply schema to local Postgres once migrations exist |
+| Frontend | Build/lint once Next.js is scaffolded |
+| Worker | Unit/manual event test once worker exists |
+
+## 8. Module Ownership Suggestions
+
+Suggested team split:
+
+| Module | Suggested owner scope |
+|---|---|
+| Baseline repo and docs | PM / baseline owner |
+| Web search and checkout UI | Frontend owner |
+| GraphQL Gateway | API owner |
+| Trip/search service | Backend owner |
+| Seat inventory and Redis | Backend owner |
+| Booking/payment/ticket flow | Backend owner |
+| Admin operations | Full-stack owner |
+| Analytics dashboard | Data/backend owner |
+| AI chatbot and MCP Server | AI/backend owner |
+| QA/demo | QA owner |
+
+## 9. Agent Scope Lock
+
+Every AI Agent task must identify:
+
+```text
+Assigned task:
+Owner or member:
+Feature/module:
+Expected output:
+Required docs:
+Verification required:
+```
+
+Agent must not:
+
+- Add unrelated features.
+- Add screens/endpoints/services/tables/packages outside the assigned task.
+- Change contracts silently.
+- Modify unrelated files.
+- Commit secrets.
+- Delete user/team work without confirmation.
+- Fix out-of-scope issues silently.
+
+## 10. Required Completion Report
+
+After finishing a task, report:
+
+```text
+Summary:
+Files changed:
+Implementation notes:
+How to run:
+How to test:
+Docs updated:
+Assignment sheet update:
+Assumptions:
+Blockers:
+Out-of-scope issues found:
+```

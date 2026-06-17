@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package bus.seat.v1;
+
+service SeatInventoryService {
+  rpc GetSeatMap(GetSeatMapRequest) returns (GetSeatMapResponse);
+  rpc HoldSeats(HoldSeatsRequest) returns (HoldSeatsResponse);
+  rpc ReleaseHold(ReleaseHoldRequest) returns (ReleaseHoldResponse);
+  rpc ConfirmSeats(ConfirmSeatsRequest) returns (ConfirmSeatsResponse);
+  rpc BlockSeats(BlockSeatsRequest) returns (BlockSeatsResponse);
+}
+
+enum SeatStatus {
+  SEAT_STATUS_UNSPECIFIED = 0;
+  AVAILABLE = 1;
+  HELD = 2;
+  BOOKED = 3;
+  BLOCKED = 4;
+}
+
+message Seat {
+  string id = 1;
+  string label = 2;
+  int32 deck = 3;
+  int32 row = 4;
+  int32 column = 5;
+  SeatStatus status = 6;
+}
+
+message GetSeatMapRequest {
+  string trip_id = 1;
+}
+
+message GetSeatMapResponse {
+  repeated Seat seats = 1;
+}
+
+message HoldSeatsRequest {
+  string trip_id = 1;
+  repeated string seat_ids = 2;
+  string requester_id = 3;
+}
+
+message HoldSeatsResponse {
+  string hold_token = 1;
+  string trip_id = 2;
+  repeated Seat seats = 3;
+  string expires_at = 4;
+}
+
+message ReleaseHoldRequest {
+  string hold_token = 1;
+}
+
+message ReleaseHoldResponse {
+  bool released = 1;
+}
+
+message ConfirmSeatsRequest {
+  string trip_id = 1;
+  repeated string seat_ids = 2;
+  string hold_token = 3;
+  string booking_id = 4;
+}
+
+message ConfirmSeatsResponse {
+  repeated Seat seats = 1;
+}
+
+message BlockSeatsRequest {
+  string trip_id = 1;
+  repeated string seat_ids = 2;
+  string reason = 3;
+}
+
+message BlockSeatsResponse {
+  repeated Seat seats = 1;
+}

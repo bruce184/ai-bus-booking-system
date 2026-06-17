@@ -1,0 +1,184 @@
+scalar DateTime
+
+enum UserRole {
+  ADMIN
+  STAFF
+  CUSTOMER
+}
+
+enum SeatStatus {
+  AVAILABLE
+  HELD
+  BOOKED
+  BLOCKED
+}
+
+enum BookingStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PAID
+  TICKET_ISSUED
+  CHECKED_IN
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+type Location {
+  id: ID!
+  name: String!
+  type: String!
+}
+
+type Route {
+  id: ID!
+  origin: Location!
+  destination: Location!
+  distanceKm: Int
+}
+
+type Trip {
+  id: ID!
+  route: Route!
+  operatorName: String!
+  vehicleType: String!
+  departureTime: DateTime!
+  arrivalTime: DateTime!
+  price: Int!
+  availableSeats: Int!
+}
+
+type Seat {
+  id: ID!
+  label: String!
+  deck: Int!
+  row: Int!
+  column: Int!
+  status: SeatStatus!
+}
+
+type SeatHold {
+  holdToken: String!
+  tripId: ID!
+  seats: [Seat!]!
+  expiresAt: DateTime!
+}
+
+type Passenger {
+  fullName: String!
+  phone: String
+  email: String
+  documentNumber: String
+  seatId: ID!
+}
+
+type Ticket {
+  id: ID!
+  ticketCode: String!
+  passengerName: String!
+  seatId: ID!
+  qrPayload: String!
+}
+
+type Booking {
+  id: ID!
+  bookingCode: String!
+  status: BookingStatus!
+  trip: Trip!
+  contactEmail: String!
+  contactPhone: String
+  totalAmount: Int!
+  passengers: [Passenger!]!
+  tickets: [Ticket!]!
+}
+
+type RevenueSummary {
+  from: String!
+  to: String!
+  totalRevenue: Int!
+  paidBookings: Int!
+  ticketsSold: Int!
+}
+
+type PopularRoute {
+  origin: String!
+  destination: String!
+  searchCount: Int!
+}
+
+input SearchTripsInput {
+  origin: String!
+  destination: String!
+  departureDate: String!
+  minPrice: Int
+  maxPrice: Int
+  operatorName: String
+  vehicleType: String
+  minAvailableSeats: Int
+  sortBy: String
+}
+
+input HoldSeatsInput {
+  tripId: ID!
+  seatIds: [ID!]!
+}
+
+input ReleaseSeatHoldInput {
+  holdToken: String!
+}
+
+input PassengerInput {
+  fullName: String!
+  phone: String
+  email: String
+  documentNumber: String
+  seatId: ID!
+}
+
+input CreateBookingInput {
+  tripId: ID!
+  holdToken: String!
+  contactEmail: String!
+  contactPhone: String
+  passengers: [PassengerInput!]!
+}
+
+input SimulatePaymentInput {
+  bookingCode: String!
+  success: Boolean!
+}
+
+input CancelBookingInput {
+  bookingCode: String!
+  email: String!
+}
+
+input AdminRevenueSummaryInput {
+  from: String!
+  to: String!
+}
+
+type Query {
+  autocompleteLocations(keyword: String!): [Location!]!
+  searchTrips(input: SearchTripsInput!): [Trip!]!
+  trip(id: ID!): Trip
+  seatMap(tripId: ID!): [Seat!]!
+  bookingStatus(bookingCode: String!, email: String!): Booking
+  myBookings: [Booking!]!
+  adminRevenueSummary(input: AdminRevenueSummaryInput!): RevenueSummary!
+  popularRoutes(limit: Int = 5): [PopularRoute!]!
+}
+
+type Mutation {
+  holdSeats(input: HoldSeatsInput!): SeatHold!
+  releaseSeatHold(input: ReleaseSeatHoldInput!): Boolean!
+  createBooking(input: CreateBookingInput!): Booking!
+  simulatePayment(input: SimulatePaymentInput!): Booking!
+  cancelBooking(input: CancelBookingInput!): Booking!
+  adminCheckIn(code: String!): Booking!
+}
+
+type Subscription {
+  seatStateChanged(tripId: ID!): Seat!
+  bookingUpdated(bookingCode: String!): Booking!
+}
