@@ -137,7 +137,6 @@ Members should add implementation files only inside their assigned module and ke
 | `docs/CODING_GUIDELINES.md` | Branch, commit, PR, code, docs, and security rules |
 | `docs/DEV_WORKFLOW.md` | Team assignment and AI Agent workflow |
 | `docs/implementation/02_task_template.md` | Copy/paste task template for members and Agents |
-| `docs/implementation/handoff/issues_backlog.md` | Backlog for issues outside assigned scope |
 
 ## AI Agent Workflow
 
@@ -157,7 +156,7 @@ Agent rules:
 - Do not change GraphQL, gRPC, database, event, or MCP contracts silently.
 - Update the matching source-of-truth document in the same task when a contract changes.
 - Do not add unrelated services, screens, packages, or architecture changes.
-- Record out-of-scope findings in the completion report or backlog.
+- Record out-of-scope findings in the completion report.
 - Never commit `.env`, service credentials, tokens, passwords, or real customer data.
 
 ## Development Workflow
