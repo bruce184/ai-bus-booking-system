@@ -21,3 +21,18 @@ Expected responsibilities:
 - Chatbot panel
 
 Web must call GraphQL Gateway, not internal gRPC services directly.
+
+## Seat Map Component
+
+Task `Q-10` adds a reusable React seat map component:
+
+```text
+src/components/SeatMap.tsx
+```
+
+It supports:
+
+- Four seat states: `AVAILABLE`, `HELD`, `BOOKED`, `BLOCKED`
+- Multi-seat selection for available seats
+- GraphQL `holdSeats` mutation through `src/graphql/seatOperations.ts`
+- Loading, disabled, and error states for the hold action
