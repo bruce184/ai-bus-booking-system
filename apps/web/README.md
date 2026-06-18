@@ -36,3 +36,5 @@ It supports:
 - Multi-seat selection for available seats
 - GraphQL `holdSeats` mutation through `src/graphql/seatOperations.ts`
 - Loading, disabled, and error states for the hold action
+- Countdown display from `hold.expiresAt`
+- Automatic `releaseSeatHold` mutation when the hold expires

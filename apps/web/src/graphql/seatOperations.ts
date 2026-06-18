@@ -39,6 +39,12 @@ const holdSeatsMutation = `
   }
 `;
 
+const releaseSeatHoldMutation = `
+  mutation ReleaseSeatHold($input: ReleaseSeatHoldInput!) {
+    releaseSeatHold(input: $input)
+  }
+`;
+
 export async function holdSeats(
   graphqlUrl: string,
   tripId: string,
@@ -71,4 +77,34 @@ export async function holdSeats(
   }
 
   return payload.data.holdSeats;
+}
+
+export async function releaseSeatHold(
+  graphqlUrl: string,
+  holdToken: string
+): Promise<boolean> {
+  const response = await fetch(graphqlUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      query: releaseSeatHoldMutation,
+      variables: {
+        input: {
+          holdToken
+        }
+      }
+    })
+  });
+
+  const payload = (await response.json()) as GraphQLResponse<{
+    releaseSeatHold: boolean;
+  }>;
+
+  if (!response.ok || payload.errors?.length) {
+    throw new Error(payload.errors?.[0]?.message ?? "Failed to release seat hold");
+  }
+
+  return payload.data?.releaseSeatHold ?? false;
 }

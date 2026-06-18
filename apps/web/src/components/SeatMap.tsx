@@ -1,5 +1,11 @@
-import { useMemo, useState } from "react";
-import { holdSeats, type Seat, type SeatHold, type SeatStatus } from "../graphql/seatOperations.js";
+import { useEffect, useMemo, useState } from "react";
+import {
+  holdSeats,
+  releaseSeatHold,
+  type Seat,
+  type SeatHold,
+  type SeatStatus
+} from "../graphql/seatOperations.js";
 
 type SeatMapProps = {
   graphqlUrl: string;
@@ -41,10 +47,66 @@ function sortSeatLayout(seats: Seat[]): Seat[] {
 
 export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }: SeatMapProps) {
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
+  const [activeHold, setActiveHold] = useState<SeatHold | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [isHolding, setIsHolding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const seatsByDeck = useMemo(() => groupSeatsByDeck(seats), [seats]);
+
+  useEffect(() => {
+    if (!activeHold) {
+      setRemainingSeconds(null);
+      return undefined;
+    }
+
+    const currentHold = activeHold;
+    let releaseStarted = false;
+    let cancelled = false;
+
+    async function tick(): Promise<void> {
+      const secondsLeft = Math.max(
+        0,
+        Math.ceil((new Date(currentHold.expiresAt).getTime() - Date.now()) / 1000)
+      );
+
+      if (cancelled) {
+        return;
+      }
+
+      setRemainingSeconds(secondsLeft);
+
+      if (secondsLeft > 0 || releaseStarted) {
+        return;
+      }
+
+      releaseStarted = true;
+
+      try {
+        await releaseSeatHold(graphqlUrl, currentHold.holdToken);
+      } catch (caughtError) {
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Không thể tự giải phóng ghế đã giữ."
+        );
+      } finally {
+        if (!cancelled) {
+          setActiveHold(null);
+        }
+      }
+    }
+
+    void tick();
+    const timer = window.setInterval(() => {
+      void tick();
+    }, 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [activeHold, graphqlUrl]);
 
   function toggleSeat(seat: Seat): void {
     if (!isSelectable(seat) || isHolding) {
@@ -70,6 +132,7 @@ export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }: SeatMapPro
 
     try {
       const hold = await holdSeats(graphqlUrl, tripId, selectedSeatIds);
+      setActiveHold(hold);
       setSelectedSeatIds([]);
       onHoldCreated?.(hold);
     } catch (caughtError) {
@@ -99,6 +162,12 @@ export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }: SeatMapPro
           {isHolding ? "Đang giữ..." : `Giữ ${selectedSeatIds.length} ghế`}
         </button>
       </div>
+
+      {activeHold && remainingSeconds !== null ? (
+        <div className="seat-hold-countdown" role="status">
+          Giữ ghế còn {remainingSeconds}s
+        </div>
+      ) : null}
 
       {Array.from(seatsByDeck.entries()).map(([deck, deckSeats]) => (
         <div className="seat-deck" key={deck}>
