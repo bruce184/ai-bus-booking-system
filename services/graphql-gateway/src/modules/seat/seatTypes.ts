@@ -31,6 +31,10 @@ export type ReleaseSeatHoldArgs = {
   };
 };
 
+export type SeatStateChangedArgs = {
+  tripId: string;
+};
+
 export type GatewayContext = {
   user?: {
     id?: string;

@@ -1,4 +1,5 @@
 import { callSeatInventory } from "../../grpc/seatInventoryClient.js";
+import { publishSeatStateChanged, subscribeSeatStateChanged } from "./seatStatePubSub.js";
 import type {
   GatewayContext,
   GetSeatMapResponse,
@@ -7,6 +8,7 @@ import type {
   ReleaseHoldResponse,
   ReleaseSeatHoldArgs,
   Seat,
+  SeatStateChangedArgs,
   SeatHold,
   SeatMapArgs
 } from "./seatTypes.js";
@@ -36,7 +38,7 @@ export const seatResolvers = {
       args: HoldSeatsArgs,
       context: GatewayContext
     ): Promise<SeatHold> {
-      return callSeatInventory<
+      const hold = await callSeatInventory<
         { tripId: string; seatIds: string[]; requesterId: string },
         HoldSeatsResponse
       >("holdSeats", {
@@ -44,6 +46,10 @@ export const seatResolvers = {
         seatIds: args.input.seatIds,
         requesterId: requesterIdFromContext(context)
       });
+
+      publishSeatStateChanged(hold.tripId, hold.seats);
+
+      return hold;
     },
 
     async releaseSeatHold(
@@ -56,6 +62,14 @@ export const seatResolvers = {
       );
 
       return response.released;
+    }
+  },
+
+  Subscription: {
+    seatStateChanged: {
+      subscribe(_parent: unknown, args: SeatStateChangedArgs) {
+        return subscribeSeatStateChanged(args.tripId);
+      }
     }
   }
 };

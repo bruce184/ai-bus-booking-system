@@ -32,9 +32,15 @@ Implemented GraphQL contract operations:
 - `Query.seatMap(tripId)`
 - `Mutation.holdSeats(input)`
 - `Mutation.releaseSeatHold(input)`
+- `Subscription.seatStateChanged(tripId)`
 
 The resolver module calls `SeatInventoryService` over gRPC using
 `proto/seat_inventory.proto`.
+
+Task `Q-8` adds an in-memory PubSub adapter for `seatStateChanged(tripId)`.
+`holdSeats` publishes seat state changes returned by Seat Inventory Service.
+The future GraphQL WebSocket server can attach the exported subscription
+resolver directly.
 
 Configuration:
 
