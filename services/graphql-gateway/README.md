@@ -17,3 +17,27 @@ docs/API_CONTRACT.md
 ```
 
 Internal service calls should use gRPC.
+
+## Seat Inventory Resolvers
+
+Task `Q-7` adds a minimal seat resolver module that can be imported by the
+future GraphQL server scaffold:
+
+```text
+src/modules/seat/seatResolvers.ts
+```
+
+Implemented GraphQL contract operations:
+
+- `Query.seatMap(tripId)`
+- `Mutation.holdSeats(input)`
+- `Mutation.releaseSeatHold(input)`
+
+The resolver module calls `SeatInventoryService` over gRPC using
+`proto/seat_inventory.proto`.
+
+Configuration:
+
+```text
+SEAT_INVENTORY_GRPC_URL=localhost:50053
+```
