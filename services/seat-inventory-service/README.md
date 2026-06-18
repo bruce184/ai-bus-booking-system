@@ -38,6 +38,12 @@ Run in development mode:
 npm run dev
 ```
 
+Run the booking expiration consumer:
+
+```bash
+npm run consume:booking-expired
+```
+
 Type-check:
 
 ```bash
@@ -61,6 +67,7 @@ Required local dependencies for `GetSeatMap`:
 ```text
 DATABASE_URL=postgresql://bus_app:change_me_local_only@localhost:5432/bus_booking
 REDIS_URL=redis://localhost:6379
+RABBITMQ_URL=amqp://guest:guest@localhost:5672
 SEAT_HOLD_TTL_SECONDS=300
 ```
 
@@ -87,3 +94,7 @@ holds for the blocked seats.
 `test:race` seeds one demo trip seat and sends two concurrent `HoldSeats`
 requests for the same seat. The expected result is exactly one successful hold
 and one `SEAT_NOT_AVAILABLE` rejection.
+
+`consume:booking-expired` listens for `booking.expired` messages on the
+`bus.workflow` topic exchange using routing key `booking.expired`. It releases
+holds using either `holdToken` or `tripId + seatIds` from the event payload.

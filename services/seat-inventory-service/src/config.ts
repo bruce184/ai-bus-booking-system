@@ -26,5 +26,10 @@ export const config = {
   databaseUrl:
     process.env.DATABASE_URL ??
     "postgresql://bus_app:change_me_local_only@localhost:5432/bus_booking",
-  redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379"
+  redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379",
+  rabbitmqUrl: process.env.RABBITMQ_URL ?? "amqp://guest:guest@localhost:5672",
+  workflowExchange: process.env.RABBITMQ_WORKFLOW_EXCHANGE ?? "bus.workflow",
+  bookingExpiredQueue:
+    process.env.RABBITMQ_BOOKING_EXPIRED_QUEUE ?? "seat-inventory.booking-expired",
+  bookingExpiredRoutingKey: "booking.expired"
 };
