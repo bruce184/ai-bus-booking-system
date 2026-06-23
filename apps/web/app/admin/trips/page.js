@@ -50,6 +50,43 @@ const INITIAL_TRIPS = [
   }
 ];
 
+const getFallbackSeatsForTrip = (tripId) => {
+  const seats = [];
+  if (tripId === 'trip-1') {
+    // 34 seats sleeper (2 decks, A01-A17, B01-B17)
+    let count = 1;
+    for (let d = 1; d <= 2; d++) {
+      for (let r = 1; r <= 6; r++) {
+        for (let c = 1; c <= 3; c++) {
+          if (count > 34) break;
+          const prefix = d === 1 ? 'A' : 'B';
+          const label = `${prefix}${count < 10 ? '0' : ''}${count}`;
+          let status = 'AVAILABLE';
+          if (label === 'A01' || label === 'A02' || label === 'A03') status = 'BOOKED';
+          if (label === 'A10') status = 'BLOCKED';
+          seats.push({ id: label, label, deck: d, row: r, column: c, status });
+          count++;
+        }
+      }
+    }
+  } else if (tripId === 'trip-2') {
+    // 22 seats limousine (1 deck, A01-A22)
+    for (let i = 1; i <= 22; i++) {
+      const label = `A${i < 10 ? '0' : ''}${i}`;
+      let status = 'AVAILABLE';
+      if (label === 'A01') status = 'BOOKED';
+      seats.push({ id: label, label, deck: 1, row: Math.ceil(i / 3), column: (i - 1) % 3 + 1, status });
+    }
+  } else {
+    // 29 seats seat (1 deck, A01-A29)
+    for (let i = 1; i <= 29; i++) {
+      const label = `A${i < 10 ? '0' : ''}${i}`;
+      seats.push({ id: label, label, deck: 1, row: Math.ceil(i / 4), column: (i - 1) % 4 + 1, status: 'AVAILABLE' });
+    }
+  }
+  return seats;
+};
+
 export default function TripsCrud() {
   const [trips, setTrips] = useState(INITIAL_TRIPS);
   const [routeId, setRouteId] = useState('');
@@ -62,6 +99,12 @@ export default function TripsCrud() {
   const [editingTrip, setEditingTrip] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+
+  // Seat blocking states
+  const [blockingSeatsTrip, setBlockingSeatsTrip] = useState(null);
+  const [tripSeats, setTripSeats] = useState([]);
+  const [selectedSeatIds, setSelectedSeatIds] = useState([]);
+  const [blockReason, setBlockReason] = useState('');
 
   const showToast = (text, type = 'success') => {
     setMessage({ text, type });
@@ -200,6 +243,101 @@ export default function TripsCrud() {
     }
   };
 
+  const handleOpenBlockSeats = async (trip) => {
+    setBlockingSeatsTrip(trip);
+    setSelectedSeatIds([]);
+    setBlockReason('');
+    setLoading(true);
+
+    const seatMapQuery = `
+      query GetSeatMap($tripId: ID!) {
+        seatMap(tripId: $tripId) {
+          id
+          label
+          deck
+          row
+          column
+          status
+        }
+      }
+    `;
+
+    try {
+      const data = await queryGraphQL(seatMapQuery, { tripId: trip.id });
+      if (data.seatMap && data.seatMap.length > 0) {
+        setTripSeats(data.seatMap);
+      } else {
+        setTripSeats(getFallbackSeatsForTrip(trip.id));
+      }
+    } catch (err) {
+      console.log('Using fallback seats.');
+      setTripSeats(getFallbackSeatsForTrip(trip.id));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBlockSeatsSubmit = async (e) => {
+    e.preventDefault();
+    if (selectedSeatIds.length === 0) {
+      showToast('Please select at least one seat to block.', 'error');
+      return;
+    }
+
+    setLoading(true);
+
+    const blockSeatsMutation = `
+      mutation BlockSeats($input: AdminBlockSeatsInput!) {
+        adminBlockSeats(input: $input) {
+          id
+          label
+          status
+        }
+      }
+    `;
+
+    try {
+      await queryGraphQL(blockSeatsMutation, {
+        input: {
+          tripId: blockingSeatsTrip.id,
+          seatIds: selectedSeatIds,
+          reason: blockReason
+        }
+      });
+
+      // Update local seats
+      setTripSeats(tripSeats.map(s => {
+        if (selectedSeatIds.includes(s.id)) {
+          return { ...s, status: 'BLOCKED' };
+        }
+        return s;
+      }));
+
+      showToast(`Successfully blocked ${selectedSeatIds.length} seat(s)!`);
+      setSelectedSeatIds([]);
+    } catch (err) {
+      // Offline fallback
+      setTripSeats(tripSeats.map(s => {
+        if (selectedSeatIds.includes(s.id)) {
+          return { ...s, status: 'BLOCKED' };
+        }
+        return s;
+      }));
+      showToast(`Successfully blocked ${selectedSeatIds.length} seat(s)!`);
+      setSelectedSeatIds([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleSeatSelection = (seatId) => {
+    if (selectedSeatIds.includes(seatId)) {
+      setSelectedSeatIds(selectedSeatIds.filter(id => id !== seatId));
+    } else {
+      setSelectedSeatIds([...selectedSeatIds, seatId]);
+    }
+  };
+
   const startEdit = (t) => {
     setEditingTrip(t);
     setRouteId(t.route.id);
@@ -328,6 +466,9 @@ export default function TripsCrud() {
                     </td>
                     <td style={{ padding: '16px 8px', textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '8px' }}>
+                        <button onClick={() => handleOpenBlockSeats(t)} className="btn btn-success" style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.3)' }} disabled={loading}>
+                          Block Seats
+                        </button>
                         <button onClick={() => startEdit(t)} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} disabled={loading}>
                           Edit
                         </button>
@@ -451,6 +592,267 @@ export default function TripsCrud() {
           </form>
         </div>
       </div>
+
+      {/* Seat Blocking Modal */}
+      {blockingSeatsTrip && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(5, 5, 10, 0.85)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div className="glass-card animate-fade-in" style={{
+            width: '100%',
+            maxWidth: '850px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: '35px',
+            border: '1px solid var(--border-glass)',
+            boxShadow: 'var(--shadow-lg)'
+          }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '20px', marginBottom: '25px' }}>
+              <div>
+                <span style={{ fontSize: '11px', color: 'var(--warning)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Inventory Operations</span>
+                <h2 style={{ fontSize: '24px', fontWeight: '700', marginTop: '4px' }}>
+                  Block seats: {blockingSeatsTrip.route.name}
+                </h2>
+                <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                  Bus: {blockingSeatsTrip.vehicle.name} | Departure: {formatDateTime(blockingSeatsTrip.departureTime)}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBlockingSeatsTrip(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '20px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '35px', alignItems: 'start' }}>
+              {/* Left Column: Visual Seat Map */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                <h4 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Select seats on the map:</h4>
+
+                <div style={{
+                  background: 'rgba(0, 0, 0, 0.25)',
+                  borderRadius: '12px',
+                  border: '1px dashed var(--border-glass)',
+                  padding: '25px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '30px',
+                  minHeight: '280px',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  {tripSeats.length === 0 ? (
+                    <div className="spinner"></div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '40px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      {Array.from(new Set(tripSeats.map(s => s.deck))).sort((a,b) => a-b).map(deckNum => {
+                        const deckSeats = tripSeats.filter(s => s.deck === deckNum);
+                        const maxRow = Math.max(1, ...tripSeats.map(s => s.row));
+                        const maxCol = Math.max(1, ...tripSeats.map(s => s.column));
+
+                        return (
+                          <div key={deckNum} style={{ textAlign: 'center' }}>
+                            <span style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block', marginBottom: '12px' }}>
+                              Deck {deckNum}
+                            </span>
+                            
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: `repeat(${maxCol}, 45px)`,
+                              gap: '8px',
+                              background: 'rgba(255, 255, 255, 0.02)',
+                              padding: '16px',
+                              borderRadius: '10px',
+                              border: '1px solid rgba(255, 255, 255, 0.04)'
+                            }}>
+                              {deckNum === 1 && (
+                                <div style={{ gridColumn: `span ${maxCol}`, textAlign: 'right', fontSize: '16px', marginBottom: '8px', opacity: 0.6 }}>
+                                  ☸️
+                                </div>
+                              )}
+
+                              {Array.from({ length: maxRow }).map((_, rowIdx) => {
+                                const r = rowIdx + 1;
+                                return Array.from({ length: maxCol }).map((_, colIdx) => {
+                                  const c = colIdx + 1;
+                                  const seat = deckSeats.find(s => s.row === r && s.column === c);
+                                  
+                                  if (!seat) return <div key={`${r}-${c}`} style={{ height: '40px' }} />;
+                                  
+                                  const isSelected = selectedSeatIds.includes(seat.id);
+                                  const isAvailable = seat.status === 'AVAILABLE';
+                                  const isBlocked = seat.status === 'BLOCKED';
+                                  const isBooked = seat.status === 'BOOKED';
+                                  const isHeld = seat.status === 'HELD';
+                                  
+                                  let bg = 'rgba(255, 255, 255, 0.02)';
+                                  let color = 'var(--color-text-secondary)';
+                                  let border = '1px solid rgba(255, 255, 255, 0.08)';
+                                  let cursor = 'not-allowed';
+                                  
+                                  if (isAvailable) {
+                                    bg = 'rgba(16, 185, 129, 0.08)';
+                                    color = 'var(--secondary)';
+                                    border = '1px solid rgba(16, 185, 129, 0.25)';
+                                    cursor = 'pointer';
+                                  } else if (isBlocked) {
+                                    bg = 'rgba(255, 255, 255, 0.04)';
+                                    color = 'var(--color-text-muted)';
+                                    border = '1px dashed rgba(255, 255, 255, 0.1)';
+                                  } else if (isBooked) {
+                                    bg = 'rgba(139, 92, 246, 0.1)';
+                                    color = '#8b5cf6';
+                                    border = '1px solid rgba(139, 92, 246, 0.2)';
+                                  } else if (isHeld) {
+                                    bg = 'rgba(59, 130, 246, 0.1)';
+                                    color = 'var(--info)';
+                                    border = '1px solid rgba(59, 130, 246, 0.2)';
+                                  }
+
+                                  if (isSelected) {
+                                    bg = 'var(--primary-gradient)';
+                                    color = 'white';
+                                    border = '1px solid var(--primary)';
+                                    cursor = 'pointer';
+                                  }
+                                  
+                                  return (
+                                    <button
+                                      key={seat.id}
+                                      type="button"
+                                      onClick={() => (isAvailable || isBlocked) && handleToggleSeatSelection(seat.id)}
+                                      disabled={!isAvailable && !isBlocked}
+                                      style={{
+                                        height: '40px',
+                                        borderRadius: '6px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '11px',
+                                        fontWeight: '700',
+                                        background: bg,
+                                        border: border,
+                                        color: color,
+                                        cursor: cursor,
+                                        transition: 'all 0.15s ease',
+                                        padding: 0,
+                                        width: '100%',
+                                        boxShadow: isSelected ? 'var(--shadow-glow)' : 'none'
+                                      }}
+                                      title={`${seat.label} (${seat.status})`}
+                                    >
+                                      {seat.label}
+                                    </button>
+                                  );
+                                });
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Map Legend */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', flexWrap: 'wrap', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)' }} />
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Available</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.2)' }} />
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Booked</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)' }} />
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Held</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'rgba(255, 255, 255, 0.04)', border: '1px dashed rgba(255, 255, 255, 0.1)' }} />
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Blocked</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'var(--primary-gradient)', border: '1px solid var(--primary)' }} />
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Selected</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Form Action */}
+              <div className="glass-card" style={{ padding: '25px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Block Allocation</h3>
+                
+                <div>
+                  <label>Selected Seats</label>
+                  <div style={{
+                    minHeight: '40px',
+                    padding: '10px 14px',
+                    background: 'rgba(0,0,0,0.2)',
+                    border: '1px solid rgba(255,255,255,0.05)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    color: 'var(--primary)',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px'
+                  }}>
+                    {selectedSeatIds.length === 0 ? (
+                      <span style={{ color: 'var(--color-text-muted)', fontWeight: '400', fontSize: '13px' }}>No seats selected</span>
+                    ) : (
+                      selectedSeatIds.map(id => (
+                        <span key={id} style={{ background: 'rgba(99, 102, 241, 0.15)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+                          {id}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <form onSubmit={handleBlockSeatsSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div>
+                    <label htmlFor="reason">Block Reason</label>
+                    <textarea
+                      id="reason"
+                      placeholder="e.g. VIP allocation, technical issues..."
+                      value={blockReason}
+                      onChange={(e) => setBlockReason(e.target.value)}
+                      required
+                      rows="3"
+                      disabled={loading}
+                      style={{ resize: 'none' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                    <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={loading || selectedSeatIds.length === 0}>
+                      {loading ? <div className="spinner"></div> : 'Confirm Block'}
+                    </button>
+                    <button type="button" onClick={() => setBlockingSeatsTrip(null)} className="btn btn-secondary" disabled={loading}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

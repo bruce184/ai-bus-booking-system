@@ -66,7 +66,9 @@ export default function AdminLayout({ children }) {
     { name: 'Trips', href: '/admin/trips', icon: '🗓️' },
     { name: 'Routes', href: '/admin/routes', icon: '🛣️' },
     { name: 'Stops', href: '/admin/stops', icon: '📍' },
-    { name: 'Vehicles', href: '/admin/vehicles', icon: '🚌' }
+    { name: 'Vehicles', href: '/admin/vehicles', icon: '🚌' },
+    { name: 'Bookings', href: '/admin/bookings', icon: '🎟️' },
+    { name: 'Event Logs', href: '/admin/event-logs', icon: '📜' }
   ];
 
   return (

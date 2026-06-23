@@ -72,6 +72,14 @@ export const resolvers = {
         request
       );
       return response.logs || [];
+    },
+    seatMap: async (_parent, args, context) => {
+      const response = await callGrpc(
+        context.grpc.seatInventory,
+        "getSeatMap",
+        { tripId: args.tripId }
+      );
+      return response.seats || [];
     }
   },
   Mutation: {
