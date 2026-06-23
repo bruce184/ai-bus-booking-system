@@ -9,6 +9,8 @@
     "compose:config": "docker compose config",
     "dev": "echo \"Baseline repo is ready. Implement service package scripts before running all services.\"",
     "dev:web": "echo \"apps/web Next.js implementation is not scaffolded yet.\"",
-    "dev:gateway": "echo \"services/graphql-gateway implementation is not scaffolded yet.\""
+    "dev:gateway": "npm --prefix services/graphql-gateway run dev",
+    "build:gateway": "npm --prefix services/graphql-gateway run build",
+    "typecheck:gateway": "npm --prefix services/graphql-gateway run typecheck"
   }
 }

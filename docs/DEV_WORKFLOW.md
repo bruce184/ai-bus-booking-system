@@ -38,9 +38,9 @@ Analytics, AI Chatbot, MCP Server
 Current baseline status:
 
 ```text
-Implementation is intentionally not scaffolded yet.
+Only the B-1 GraphQL Gateway scaffold exists.
 Members should add files/folders only inside their assigned module after task assignment.
-Contracts and source-of-truth docs define the required behavior before code exists.
+Contracts and source-of-truth docs define the required behavior before feature code exists.
 ```
 
 ## 3. Required Docs

@@ -18,8 +18,8 @@ Intercity Bus Booking AI lets customers search trips, select seats, hold seats, 
 Current repository status:
 
 ```text
-Baseline setup only. Docs, contracts, schema, proto files, and infrastructure are prepared.
-Application/service implementation files will be added later by assigned members.
+Baseline setup plus the B-1 GraphQL Gateway scaffold. Docs, contracts, schema, proto files, and infrastructure are prepared.
+Most application/service implementation files will be added later by assigned members.
 ```
 
 Local demo is required. Online deployment is optional.
@@ -159,13 +159,19 @@ On Windows PowerShell, if `npm run check:docs` is blocked by execution policy, u
 npm.cmd run check:docs
 ```
 
-## 9. Future Local Run Targets
+## 9. Local Run Targets
 
-When implementations exist, keep these commands updated:
+Current implemented run target:
+
+```bash
+npm install --prefix services/graphql-gateway
+npm run dev:gateway
+```
+
+Future local run targets:
 
 ```bash
 npm run dev:web
-npm run dev:gateway
 npm run dev
 ```
 

@@ -29,6 +29,9 @@ Thumbs.db
 tmp/
 .tmp/
 .sample-*/
+assignment_sheet.xlsx
+AI Bus Booking System - Bảng Phân Công.xlsx
+docs/TEAM_ASSIGNMENTS.md
 
 # Docker volumes / runtime artifacts
 data/

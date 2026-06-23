@@ -2,7 +2,7 @@
 
 Intercity Bus Booking AI is a student microservices project for searching intercity bus trips, selecting seats, holding seats with Redis TTL, simulating checkout, issuing e-tickets, supporting admin operations, providing analytics, and exposing AI/MCP tools.
 
-The repository is set up with a local-demo-first strategy. The current state is a contract and documentation baseline: folders, README files, source-of-truth docs, GraphQL schema, gRPC proto files, database schema, and Docker infrastructure are prepared so members can later add implementation files inside their assigned areas.
+The repository is set up with a local-demo-first strategy. The current state is a contract and documentation baseline plus an initial GraphQL Gateway scaffold: folders, README files, source-of-truth docs, GraphQL schema, gRPC proto files, database schema, Docker infrastructure, and the gateway runtime baseline are prepared so members can add implementation files inside their assigned areas.
 
 ## Required Stack
 
@@ -90,6 +90,13 @@ View the planned local infrastructure:
 docker compose config
 ```
 
+Run the B-1 GraphQL Gateway scaffold:
+
+```bash
+npm install --prefix services/graphql-gateway
+npm run dev:gateway
+```
+
 When service implementations are added, the expected local URLs are:
 
 ```text
@@ -111,11 +118,12 @@ Implemented now:
 - Bootstrap seed placeholders in `database/seed.sql`
 - Docker Compose infrastructure for PostgreSQL, Redis, RabbitMQ, Kafka, Zookeeper, and Nginx
 - Assignment and AI-agent workflow docs
+- GraphQL Gateway B-1 runtime scaffold, schema loader, and gRPC client stubs
 
 Not implemented yet:
 
 - Next.js app code
-- GraphQL Gateway runtime
+- GraphQL Gateway business resolvers and demo auth
 - Node.js service runtimes
 - Workers
 - AI SDK chatbot runtime
