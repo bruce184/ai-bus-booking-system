@@ -13,6 +13,7 @@ service BookingService {
   rpc SavePassengerProfile(SavePassengerProfileRequest) returns (SavedPassengerResponse);
   rpc DeletePassengerProfile(DeletePassengerProfileRequest) returns (DeletePassengerProfileResponse);
   rpc ListPassengerProfiles(ListPassengerProfilesRequest) returns (ListPassengerProfilesResponse);
+  rpc ListEventLogs(ListEventLogsRequest) returns (ListEventLogsResponse);
 }
 
 enum BookingStatus {
@@ -148,4 +149,24 @@ message ListPassengerProfilesRequest {
 
 message ListPassengerProfilesResponse {
   repeated SavedPassenger passengers = 1;
+}
+
+message ListEventLogsRequest {
+  string event_type = 1;
+  string entity_type = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message EventLogResponse {
+  string id = 1;
+  string event_type = 2;
+  string entity_type = 3;
+  string entity_id = 4;
+  string payload = 5;
+  string created_at = 6;
+}
+
+message ListEventLogsResponse {
+  repeated EventLogResponse logs = 1;
 }

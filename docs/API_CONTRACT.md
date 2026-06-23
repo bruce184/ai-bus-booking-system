@@ -260,6 +260,7 @@ Owns booking state machine, passenger-per-seat data, booking lookup privacy, can
 | `CancelBooking` | Cancel eligible booking |
 | `CheckInPassenger` | Admin/staff check-in |
 | `SavePassengerProfile` / `DeletePassengerProfile` / `ListPassengerProfiles` | Registered customer saved passenger profiles |
+| `ListEventLogs` | Query operational event logs for admin |
 
 ## 9. Events
 

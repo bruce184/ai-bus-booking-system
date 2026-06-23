@@ -5,6 +5,7 @@ import { signDemoJwt } from "../auth/jwt.js";
 import { findDemoUserByCredentials } from "../auth/users.js";
 import { adminMutationResolvers } from "./adminResolvers.js";
 import { callGrpc } from "../grpc/call.js";
+import { requireAdmin } from "../auth/authorization.js";
 
 function parseDateTime(value) {
   if (typeof value !== "string" && typeof value !== "number" && !(value instanceof Date)) {
@@ -35,7 +36,43 @@ export const resolvers = {
     }
   }),
   Query: {
-    me: (_parent, _args, context) => context.user
+    me: (_parent, _args, context) => context.user,
+    adminBookings: async (_parent, args, context) => {
+      requireAdmin(context);
+      const request = {
+        tripId: args.input.tripId ?? "",
+        status: args.input.status ?? "BOOKING_STATUS_UNSPECIFIED",
+        email: args.input.email ?? "",
+        bookingCode: args.input.bookingCode ?? "",
+        limit: args.input.limit ?? 20,
+        offset: args.input.offset ?? 0
+      };
+      const response = await callGrpc(
+        context.grpc.booking,
+        "listAdminBookings",
+        request
+      );
+      return {
+        items: response.bookings || [],
+        total: response.total || 0
+      };
+    },
+    adminEventLogs: async (_parent, args, context) => {
+      requireAdmin(context);
+      const input = args.input || {};
+      const request = {
+        eventType: input.eventType ?? "",
+        entityType: input.entityType ?? "",
+        limit: input.limit ?? 20,
+        offset: input.offset ?? 0
+      };
+      const response = await callGrpc(
+        context.grpc.booking,
+        "listEventLogs",
+        request
+      );
+      return response.logs || [];
+    }
   },
   Mutation: {
     ...adminMutationResolvers,
