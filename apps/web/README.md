@@ -21,3 +21,9 @@ Expected responsibilities:
 - Chatbot panel
 
 Web must call GraphQL Gateway, not internal gRPC services directly.
+
+Run admin E2E tests from the repository root with:
+
+```bash
+npm run test:web:e2e
+```

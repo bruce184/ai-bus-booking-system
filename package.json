@@ -11,6 +11,11 @@
     "dev:web": "npm --prefix apps/web run dev",
     "dev:gateway": "npm --prefix services/graphql-gateway run dev",
     "build:gateway": "npm --prefix services/graphql-gateway run build",
-    "typecheck:gateway": "npm --prefix services/graphql-gateway run typecheck"
+    "typecheck:gateway": "npm --prefix services/graphql-gateway run typecheck",
+    "test:gateway": "npm --prefix services/graphql-gateway test",
+    "test:gateway:integration": "npm --prefix services/graphql-gateway run test:integration",
+    "test:gateway:api": "npm --prefix services/graphql-gateway run test:api",
+    "test:gateway:perf": "npm --prefix services/graphql-gateway run test:perf",
+    "test:web:e2e": "npm --prefix apps/web run test:e2e"
   }
 }

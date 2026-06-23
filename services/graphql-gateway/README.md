@@ -7,7 +7,8 @@ Current status:
 ```text
 B-1 scaffold exists. The gateway can start, load the shared GraphQL schema, and prepare gRPC clients from the proto contracts.
 B-2 demo auth exists. The gateway supports login, me, JWT signing/verification, and reusable role helpers.
-Business/admin resolvers are intentionally still pending for the later B-4 and B-5 tasks.
+Admin baseline resolvers exist for local demo authentication, operations wiring, analytics smoke data, API tests, integration tests, and performance benchmarks.
+Remaining business resolvers still depend on the assigned backend services.
 ```
 
 ## Local Commands
@@ -36,9 +37,12 @@ Run API and performance tests from this package:
 
 ```bash
 npm run test
+npm run test:integration
 npm run test:api
 npm run test:perf
 ```
+
+`test:integration` starts a real GraphQL Gateway process on port `4100` and checks HTTP GraphQL auth, admin authorization, analytics, and unavailable gRPC dependency error mapping.
 
 `test:perf` requires Apache JMeter on `PATH` and writes ignored local output under `tests/performance/`.
 

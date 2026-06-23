@@ -167,10 +167,13 @@ Minimum verification by task type:
 |---|---|
 | Docs/setup | `npm run check:docs` |
 | Docker/infra | `docker compose config` |
-| GraphQL | Schema validation once tooling exists |
+| GraphQL Gateway unit/auth | `npm run test:gateway` |
+| GraphQL Gateway integration | `npm run test:gateway:integration` |
+| GraphQL API smoke | `npm run test:gateway:api` with gateway running |
+| GraphQL performance | `npm run test:gateway:perf` when Apache JMeter is installed |
 | gRPC | Proto lint/generation once tooling exists |
 | Database | Apply schema to local Postgres once migrations exist |
-| Frontend | Build/lint once Next.js is scaffolded |
+| Frontend | `npm run test:web:e2e` for admin E2E when browser dependencies are installed |
 | Worker | Unit/manual event test once worker exists |
 
 ## 8. Module Ownership Suggestions

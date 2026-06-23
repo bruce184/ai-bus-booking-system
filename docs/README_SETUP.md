@@ -18,8 +18,8 @@ Intercity Bus Booking AI lets customers search trips, select seats, hold seats, 
 Current repository status:
 
 ```text
-Baseline setup plus the B-1 GraphQL Gateway scaffold. Docs, contracts, schema, proto files, and infrastructure are prepared.
-Most application/service implementation files will be added later by assigned members.
+Baseline setup plus the GraphQL Gateway/admin baseline. Docs, contracts, schema, proto files, infrastructure, demo auth, admin gateway wiring, frontend admin demo screens, and test harnesses are prepared.
+Most backend service runtimes, workers, AI chatbot runtime, and MCP Server implementation files will be added later by assigned members.
 ```
 
 Local demo is required. Online deployment is optional.
@@ -167,6 +167,16 @@ On Windows PowerShell, if `npm run check:docs` is blocked by execution policy, u
 ```bash
 npm.cmd run check:docs
 ```
+
+Implemented test targets:
+
+| Target | Command | Notes |
+|---|---|---|
+| Gateway unit / whitebox | `npm run test:gateway` | Auth, JWT, role helpers, and context factory |
+| Gateway integration | `npm run test:gateway:integration` | Starts a real gateway on port `4100` and calls GraphQL over HTTP |
+| Gateway API / contract smoke | `npm run test:gateway:api` | Requires a gateway already running on `http://localhost:4000/graphql` |
+| Gateway performance | `npm run test:gateway:perf` | Requires Apache JMeter on `PATH` |
+| Web admin E2E | `npm run test:web:e2e` | Uses Playwright and starts configured dev servers |
 
 ## 9. Local Run Targets
 

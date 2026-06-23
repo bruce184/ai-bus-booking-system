@@ -2,7 +2,7 @@
 
 Intercity Bus Booking AI is a student microservices project for searching intercity bus trips, selecting seats, holding seats with Redis TTL, simulating checkout, issuing e-tickets, supporting admin operations, providing analytics, and exposing AI/MCP tools.
 
-The repository is set up with a local-demo-first strategy. The current state is a contract and documentation baseline plus an initial GraphQL Gateway scaffold: folders, README files, source-of-truth docs, GraphQL schema, gRPC proto files, database schema, Docker infrastructure, and the gateway runtime baseline are prepared so members can add implementation files inside their assigned areas.
+The repository is set up with a local-demo-first strategy. The current state is a contract and documentation baseline plus a GraphQL Gateway/admin baseline: folders, README files, source-of-truth docs, GraphQL schema, gRPC proto files, database schema, Docker infrastructure, gateway runtime, demo auth, admin demo screens, and test harnesses are prepared so members can add implementation files inside their assigned areas.
 
 ## Required Stack
 
@@ -97,6 +97,14 @@ npm install --prefix services/graphql-gateway
 npm run dev:gateway
 ```
 
+Run implemented verification targets:
+
+```bash
+npm run check:docs
+npm run test:gateway
+npm run test:gateway:integration
+```
+
 When service implementations are added, the expected local URLs are:
 
 ```text
@@ -120,16 +128,15 @@ Implemented now:
 - Assignment and AI-agent workflow docs
 - GraphQL Gateway B-1 runtime scaffold, schema loader, and gRPC client stubs
 - GraphQL Gateway B-2 demo auth with login, me, JWT token handling, and role helpers
+- GraphQL Gateway admin baseline resolvers, API smoke tests, integration tests, and JMeter performance benchmark
+- Next.js admin baseline screens and Playwright admin E2E tests
 
 Not implemented yet:
 
-- Next.js app code
-- GraphQL Gateway business/admin resolvers
 - Node.js service runtimes
 - Workers
 - AI SDK chatbot runtime
 - MCP Server runtime
-- Full demo seed dataset
 
 Members should add implementation files only inside their assigned module and keep the matching docs/contracts updated.
 
