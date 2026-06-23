@@ -11,7 +11,7 @@ database/schema.sql
 database/seed.sql
 ```
 
-The repository is currently a contract/setup baseline. `database/schema.sql` should stay aligned with this document. `database/seed.sql` may remain a small bootstrap until the database owner expands the full demo seed set.
+The repository is currently a contract/setup baseline with an expanded B-3 demo seed. `database/schema.sql` should stay aligned with this document, and `database/seed.sql` provides deterministic fake data for local admin/frontend demos.
 
 ## 2. Database Platform
 
@@ -201,7 +201,7 @@ Phuong Trang Demo, Thanh Buoi Demo, Kumho Demo
 seat_29, sleeper_34, limousine_22
 ```
 
-The current `database/seed.sql` is allowed to be a small bootstrap in the baseline phase. Expanding it to the full set above is a database assignment, not required before service owners start from contracts.
+The current `database/seed.sql` includes the B-3 deterministic demo dataset: 3 users, 12 locations/stations, 3 vehicles with generated seat layouts, 5 routes, 12 trips, 8 bookings, 6 tickets, saved passengers, event logs, and 7 analytics rows.
 
 ## 13. Schema Change Rule
 

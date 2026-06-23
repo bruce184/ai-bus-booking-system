@@ -115,7 +115,7 @@ Implemented now:
 - GraphQL schema contract in `graphql/schema.graphql`
 - gRPC proto contracts in `proto/`
 - PostgreSQL schema baseline in `database/schema.sql`
-- Bootstrap seed placeholders in `database/seed.sql`
+- Expanded deterministic demo seed data in `database/seed.sql`
 - Docker Compose infrastructure for PostgreSQL, Redis, RabbitMQ, Kafka, Zookeeper, and Nginx
 - Assignment and AI-agent workflow docs
 - GraphQL Gateway B-1 runtime scaffold, schema loader, and gRPC client stubs

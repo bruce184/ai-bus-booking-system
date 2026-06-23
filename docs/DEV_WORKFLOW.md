@@ -39,6 +39,7 @@ Current baseline status:
 
 ```text
 The B-1 GraphQL Gateway scaffold and B-2 demo auth exist.
+The B-3 deterministic database seed exists for local demo data.
 Members should add files/folders only inside their assigned module after task assignment.
 Contracts and source-of-truth docs define the required behavior before feature code exists.
 ```

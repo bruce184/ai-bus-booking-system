@@ -139,6 +139,15 @@ docker compose down
 
 Use fake demo data only.
 
+The B-3 seed includes deterministic fake data for the local demo:
+
+```text
+3 users, 12 locations/stations, 3 vehicle layouts, 5 routes, 12 trips,
+8 bookings, 6 tickets, saved passengers, event logs, and 7 analytics rows.
+```
+
+If the local PostgreSQL volume was created before B-3, Docker will not rerun `database/seed.sql` automatically. For a disposable local demo database, reset the compose volume before starting Postgres again.
+
 ## 8. Baseline Verification
 
 Run:
