@@ -19,7 +19,7 @@ export default function AdminLogin() {
       try {
         const user = JSON.parse(userJson);
         if (user.role === 'ADMIN' || user.role === 'STAFF') {
-          router.push('/admin/trips');
+          router.push('/admin/dashboard');
         }
       } catch (e) {
         localStorage.removeItem('admin_token');
@@ -65,7 +65,7 @@ export default function AdminLogin() {
       localStorage.setItem('admin_token', token);
       localStorage.setItem('admin_user', JSON.stringify(user));
 
-      router.push('/admin/trips');
+      router.push('/admin/dashboard');
     } catch (err) {
       setError(err.message || 'Failed to login. Please try again.');
     } finally {

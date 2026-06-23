@@ -734,8 +734,8 @@ export default function TripsCrud() {
                                     <button
                                       key={seat.id}
                                       type="button"
-                                      onClick={() => (isAvailable || isBlocked) && handleToggleSeatSelection(seat.id)}
-                                      disabled={!isAvailable && !isBlocked}
+                                      onClick={() => isAvailable && handleToggleSeatSelection(seat.id)}
+                                      disabled={!isAvailable}
                                       style={{
                                         height: '40px',
                                         borderRadius: '6px',
