@@ -168,6 +168,14 @@ npm install --prefix services/graphql-gateway
 npm run dev:gateway
 ```
 
+Demo auth users:
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@example.com` | `admin123` |
+| Staff | `staff@example.com` | `staff123` |
+| Customer | `customer@example.com` | `customer123` |
+
 Future local run targets:
 
 ```bash

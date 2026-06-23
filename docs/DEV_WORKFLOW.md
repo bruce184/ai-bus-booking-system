@@ -38,7 +38,7 @@ Analytics, AI Chatbot, MCP Server
 Current baseline status:
 
 ```text
-Only the B-1 GraphQL Gateway scaffold exists.
+The B-1 GraphQL Gateway scaffold and B-2 demo auth exist.
 Members should add files/folders only inside their assigned module after task assignment.
 Contracts and source-of-truth docs define the required behavior before feature code exists.
 ```

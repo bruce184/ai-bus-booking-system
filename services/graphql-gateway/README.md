@@ -6,7 +6,8 @@ Current status:
 
 ```text
 B-1 scaffold exists. The gateway can start, load the shared GraphQL schema, and prepare gRPC clients from the proto contracts.
-Business resolvers are intentionally still pending for the later B-2, B-4, and B-5 tasks.
+B-2 demo auth exists. The gateway supports login, me, JWT signing/verification, and reusable role helpers.
+Business/admin resolvers are intentionally still pending for the later B-4 and B-5 tasks.
 ```
 
 ## Local Commands
@@ -36,6 +37,40 @@ Default endpoint:
 ```text
 http://localhost:4000/graphql
 ```
+
+## Demo Auth
+
+Local demo credentials:
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@example.com` | `admin123` |
+| Staff | `staff@example.com` | `staff123` |
+| Customer | `customer@example.com` | `customer123` |
+
+Login mutation:
+
+```graphql
+mutation Login($input: LoginInput!) {
+  login(input: $input) {
+    token
+    expiresAt
+    user {
+      id
+      email
+      role
+    }
+  }
+}
+```
+
+Use the returned token as:
+
+```text
+Authorization: Bearer <token>
+```
+
+Then `me` returns the current user.
 
 Must expose:
 

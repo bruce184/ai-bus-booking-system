@@ -119,11 +119,12 @@ Implemented now:
 - Docker Compose infrastructure for PostgreSQL, Redis, RabbitMQ, Kafka, Zookeeper, and Nginx
 - Assignment and AI-agent workflow docs
 - GraphQL Gateway B-1 runtime scaffold, schema loader, and gRPC client stubs
+- GraphQL Gateway B-2 demo auth with login, me, JWT token handling, and role helpers
 
 Not implemented yet:
 
 - Next.js app code
-- GraphQL Gateway business resolvers and demo auth
+- GraphQL Gateway business/admin resolvers
 - Node.js service runtimes
 - Workers
 - AI SDK chatbot runtime
