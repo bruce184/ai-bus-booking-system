@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const serviceRoot = resolve(currentDir, "../..");
 
-function findRepoRoot(startDir: string): string {
+function findRepoRoot(startDir) {
   let cursor = startDir;
 
   while (true) {
@@ -28,10 +28,10 @@ function findRepoRoot(startDir: string): string {
 
 export const repoRoot = findRepoRoot(serviceRoot);
 
-export function getGraphqlSchemaPath(): string {
+export function getGraphqlSchemaPath() {
   return resolve(repoRoot, "graphql/schema.graphql");
 }
 
-export function getProtoPath(fileName: "booking.proto" | "seat_inventory.proto" | "trip.proto"): string {
+export function getProtoPath(fileName) {
   return resolve(repoRoot, "proto", fileName);
 }

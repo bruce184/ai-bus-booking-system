@@ -5,10 +5,10 @@
   "type": "module",
   "description": "GraphQL API gateway for the Intercity Bus Booking AI local demo",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "dev": "node --watch src/index.js",
+    "build": "echo \"No build needed for JavaScript project\"",
+    "start": "node src/index.js",
+    "typecheck": "echo \"No typecheck needed for JavaScript project\""
   },
   "dependencies": {
     "@apollo/server": "^5.5.1",

@@ -6,15 +6,15 @@ import { startStandaloneServer } from "@apollo/server/standalone";
 import { loadGatewayConfig } from "./config/env.js";
 import { closeGrpcClients, createGrpcClients } from "./grpc/clients.js";
 import { loadTypeDefs } from "./graphql/schema.js";
-import { createContextFactory, type GatewayContext } from "./server/context.js";
+import { createContextFactory } from "./server/context.js";
 import { resolvers } from "./server/resolvers.js";
 
-async function main(): Promise<void> {
+async function main() {
   const config = loadGatewayConfig();
   const typeDefs = await loadTypeDefs();
   const grpcClients = createGrpcClients(config);
 
-  const server = new ApolloServer<GatewayContext>({
+  const server = new ApolloServer({
     typeDefs,
     resolvers
   });
@@ -42,7 +42,7 @@ async function main(): Promise<void> {
   console.log(`Seat Inventory Service gRPC target: ${config.grpc.seatInventoryAddress}`);
 }
 
-main().catch((error: unknown) => {
+main().catch((error) => {
   console.error("GraphQL Gateway failed to start.");
   console.error(error);
   process.exit(1);

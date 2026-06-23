@@ -3,9 +3,10 @@ import { GraphQLScalarType, Kind } from "graphql";
 import { gatewayError } from "../auth/errors.js";
 import { signDemoJwt } from "../auth/jwt.js";
 import { findDemoUserByCredentials } from "../auth/users.js";
-import type { GatewayContext } from "./context.js";
+import { adminMutationResolvers } from "./adminResolvers.js";
+import { callGrpc } from "../grpc/call.js";
 
-function parseDateTime(value: unknown): string {
+function parseDateTime(value) {
   if (typeof value !== "string" && typeof value !== "number" && !(value instanceof Date)) {
     throw new TypeError("DateTime must be a string, number, or Date.");
   }
@@ -34,13 +35,14 @@ export const resolvers = {
     }
   }),
   Query: {
-    me: (_parent: unknown, _args: Record<string, never>, context: GatewayContext) => context.user
+    me: (_parent, _args, context) => context.user
   },
   Mutation: {
+    ...adminMutationResolvers,
     login: (
-      _parent: unknown,
-      args: { input: { email: string; password: string } },
-      context: GatewayContext
+      _parent,
+      args,
+      context
     ) => {
       const email = args.input.email.trim();
       const password = args.input.password;
@@ -62,6 +64,19 @@ export const resolvers = {
         user,
         expiresAt
       };
+    }
+  },
+  Booking: {
+    trip: async (parent, _args, context) => {
+      if (!parent.tripId) {
+        return null;
+      }
+      const response = await callGrpc(
+        context.grpc.trip,
+        "getTripDetail",
+        { tripId: parent.tripId }
+      );
+      return response.trip;
     }
   }
 };

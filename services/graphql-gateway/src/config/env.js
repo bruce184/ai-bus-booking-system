@@ -1,20 +1,6 @@
-export type GatewayConfig = {
-  port: number;
-  webOrigin: string;
-  auth: {
-    jwtSecret: string;
-    jwtExpiresInSeconds: number;
-  };
-  grpc: {
-    tripAddress: string;
-    bookingAddress: string;
-    seatInventoryAddress: string;
-  };
-};
-
 const DEFAULT_HOST = "localhost";
 
-function readPort(env: NodeJS.ProcessEnv, key: string, fallback: number): number {
+function readPort(env, key, fallback) {
   const rawValue = env[key];
 
   if (!rawValue) {
@@ -31,11 +17,11 @@ function readPort(env: NodeJS.ProcessEnv, key: string, fallback: number): number
 }
 
 function readGrpcAddress(
-  env: NodeJS.ProcessEnv,
-  addressKey: string,
-  portKey: string,
-  fallbackPort: number
-): string {
+  env,
+  addressKey,
+  portKey,
+  fallbackPort
+) {
   if (env[addressKey]) {
     return env[addressKey];
   }
@@ -45,7 +31,7 @@ function readGrpcAddress(
   return `${host}:${port}`;
 }
 
-export function loadGatewayConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig {
+export function loadGatewayConfig(env = process.env) {
   return {
     port: readPort(env, "GRAPHQL_GATEWAY_PORT", 4000),
     webOrigin: env.WEB_ORIGIN ?? "http://localhost:3000",

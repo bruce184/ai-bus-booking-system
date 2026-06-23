@@ -1,16 +1,8 @@
 import * as grpc from "@grpc/grpc-js";
-
-import type { GatewayConfig } from "../config/env.js";
 import { getProtoPath } from "../config/paths.js";
 import { loadServiceConstructor } from "./proto.js";
 
-export type GatewayGrpcClients = {
-  trip: grpc.Client;
-  booking: grpc.Client;
-  seatInventory: grpc.Client;
-};
-
-export function createGrpcClients(config: GatewayConfig): GatewayGrpcClients {
+export function createGrpcClients(config) {
   const insecureCredentials = grpc.credentials.createInsecure();
 
   const TripService = loadServiceConstructor(getProtoPath("trip.proto"), [
@@ -39,7 +31,7 @@ export function createGrpcClients(config: GatewayConfig): GatewayGrpcClients {
   };
 }
 
-export function closeGrpcClients(clients: GatewayGrpcClients): void {
+export function closeGrpcClients(clients) {
   clients.trip.close();
   clients.booking.close();
   clients.seatInventory.close();

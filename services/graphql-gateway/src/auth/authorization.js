@@ -1,8 +1,6 @@
-import type { CurrentUser, GatewayContext } from "../server/context.js";
 import { gatewayError } from "./errors.js";
-import type { UserRole } from "./users.js";
 
-export function requireUser(context: GatewayContext): CurrentUser {
+export function requireUser(context) {
   if (!context.user) {
     throw gatewayError("Authentication is required.", "UNAUTHORIZED");
   }
@@ -10,7 +8,7 @@ export function requireUser(context: GatewayContext): CurrentUser {
   return context.user;
 }
 
-export function requireRole(context: GatewayContext, allowedRoles: readonly UserRole[]): CurrentUser {
+export function requireRole(context, allowedRoles) {
   const user = requireUser(context);
 
   if (!allowedRoles.includes(user.role)) {
@@ -20,10 +18,10 @@ export function requireRole(context: GatewayContext, allowedRoles: readonly User
   return user;
 }
 
-export function requireAdmin(context: GatewayContext): CurrentUser {
+export function requireAdmin(context) {
   return requireRole(context, ["ADMIN"]);
 }
 
-export function requireAdminOrStaff(context: GatewayContext): CurrentUser {
+export function requireAdminOrStaff(context) {
   return requireRole(context, ["ADMIN", "STAFF"]);
 }

@@ -1,7 +1,7 @@
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 
-const LOADER_OPTIONS: protoLoader.Options = {
+const LOADER_OPTIONS = {
   defaults: true,
   enums: String,
   keepCase: false,
@@ -9,24 +9,21 @@ const LOADER_OPTIONS: protoLoader.Options = {
   oneofs: true
 };
 
-function readNested(root: grpc.GrpcObject, segments: string[]): unknown {
-  return segments.reduce<unknown>((current, segment) => {
+function readNested(root, segments) {
+  return segments.reduce((current, segment) => {
     if (!current || typeof current !== "object") {
       return undefined;
     }
 
-    return (current as Record<string, unknown>)[segment];
+    return current[segment];
   }, root);
 }
 
-function isServiceConstructor(value: unknown): value is grpc.ServiceClientConstructor {
+function isServiceConstructor(value) {
   return typeof value === "function" && "service" in value;
 }
 
-export function loadServiceConstructor(
-  protoPath: string,
-  servicePath: string[]
-): grpc.ServiceClientConstructor {
+export function loadServiceConstructor(protoPath, servicePath) {
   const packageDefinition = protoLoader.loadSync(protoPath, LOADER_OPTIONS);
   const grpcObject = grpc.loadPackageDefinition(packageDefinition);
   const service = readNested(grpcObject, servicePath);
