@@ -7,7 +7,7 @@ export default function AdminIndex() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/admin/trips');
+    router.replace('/admin/dashboard');
   }, [router]);
 
   return null;

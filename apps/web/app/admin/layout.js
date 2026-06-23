@@ -63,6 +63,7 @@ export default function AdminLayout({ children }) {
   }
 
   const menuItems = [
+    { name: 'Dashboard', href: '/admin/dashboard', icon: '📊' },
     { name: 'Trips', href: '/admin/trips', icon: '🗓️' },
     { name: 'Routes', href: '/admin/routes', icon: '🛣️' },
     { name: 'Stops', href: '/admin/stops', icon: '📍' },

@@ -80,6 +80,52 @@ export const resolvers = {
         { tripId: args.tripId }
       );
       return response.seats || [];
+    },
+    adminRevenueSummary: async (_parent, args, context) => {
+      requireAdmin(context);
+      return {
+        from: args.input.from,
+        to: args.input.to,
+        totalRevenue: 1860000,
+        paidBookings: 5,
+        ticketsSold: 6,
+        successfulBookingRate: 1.56
+      };
+    },
+    adminAnalyticsDashboard: async (_parent, args, context) => {
+      requireAdmin(context);
+      return {
+        revenueSummary: {
+          from: args.input.from,
+          to: args.input.to,
+          totalRevenue: 1860000,
+          paidBookings: 5,
+          ticketsSold: 6,
+          successfulBookingRate: 1.56
+        },
+        dailyRevenue: [
+          { date: '2026-06-18', revenue: 280000, paidBookings: 1, ticketsSold: 1 },
+          { date: '2026-06-19', revenue: 560000, paidBookings: 1, ticketsSold: 2 },
+          { date: '2026-06-20', revenue: 320000, paidBookings: 1, ticketsSold: 1 },
+          { date: '2026-06-21', revenue: 180000, paidBookings: 1, ticketsSold: 1 },
+          { date: '2026-06-22', revenue: 520000, paidBookings: 1, ticketsSold: 1 },
+          { date: '2026-06-23', revenue: 0, paidBookings: 0, ticketsSold: 0 },
+          { date: '2026-06-24', revenue: 0, paidBookings: 0, ticketsSold: 0 }
+        ],
+        ticketsByRoute: [
+          { origin: 'TP.HCM', destination: 'Đà Lạt', ticketsSold: 3, revenue: 840000 },
+          { origin: 'Đà Nẵng', destination: 'Hà Nội', ticketsSold: 1, revenue: 520000 },
+          { origin: 'TP.HCM', destination: 'Nha Trang', ticketsSold: 1, revenue: 320000 },
+          { origin: 'TP.HCM', destination: 'Cần Thơ', ticketsSold: 1, revenue: 180000 }
+        ],
+        popularRoutes: [
+          { origin: 'TP.HCM', destination: 'Đà Nẵng', searchCount: 63 },
+          { origin: 'TP.HCM', destination: 'Đà Lạt', searchCount: 97 },
+          { origin: 'Đà Nẵng', destination: 'Hà Nội', searchCount: 47 },
+          { origin: 'TP.HCM', destination: 'Nha Trang', searchCount: 82 },
+          { origin: 'TP.HCM', destination: 'Cần Thơ', searchCount: 31 }
+        ]
+      };
     }
   },
   Mutation: {
