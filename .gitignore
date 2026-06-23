@@ -33,6 +33,10 @@ assignment_sheet.xlsx
 AI Bus Booking System - Bảng Phân Công.xlsx
 docs/TEAM_ASSIGNMENTS.md
 
+# JMeter performance output
+services/graphql-gateway/tests/performance/results*.jtl
+services/graphql-gateway/tests/performance/report/
+
 # Docker volumes / runtime artifacts
 data/
 *.sqlite

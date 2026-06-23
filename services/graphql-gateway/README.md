@@ -32,6 +32,16 @@ npm run typecheck:gateway
 npm run build:gateway
 ```
 
+Run API and performance tests from this package:
+
+```bash
+npm run test
+npm run test:api
+npm run test:perf
+```
+
+`test:perf` requires Apache JMeter on `PATH` and writes ignored local output under `tests/performance/`.
+
 Default endpoint:
 
 ```text

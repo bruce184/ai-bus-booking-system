@@ -10,7 +10,8 @@
     "start": "node src/index.js",
     "typecheck": "echo \"No typecheck needed for JavaScript project\"",
     "test": "node --test tests/*.test.js",
-    "test:api": "newman run tests/api-testing/graphql-gateway.postman_collection.json -e tests/api-testing/local.postman_environment.json"
+    "test:api": "newman run tests/api-testing/graphql-gateway.postman_collection.json -e tests/api-testing/local.postman_environment.json",
+    "test:perf": "node -e \"const fs=require('node:fs'); fs.rmSync('tests/performance/results.jtl',{force:true}); fs.rmSync('tests/performance/report',{recursive:true,force:true});\" && jmeter -n -t tests/performance/graphql-gateway.jmx -l tests/performance/results.jtl -e -o tests/performance/report"
   },
   "dependencies": {
     "@apollo/server": "^5.5.1",
