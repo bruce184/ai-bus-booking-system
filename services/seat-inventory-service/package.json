@@ -1,0 +1,20 @@
+{
+  "name": "@bus/seat-inventory-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "gRPC Seat Inventory Service for Redis TTL seat holds",
+  "scripts": {
+    "dev": "node src/server.js",
+    "consume:booking-expired": "node src/consumers/bookingExpiredConsumer.js",
+    "test:race": "node scripts/race-hold-test.mjs"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.12.6",
+    "@grpc/proto-loader": "^0.7.13",
+    "amqplib": "^2.0.1",
+    "dotenv": "^16.4.7",
+    "ioredis": "^5.11.1",
+    "pg": "^8.21.0"
+  }
+}

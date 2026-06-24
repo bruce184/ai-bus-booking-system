@@ -6,6 +6,11 @@ import { findDemoUserByCredentials } from "../auth/users.js";
 import { adminMutationResolvers } from "./adminResolvers.js";
 import { callGrpc } from "../grpc/call.js";
 import { requireAdmin } from "../auth/authorization.js";
+import { publishSeatStateChanged, subscribeSeatStateChanged } from "./seatStatePubSub.js";
+
+function requesterIdFromContext(context) {
+  return context.user?.id ?? context.requestId ?? "guest";
+}
 
 function parseDateTime(value) {
   if (typeof value !== "string" && typeof value !== "number" && !(value instanceof Date)) {
@@ -155,6 +160,32 @@ export const resolvers = {
         user,
         expiresAt
       };
+    },
+
+    holdSeats: async (_parent, args, context) => {
+      const hold = await callGrpc(
+        context.grpc.seatInventory,
+        "holdSeats",
+        {
+          tripId: args.input.tripId,
+          seatIds: args.input.seatIds,
+          requesterId: requesterIdFromContext(context)
+        }
+      );
+
+      publishSeatStateChanged(hold.tripId, hold.seats);
+
+      return hold;
+    },
+
+    releaseSeatHold: async (_parent, args, context) => {
+      const response = await callGrpc(
+        context.grpc.seatInventory,
+        "releaseHold",
+        { holdToken: args.input.holdToken }
+      );
+
+      return response.released;
     }
   },
   Booking: {
@@ -168,6 +199,11 @@ export const resolvers = {
         { tripId: parent.tripId }
       );
       return response.trip;
+    }
+  },
+  Subscription: {
+    seatStateChanged: {
+      subscribe: (_parent, args) => subscribeSeatStateChanged(args.tripId)
     }
   }
 };

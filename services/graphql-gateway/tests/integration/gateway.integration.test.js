@@ -207,3 +207,81 @@ test("gateway maps unavailable gRPC dependencies to GraphQL service errors", asy
   assert.equal(result.body.data, null);
   assert.equal(result.body.errors[0].extensions.code, "INTERNAL_ERROR");
 });
+
+test("gateway queries seat map, holds and releases seats through the real gRPC seat inventory service", async () => {
+  const tripId = "33333333-3333-3333-3333-333333333333";
+  const seatId = "R01";
+
+  // 1. Query Seat Map
+  const mapResult = await graphqlRequest({
+    query: `
+      query SeatMap($tripId: ID!) {
+        seatMap(tripId: $tripId) {
+          id
+          label
+          status
+        }
+      }
+    `,
+    variables: { tripId }
+  });
+
+  assert.equal(mapResult.status, 200);
+  assert.equal(mapResult.body.errors, undefined);
+  const seats = mapResult.body.data.seatMap;
+  assert.ok(Array.isArray(seats));
+  const testSeat = seats.find((s) => s.label === seatId);
+  assert.ok(testSeat);
+  assert.equal(testSeat.status, "AVAILABLE");
+
+  // 2. Hold Seat
+  const holdResult = await graphqlRequest({
+    query: `
+      mutation HoldSeats($input: HoldSeatsInput!) {
+        holdSeats(input: $input) {
+          holdToken
+          tripId
+          expiresAt
+          seats {
+            id
+            label
+            status
+          }
+        }
+      }
+    `,
+    variables: {
+      input: {
+        tripId,
+        seatIds: [testSeat.id]
+      }
+    }
+  });
+
+  assert.equal(holdResult.status, 200);
+  assert.equal(holdResult.body.errors, undefined);
+  const hold = holdResult.body.data.holdSeats;
+  assert.ok(hold.holdToken);
+  assert.equal(hold.tripId, tripId);
+  const heldSeat = hold.seats.find((s) => s.label === seatId);
+  assert.ok(heldSeat);
+  assert.equal(heldSeat.status, "HELD");
+
+  // 3. Release Hold
+  const releaseResult = await graphqlRequest({
+    query: `
+      mutation ReleaseSeatHold($input: ReleaseSeatHoldInput!) {
+        releaseSeatHold(input: $input)
+      }
+    `,
+    variables: {
+      input: {
+        holdToken: hold.holdToken
+      }
+    }
+  });
+
+  assert.equal(releaseResult.status, 200);
+  assert.equal(releaseResult.body.errors, undefined);
+  assert.equal(releaseResult.body.data.releaseSeatHold, true);
+});
