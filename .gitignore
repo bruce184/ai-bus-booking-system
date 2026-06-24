@@ -34,4 +34,5 @@ tmp/
 data/
 *.sqlite
 
-.xlsx
+*.xlsx
+*.md
