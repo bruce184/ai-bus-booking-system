@@ -51,7 +51,6 @@ const INITIAL_BOOKINGS = [
 
 export default function BookingsCrud() {
   const [bookings, setBookings] = useState(INITIAL_BOOKINGS);
-  const [filteredBookings, setFilteredBookings] = useState(INITIAL_BOOKINGS);
   
   // Filters
   const [filterCode, setFilterCode] = useState('');
@@ -70,23 +69,14 @@ export default function BookingsCrud() {
     setTimeout(() => setMessage(null), 3000);
   };
 
-  useEffect(() => {
-    // Apply filters locally in memory for visual consistency
-    let list = [...bookings];
-    if (filterCode) {
-      list = list.filter(b => b.bookingCode.toLowerCase().includes(filterCode.toLowerCase()));
-    }
-    if (filterEmail) {
-      list = list.filter(b => b.contactEmail.toLowerCase().includes(filterEmail.toLowerCase()));
-    }
-    if (filterTripId) {
-      list = list.filter(b => b.trip.id === filterTripId);
-    }
-    if (filterStatus) {
-      list = list.filter(b => b.status === filterStatus);
-    }
-    setFilteredBookings(list);
-  }, [bookings, filterCode, filterEmail, filterTripId, filterStatus]);
+  // Apply filters locally in memory for visual consistency
+  const filteredBookings = bookings.filter(b => {
+    if (filterCode && !b.bookingCode.toLowerCase().includes(filterCode.toLowerCase())) return false;
+    if (filterEmail && !b.contactEmail.toLowerCase().includes(filterEmail.toLowerCase())) return false;
+    if (filterTripId && b.trip.id !== filterTripId) return false;
+    if (filterStatus && b.status !== filterStatus) return false;
+    return true;
+  });
 
   const handleQueryBookings = async () => {
     setLoading(true);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { queryGraphQL } from '../../graphql.js';
 
 // Pre-seeded vehicles from B-3
@@ -29,6 +29,7 @@ export default function VehiclesCrud() {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const nextId = useRef(0);
 
   const showToast = (text, type = 'success') => {
     setMessage({ text, type });
@@ -88,7 +89,8 @@ export default function VehiclesCrud() {
         } : v));
         showToast('Vehicle updated successfully!');
       } else {
-        const newId = `veh-new-${Date.now()}`;
+        nextId.current += 1;
+        const newId = `veh-new-${nextId.current}`;
         setVehicles([...vehicles, {
           id: newId,
           operatorName,

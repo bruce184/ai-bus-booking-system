@@ -115,7 +115,10 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     // Initial fetch
-    handleFetchAnalytics();
+    setTimeout(() => {
+      handleFetchAnalytics();
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const formatCurrency = (amount) => {

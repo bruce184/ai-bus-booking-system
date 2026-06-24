@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { queryGraphQL } from '../../graphql.js';
 
 // Seeded routes from B-3
@@ -99,6 +99,7 @@ export default function TripsCrud() {
   const [editingTrip, setEditingTrip] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const nextId = useRef(0);
 
   // Seat blocking states
   const [blockingSeatsTrip, setBlockingSeatsTrip] = useState(null);
@@ -172,7 +173,8 @@ export default function TripsCrud() {
         } : t));
         showToast('Trip updated successfully!');
       } else {
-        const newId = `trip-new-${Date.now()}`;
+        nextId.current += 1;
+        const newId = `trip-new-${nextId.current}`;
         setTrips([...trips, {
           id: newId,
           route: routeObj,

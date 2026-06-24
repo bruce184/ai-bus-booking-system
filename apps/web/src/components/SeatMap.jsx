@@ -46,7 +46,7 @@ export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }) {
 
   useEffect(() => {
     if (!activeHold) {
-      setRemainingSeconds(null);
+      setTimeout(() => setRemainingSeconds(null), 0);
       return undefined;
     }
 

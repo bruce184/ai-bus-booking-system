@@ -12,7 +12,7 @@ export default function AdminLayout({ children }) {
 
   useEffect(() => {
     if (pathname === '/admin/login') {
-      setLoading(false);
+      setTimeout(() => setLoading(false), 0);
       return;
     }
 
@@ -30,11 +30,11 @@ export default function AdminLayout({ children }) {
         router.push('/admin/login');
         return;
       }
-      setUser(parsedUser);
+      setTimeout(() => setUser(parsedUser), 0);
     } catch (e) {
       router.push('/admin/login');
     } finally {
-      setLoading(false);
+      setTimeout(() => setLoading(false), 0);
     }
   }, [pathname, router]);
 

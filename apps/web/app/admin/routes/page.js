@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { queryGraphQL } from '../../graphql.js';
 
 // Pre-seeded locations from B-3
@@ -32,6 +32,7 @@ export default function RoutesCrud() {
   const [editingRoute, setEditingRoute] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const nextId = useRef(0);
 
   const showToast = (text, type = 'success') => {
     setMessage({ text, type });
@@ -94,7 +95,8 @@ export default function RoutesCrud() {
         } : r));
         showToast('Route updated successfully!');
       } else {
-        const newId = `route-new-${Date.now()}`;
+        nextId.current += 1;
+        const newId = `route-new-${nextId.current}`;
         setRoutes([...routes, {
           id: newId,
           origin: originLoc,

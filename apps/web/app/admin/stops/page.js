@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { queryGraphQL } from '../../graphql.js';
 
 // Pre-seeded locations from B-3
@@ -41,6 +41,7 @@ export default function StopsCrud() {
   const [editingStop, setEditingStop] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const nextId = useRef(0);
 
   const showToast = (text, type = 'success') => {
     setMessage({ text, type });
@@ -103,7 +104,8 @@ export default function StopsCrud() {
         } : s));
         showToast('Stop updated successfully!');
       } else {
-        const newId = `stop-new-${Date.now()}`;
+        nextId.current += 1;
+        const newId = `stop-new-${nextId.current}`;
         setStops([...stops, {
           id: newId,
           route: routeObj,

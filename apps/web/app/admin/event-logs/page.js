@@ -96,8 +96,6 @@ const SEEDED_EVENTS = [
 
 export default function EventLogsDashboard() {
   const [logs, setLogs] = useState(SEEDED_EVENTS);
-  const [filteredLogs, setFilteredLogs] = useState(SEEDED_EVENTS);
-  
   // Filters
   const [filterEventType, setFilterEventType] = useState('');
   const [filterEntityType, setFilterEntityType] = useState('');
@@ -111,17 +109,12 @@ export default function EventLogsDashboard() {
     setTimeout(() => setMessage(null), 3000);
   };
 
-  useEffect(() => {
-    // Filter local list for instant responsiveness/demo purposes
-    let list = [...logs];
-    if (filterEventType) {
-      list = list.filter(l => l.eventType === filterEventType);
-    }
-    if (filterEntityType) {
-      list = list.filter(l => l.entityType === filterEntityType);
-    }
-    setFilteredLogs(list);
-  }, [logs, filterEventType, filterEntityType]);
+  // Filter local list for instant responsiveness/demo purposes
+  const filteredLogs = logs.filter(l => {
+    if (filterEventType && l.eventType !== filterEventType) return false;
+    if (filterEntityType && l.entityType !== filterEntityType) return false;
+    return true;
+  });
 
   const handleQueryLogs = async () => {
     setLoading(true);
