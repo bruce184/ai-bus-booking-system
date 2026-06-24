@@ -40,3 +40,7 @@ services/graphql-gateway/tests/performance/report/
 # Docker volumes / runtime artifacts
 data/
 *.sqlite
+
+*.xlsx
+*.md
+
