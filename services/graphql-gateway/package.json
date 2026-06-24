@@ -1,20 +1,30 @@
 {
-  "name": "@bus/graphql-gateway",
+  "name": "@intercity-bus/graphql-gateway",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "GraphQL Gateway adapters for Intercity Bus Booking AI",
+  "description": "GraphQL API gateway for the Intercity Bus Booking AI local demo",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "dev": "node --watch src/index.js",
+    "build": "echo \"No build needed for JavaScript project\"",
+    "start": "node src/index.js",
+    "typecheck": "echo \"No typecheck needed for JavaScript project\"",
+    "test": "node --test tests/*.test.js",
+    "test:integration": "node --test tests/integration/*.test.js",
+    "test:api": "newman run tests/api-testing/graphql-gateway.postman_collection.json -e tests/api-testing/local.postman_environment.json",
+    "test:perf": "node -e \"const fs=require('node:fs'); fs.rmSync('tests/performance/results.jtl',{force:true}); fs.rmSync('tests/performance/report',{recursive:true,force:true});\" && jmeter -n -t tests/performance/graphql-gateway.jmx -l tests/performance/results.jtl -e -o tests/performance/report"
   },
   "dependencies": {
-    "@grpc/grpc-js": "^1.12.6",
+    "@apollo/server": "^5.5.1",
+    "@grpc/grpc-js": "^1.10.9",
     "@grpc/proto-loader": "^0.7.13",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.5",
+    "graphql": "^16.9.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2",
-    "typescript": "^5.7.2"
+    "@types/node": "^20.14.10",
+    "newman": "^6.2.2",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3"
   }
 }

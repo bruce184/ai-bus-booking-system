@@ -33,3 +33,5 @@ tmp/
 # Docker volumes / runtime artifacts
 data/
 *.sqlite
+
+.xlsx

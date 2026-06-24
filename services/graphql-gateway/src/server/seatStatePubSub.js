@@ -1,18 +1,13 @@
 import { EventEmitter } from "node:events";
-import type { Seat } from "./seatTypes.js";
-
-type SeatStateChangedPayload = {
-  seatStateChanged: Seat;
-};
 
 const emitter = new EventEmitter();
 emitter.setMaxListeners(100);
 
-function topicForTrip(tripId: string): string {
+function topicForTrip(tripId) {
   return `seatStateChanged:${tripId}`;
 }
 
-export function publishSeatStateChanged(tripId: string, seats: Seat[]): void {
+export function publishSeatStateChanged(tripId, seats) {
   const topic = topicForTrip(tripId);
 
   seats.forEach((seat) => {
@@ -20,15 +15,13 @@ export function publishSeatStateChanged(tripId: string, seats: Seat[]): void {
   });
 }
 
-export function subscribeSeatStateChanged(
-  tripId: string
-): AsyncIterableIterator<SeatStateChangedPayload> {
+export function subscribeSeatStateChanged(tripId) {
   const topic = topicForTrip(tripId);
-  const queue: SeatStateChangedPayload[] = [];
-  let pendingResolve: ((value: IteratorResult<SeatStateChangedPayload>) => void) | null = null;
+  const queue = [];
+  let pendingResolve = null;
   let active = true;
 
-  const onSeatStateChanged = (payload: SeatStateChangedPayload): void => {
+  const onSeatStateChanged = (payload) => {
     if (!active) {
       return;
     }
@@ -45,7 +38,7 @@ export function subscribeSeatStateChanged(
   emitter.on(topic, onSeatStateChanged);
 
   return {
-    async next(): Promise<IteratorResult<SeatStateChangedPayload>> {
+    async next() {
       if (!active) {
         return { value: undefined, done: true };
       }
@@ -61,7 +54,7 @@ export function subscribeSeatStateChanged(
       });
     },
 
-    async return(): Promise<IteratorResult<SeatStateChangedPayload>> {
+    async return() {
       active = false;
       emitter.off(topic, onSeatStateChanged);
 
@@ -73,13 +66,13 @@ export function subscribeSeatStateChanged(
       return { value: undefined, done: true };
     },
 
-    async throw(error?: unknown): Promise<IteratorResult<SeatStateChangedPayload>> {
+    async throw(error) {
       active = false;
       emitter.off(topic, onSeatStateChanged);
       throw error;
     },
 
-    [Symbol.asyncIterator](): AsyncIterableIterator<SeatStateChangedPayload> {
+    [Symbol.asyncIterator]() {
       return this;
     }
   };
