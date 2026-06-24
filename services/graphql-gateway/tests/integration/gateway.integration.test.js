@@ -188,7 +188,18 @@ test("admin analytics enforces authentication and admin role over HTTP", async (
   assert.ok(allowed.body.data.adminAnalyticsDashboard.dailyRevenue.length >= 1);
 });
 
-test("gateway maps unavailable gRPC dependencies to GraphQL service errors", async () => {
+// When SEAT_INVENTORY_URL is not set, the gateway cannot reach the gRPC service.
+// The gateway must translate the connection failure into a GraphQL INTERNAL_ERROR.
+// When SEAT_INVENTORY_URL is set, the gateway reaches the real service and returns data.
+const SEAT_INVENTORY_URL = process.env.SEAT_INVENTORY_URL;
+
+test("seatMap returns INTERNAL_ERROR when seat inventory service is unreachable", {
+  skip: !!SEAT_INVENTORY_URL
+    ? "Seat inventory service is running — skipping the unavailability test"
+    : false
+}, async () => {
+  // Business rule: gateway must never expose raw gRPC errors to clients.
+  // An unreachable downstream service must surface as INTERNAL_ERROR.
   const result = await graphqlRequest({
     query: `
       query SeatMap($tripId: ID!) {
@@ -199,7 +210,7 @@ test("gateway maps unavailable gRPC dependencies to GraphQL service errors", asy
       }
     `,
     variables: {
-      tripId: "trip-demo-001"
+      tripId: "00000000-0000-4000-8004-000000000001"
     }
   });
 
@@ -208,7 +219,51 @@ test("gateway maps unavailable gRPC dependencies to GraphQL service errors", asy
   assert.equal(result.body.errors[0].extensions.code, "INTERNAL_ERROR");
 });
 
-test("gateway queries seat map, holds and releases seats through the real gRPC seat inventory service", async () => {
+test("seatMap returns seat array when seat inventory service is available", {
+  skip: !SEAT_INVENTORY_URL
+    ? "Set SEAT_INVENTORY_URL=<host:port> to run this test against a live seat service"
+    : false
+}, async () => {
+  // Business rule: gateway must proxy the gRPC seat map to GraphQL clients.
+  // Expects the real seeded trip from database/seed.sql.
+  const result = await graphqlRequest({
+    query: `
+      query SeatMap($tripId: ID!) {
+        seatMap(tripId: $tripId) {
+          id
+          label
+          status
+        }
+      }
+    `,
+    variables: {
+      tripId: "00000000-0000-4000-8004-000000000001"
+    }
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.errors, undefined);
+  assert.ok(Array.isArray(result.body.data.seatMap));
+  assert.ok(result.body.data.seatMap.length > 0);
+  // Every seat must have the required fields
+  for (const seat of result.body.data.seatMap) {
+    assert.ok(seat.id);
+    assert.ok(seat.label);
+    assert.ok(["AVAILABLE", "HELD", "BOOKED", "BLOCKED"].includes(seat.status));
+  }
+});
+
+// This test requires a live seat inventory service seeded with the race-test trip.
+// Run: docker compose up -d && node services/seat-inventory-service/src/server.js
+// Then: SEAT_INVENTORY_URL=localhost:50053 npm run test:gateway:integration
+test("gateway proxies holdSeats and releaseSeatHold through to the seat inventory service", {
+  skip: !SEAT_INVENTORY_URL
+    ? "Set SEAT_INVENTORY_URL=<host:port> to run this test against a live seat service"
+    : false
+}, async () => {
+  // Business rule: gateway must correctly relay hold/release operations to
+  // seat-inventory-service via gRPC. The seat state must change atomically.
+  // Requires: race-hold-test trip seeded by scripts/race-hold-test.mjs
   const tripId = "33333333-3333-3333-3333-333333333333";
   const seatId = "R01";
 

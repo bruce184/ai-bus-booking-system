@@ -11,11 +11,13 @@ const SEEDED_TRIPS = [
 ];
 
 // Pre-seeded bookings from B-3
+// NOTE: Pre-boarding (boardable) state is TICKET_ISSUED, not PAID.
+// State machine: PAID → TICKET_ISSUED → CHECKED_IN
 const INITIAL_BOOKINGS = [
   {
     id: 'b-01',
     bookingCode: 'BK202606240001',
-    status: 'PAID',
+    status: 'TICKET_ISSUED',
     contactEmail: 'customer@example.com',
     contactPhone: '0901234567',
     totalAmount: 280000,

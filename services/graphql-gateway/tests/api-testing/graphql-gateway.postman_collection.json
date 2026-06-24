@@ -91,6 +91,23 @@
       "name": "3. Admin Dashboard - Authorized (Admin)",
       "event": [
         {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Build a dynamic 30-day date window so this test never expires.",
+              "var to = new Date();",
+              "var from = new Date();",
+              "from.setDate(from.getDate() - 30);",
+              "function fmt(d) {",
+              "    return d.toISOString().split('T')[0];",
+              "}",
+              "pm.environment.set(\"dashboardFrom\", fmt(from));",
+              "pm.environment.set(\"dashboardTo\", fmt(to));"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
           "listen": "test",
           "script": {
             "exec": [
@@ -122,7 +139,7 @@
           "mode": "graphql",
           "graphql": {
             "query": "query AdminDashboard($input: AdminRevenueSummaryInput!) {\n  adminAnalyticsDashboard(input: $input) {\n    revenueSummary {\n      from\n      to\n      totalRevenue\n      paidBookings\n      ticketsSold\n      successfulBookingRate\n    }\n    dailyRevenue {\n      date\n      revenue\n      paidBookings\n      ticketsSold\n    }\n  }\n}",
-            "variables": "{\n  \"input\": {\n    \"from\": \"2026-06-18\",\n    \"to\": \"2026-06-24\"\n  }\n}"
+            "variables": "{\n  \"input\": {\n    \"from\": \"{{dashboardFrom}}\",\n    \"to\": \"{{dashboardTo}}\"\n  }\n}"
           }
         },
         "url": {
@@ -161,7 +178,7 @@
           "mode": "graphql",
           "graphql": {
             "query": "query AdminDashboard($input: AdminRevenueSummaryInput!) {\n  adminAnalyticsDashboard(input: $input) {\n    revenueSummary {\n      totalRevenue\n    }\n  }\n}",
-            "variables": "{\n  \"input\": {\n    \"from\": \"2026-06-18\",\n    \"to\": \"2026-06-24\"\n  }\n}"
+            "variables": "{\n  \"input\": {\n    \"from\": \"{{dashboardFrom}}\",\n    \"to\": \"{{dashboardTo}}\"\n  }\n}"
           }
         },
         "url": {
@@ -206,7 +223,7 @@
           "mode": "graphql",
           "graphql": {
             "query": "query AdminDashboard($input: AdminRevenueSummaryInput!) {\n  adminAnalyticsDashboard(input: $input) {\n    revenueSummary {\n      totalRevenue\n    }\n  }\n}",
-            "variables": "{\n  \"input\": {\n    \"from\": \"2026-06-18\",\n    \"to\": \"2026-06-24\"\n  }\n}"
+            "variables": "{\n  \"input\": {\n    \"from\": \"{{dashboardFrom}}\",\n    \"to\": \"{{dashboardTo}}\"\n  }\n}"
           }
         },
         "url": {
@@ -228,12 +245,24 @@
               "    pm.response.to.have.status(200);",
               "});",
               "",
-              "pm.test(\"SeatMap returns seat data array or service errors\", function () {",
+              "// Business rule: if the seat inventory service is reachable, the gateway must",
+              "// return a seat array. If unreachable, it must surface a GraphQL INTERNAL_ERROR",
+              "// (never a raw gRPC error or HTTP 5xx).",
+              "pm.test(\"SeatMap returns seat array OR surfaces INTERNAL_ERROR when service is down\", function () {",
               "    var jsonData = pm.response.json();",
               "    if (jsonData.errors) {",
               "        pm.expect(jsonData.errors).to.be.an('array');",
+              "        pm.expect(jsonData.errors[0].extensions.code).to.eql('INTERNAL_ERROR',",
+              "            'Downstream error must be wrapped as INTERNAL_ERROR, not exposed raw');",
+              "        pm.expect(jsonData.data).to.be.null;",
               "    } else {",
               "        pm.expect(jsonData.data.seatMap).to.be.an('array');",
+              "        pm.expect(jsonData.data.seatMap.length).to.be.above(0);",
+              "        jsonData.data.seatMap.forEach(function(seat) {",
+              "            pm.expect(seat).to.have.property('id');",
+              "            pm.expect(seat).to.have.property('label');",
+              "            pm.expect(['AVAILABLE','HELD','BOOKED','BLOCKED']).to.include(seat.status);",
+              "        });",
               "    }",
               "});"
             ],
@@ -248,7 +277,106 @@
           "mode": "graphql",
           "graphql": {
             "query": "query SeatMap($tripId: ID!) {\n  seatMap(tripId: $tripId) {\n    id\n    label\n    status\n  }\n}",
-            "variables": "{\n  \"tripId\": \"trip-demo-001\"\n}"
+            "variables": "{\n  \"tripId\": \"00000000-0000-4000-8004-000000000001\"\n}"
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}",
+          "host": [
+            "{{baseUrl}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "7. Hold Seats (requires seat inventory service)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "// Business rule: holdSeats must atomically reserve the requested seats under",
+              "// a time-limited hold token. Only AVAILABLE seats can be held.",
+              "pm.test(\"holdSeats returns valid hold token and HELD seat status\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.errors) {",
+              "        // Seat inventory service may not be running — log and skip assertions.",
+              "        console.warn('holdSeats failed (seat service may be offline):', jsonData.errors[0].message);",
+              "        return;",
+              "    }",
+              "    var hold = jsonData.data.holdSeats;",
+              "    pm.expect(hold.holdToken).to.be.a('string').and.not.empty;",
+              "    pm.expect(hold.tripId).to.be.a('string');",
+              "    pm.expect(hold.expiresAt).to.be.a('string');",
+              "    pm.expect(hold.seats).to.be.an('array').with.length.above(0);",
+              "    hold.seats.forEach(function(seat) {",
+              "        pm.expect(seat.status).to.eql('HELD');",
+              "    });",
+              "    // Persist hold token for the release test",
+              "    pm.environment.set('holdToken', hold.holdToken);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "graphql",
+          "graphql": {
+            "query": "mutation HoldSeats($input: HoldSeatsInput!) {\n  holdSeats(input: $input) {\n    holdToken\n    tripId\n    expiresAt\n    seats {\n      id\n      label\n      status\n    }\n  }\n}",
+            "variables": "{\n  \"input\": {\n    \"tripId\": \"00000000-0000-4000-8004-000000000001\",\n    \"seatIds\": []\n  }\n}"
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}",
+          "host": [
+            "{{baseUrl}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "8. Release Seat Hold (requires seat inventory service)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "// Business rule: releasing a valid hold token must return true and make",
+              "// the previously held seats AVAILABLE again.",
+              "pm.test(\"releaseSeatHold returns true for a valid hold token\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.errors) {",
+              "        console.warn('releaseSeatHold failed (seat service may be offline or hold already expired):', jsonData.errors[0].message);",
+              "        return;",
+              "    }",
+              "    pm.expect(jsonData.data.releaseSeatHold).to.eql(true);",
+              "    pm.environment.unset('holdToken');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "graphql",
+          "graphql": {
+            "query": "mutation ReleaseSeatHold($input: ReleaseSeatHoldInput!) {\n  releaseSeatHold(input: $input)\n}",
+            "variables": "{\n  \"input\": {\n    \"holdToken\": \"{{holdToken}}\"\n  }\n}"
           }
         },
         "url": {

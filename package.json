@@ -16,6 +16,8 @@
     "test:gateway:integration": "npm --prefix services/graphql-gateway run test:integration",
     "test:gateway:api": "npm --prefix services/graphql-gateway run test:api",
     "test:gateway:perf": "npm --prefix services/graphql-gateway run test:perf",
+    "test:seat:race": "npm --prefix services/seat-inventory-service run test:race",
+    "test:seat:integration": "npm --prefix services/seat-inventory-service run test:integration",
     "test:web:e2e": "npm --prefix apps/web run test:e2e"
   }
 }

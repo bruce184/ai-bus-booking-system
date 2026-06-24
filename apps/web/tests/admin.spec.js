@@ -93,9 +93,11 @@ test.describe('Admin & Staff Portal Business Logic E2E Tests', () => {
     await page.click('text=Bookings');
     await expect(page).toHaveURL(/\/admin\/bookings/);
     
-    // Verify booking BK202606240001 is currently PAID (not checked-in)
+    // Verify booking BK202606240001 is currently TICKET_ISSUED (ticket issued, ready to board)
+    // Business rule: only TICKET_ISSUED bookings can be checked in.
+    // State machine: PAID → TICKET_ISSUED → CHECKED_IN
     const bookingRow = page.locator('tr:has-text("BK202606240001")');
-    await expect(bookingRow.locator('text=PAID')).toBeVisible();
+    await expect(bookingRow.locator('text=TICKET_ISSUED')).toBeVisible();
     
     // Input booking code manually at Boarding Desk
     await page.locator('#code').fill('BK202606240001');
@@ -104,7 +106,7 @@ test.describe('Admin & Staff Portal Business Logic E2E Tests', () => {
     // Toast notification showing success
     await expect(page.locator('.toast')).toBeVisible();
     
-    // The state in the table must change from PAID to CHECKED_IN
+    // The state in the table must change from TICKET_ISSUED to CHECKED_IN
     await expect(bookingRow.locator('text=CHECKED_IN')).toBeVisible();
   });
 
