@@ -1,6 +1,6 @@
 import grpc from "@grpc/grpc-js";
 
-export function serviceError(code: grpc.status, details: string): grpc.ServiceError {
+export function serviceError(code, details) {
   return Object.assign(new Error(details), {
     code,
     details,
@@ -8,6 +8,6 @@ export function serviceError(code: grpc.status, details: string): grpc.ServiceEr
   });
 }
 
-export function notImplemented(methodName: string): grpc.ServiceError {
+export function notImplemented(methodName) {
   return serviceError(grpc.status.UNIMPLEMENTED, `${methodName} is not implemented yet`);
 }

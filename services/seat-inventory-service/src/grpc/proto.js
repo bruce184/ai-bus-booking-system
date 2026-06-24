@@ -15,17 +15,7 @@ const packageDefinition = protoLoader.loadSync(protoPath, {
   oneofs: true
 });
 
-const grpcObject = grpc.loadPackageDefinition(packageDefinition) as unknown as {
-  bus: {
-    seat: {
-      v1: {
-        SeatInventoryService: {
-          service: grpc.ServiceDefinition;
-        };
-      };
-    };
-  };
-};
+const grpcObject = grpc.loadPackageDefinition(packageDefinition);
 
 export const seatInventoryServiceDefinition =
   grpcObject.bus.seat.v1.SeatInventoryService.service;

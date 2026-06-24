@@ -1,10 +1,9 @@
 import { Redis } from "ioredis";
 import { config } from "../config.js";
-import type { TripSeatRecord } from "../seatTypes.js";
 
-let redis: Redis | null = null;
+let redis = null;
 
-function getRedis(): Redis {
+function getRedis() {
   if (!redis) {
     redis = new Redis(config.redisUrl, {
       lazyConnect: true,
@@ -15,16 +14,11 @@ function getRedis(): Redis {
   return redis;
 }
 
-export function holdKey(tripId: string, seatId: string): string {
+export function holdKey(tripId, seatId) {
   return `hold:${tripId}:${seatId}`;
 }
 
-type HoldSeatsResult = {
-  holdToken: string;
-  expiresAt: string;
-};
-
-function holdTokenKey(holdToken: string): string {
+function holdTokenKey(holdToken) {
   return `hold-token:${holdToken}`;
 }
 
@@ -56,20 +50,17 @@ const holdSeatsScript = `
   return {1, ""}
 `;
 
-export async function getHeldSeatIds(
-  tripId: string,
-  seats: Pick<TripSeatRecord, "id">[]
-): Promise<Set<string>> {
+export async function getHeldSeatIds(tripId, seats) {
   if (seats.length === 0) {
     return new Set();
   }
 
   const client = getRedis();
   const keys = seats.map((seat) => holdKey(tripId, seat.id));
-  const values: (string | null)[] = await client.mget(keys);
-  const heldSeatIds = new Set<string>();
+  const values = await client.mget(keys);
+  const heldSeatIds = new Set();
 
-  values.forEach((value: string | null, index: number) => {
+  values.forEach((value, index) => {
     if (value) {
       heldSeatIds.add(seats[index].id);
     }
@@ -78,17 +69,11 @@ export async function getHeldSeatIds(
   return heldSeatIds;
 }
 
-export async function holdSeatsAtomically(
-  tripId: string,
-  seatIds: string[],
-  requesterId: string,
-  holdToken: string,
-  ttlSeconds: number
-): Promise<HoldSeatsResult & { conflictSeatId?: string }> {
+export async function holdSeatsAtomically(tripId, seatIds, requesterId, holdToken, ttlSeconds) {
   const client = getRedis();
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
   const keys = seatIds.map((seatId) => holdKey(tripId, seatId));
-  const result = (await client.eval(
+  const result = await client.eval(
     holdSeatsScript,
     keys.length,
     ...keys,
@@ -98,7 +83,7 @@ export async function holdSeatsAtomically(
     tripId,
     requesterId,
     ...seatIds
-  )) as [number, string];
+  );
 
   if (Number(result[0]) !== 1) {
     return {
@@ -114,42 +99,38 @@ export async function holdSeatsAtomically(
   };
 }
 
-function parseHoldKeyList(raw: string | null): string[] {
+function parseHoldKeyList(raw) {
   if (!raw) {
     return [];
   }
 
   try {
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = JSON.parse(raw);
 
     if (!Array.isArray(parsed)) {
       return [];
     }
 
-    return parsed.filter((key): key is string => typeof key === "string");
+    return parsed.filter((key) => typeof key === "string");
   } catch {
     return [];
   }
 }
 
-function holdPayloadMatchesToken(raw: string | null, holdToken: string): boolean {
+function holdPayloadMatchesToken(raw, holdToken) {
   if (!raw) {
     return false;
   }
 
   try {
-    const parsed = JSON.parse(raw) as { holdToken?: unknown };
+    const parsed = JSON.parse(raw);
     return parsed.holdToken === holdToken;
   } catch {
     return false;
   }
 }
 
-export async function holdTokenCoversSeats(
-  tripId: string,
-  seatIds: string[],
-  holdToken: string
-): Promise<{ valid: boolean; missingSeatId?: string }> {
+export async function holdTokenCoversSeats(tripId, seatIds, holdToken) {
   const client = getRedis();
   const keys = seatIds.map((seatId) => holdKey(tripId, seatId));
   const payloads = await client.mget(keys);
@@ -168,7 +149,7 @@ export async function holdTokenCoversSeats(
   };
 }
 
-async function releaseIndexedHold(client: Redis, holdToken: string): Promise<number> {
+async function releaseIndexedHold(client, holdToken) {
   const tokenKey = holdTokenKey(holdToken);
   const indexedKeys = parseHoldKeyList(await client.get(tokenKey));
 
@@ -189,7 +170,7 @@ async function releaseIndexedHold(client: Redis, holdToken: string): Promise<num
   return client.del(...keysToDelete, tokenKey);
 }
 
-async function releaseHoldByScan(client: Redis, holdToken: string): Promise<number> {
+async function releaseHoldByScan(client, holdToken) {
   let cursor = "0";
   let released = 0;
 
@@ -219,7 +200,7 @@ async function releaseHoldByScan(client: Redis, holdToken: string): Promise<numb
   return released;
 }
 
-export async function releaseHoldByToken(holdToken: string): Promise<boolean> {
+export async function releaseHoldByToken(holdToken) {
   const client = getRedis();
   const indexedReleaseCount = await releaseIndexedHold(client, holdToken);
 
@@ -230,7 +211,7 @@ export async function releaseHoldByToken(holdToken: string): Promise<boolean> {
   return (await releaseHoldByScan(client, holdToken)) > 0;
 }
 
-export async function releaseSeatHolds(tripId: string, seatIds: string[]): Promise<number> {
+export async function releaseSeatHolds(tripId, seatIds) {
   if (seatIds.length === 0) {
     return 0;
   }
@@ -238,7 +219,7 @@ export async function releaseSeatHolds(tripId: string, seatIds: string[]): Promi
   const client = getRedis();
   const keys = seatIds.map((seatId) => holdKey(tripId, seatId));
   const existingPayloads = await client.mget(keys);
-  const tokenKeys = new Set<string>();
+  const tokenKeys = new Set();
 
   existingPayloads.forEach((payload) => {
     if (!payload) {
@@ -246,20 +227,20 @@ export async function releaseSeatHolds(tripId: string, seatIds: string[]): Promi
     }
 
     try {
-      const parsed = JSON.parse(payload) as { holdToken?: unknown };
+      const parsed = JSON.parse(payload);
 
       if (typeof parsed.holdToken === "string") {
         tokenKeys.add(holdTokenKey(parsed.holdToken));
       }
     } catch {
-      // Ignore malformed demo payloads; deleting the seat hold key is enough.
+      // Ignore
     }
   });
 
   return client.del(...keys, ...tokenKeys);
 }
 
-export async function closeRedis(): Promise<void> {
+export async function closeRedis() {
   if (!redis) {
     return;
   }

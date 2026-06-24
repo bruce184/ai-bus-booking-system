@@ -1,18 +1,7 @@
 import { pool } from "../db/postgres.js";
-import type { SeatStatus, TripSeatRecord } from "../seatTypes.js";
 
-type TripSeatRow = {
-  id: string;
-  seat_label: string;
-  deck: number;
-  seat_row: number;
-  seat_column: number;
-  status: SeatStatus;
-  block_reason: string | null;
-};
-
-export async function listTripSeats(tripId: string): Promise<TripSeatRecord[]> {
-  const result = await pool.query<TripSeatRow>(
+export async function listTripSeats(tripId) {
+  const result = await pool.query(
     `
       select
         ts.id,
@@ -44,11 +33,8 @@ export async function listTripSeats(tripId: string): Promise<TripSeatRecord[]> {
   }));
 }
 
-export async function listTripSeatsByIds(
-  tripId: string,
-  seatIds: string[]
-): Promise<TripSeatRecord[]> {
-  const result = await pool.query<TripSeatRow>(
+export async function listTripSeatsByIds(tripId, seatIds) {
+  const result = await pool.query(
     `
       select
         ts.id,
@@ -81,12 +67,8 @@ export async function listTripSeatsByIds(
   }));
 }
 
-export async function confirmTripSeats(
-  tripId: string,
-  seatIds: string[],
-  bookingId: string
-): Promise<TripSeatRecord[]> {
-  const result = await pool.query<TripSeatRow>(
+export async function confirmTripSeats(tripId, seatIds, bookingId) {
+  const result = await pool.query(
     `
       with updated as (
         update trip_seats
@@ -97,7 +79,7 @@ export async function confirmTripSeats(
            and seat_label = any($2::text[])
            and status not in ('BOOKED', 'BLOCKED')
          returning *
-      )
+       )
       select
         updated.id,
         updated.seat_label,
@@ -127,12 +109,8 @@ export async function confirmTripSeats(
   }));
 }
 
-export async function blockTripSeats(
-  tripId: string,
-  seatIds: string[],
-  reason: string | null
-): Promise<TripSeatRecord[]> {
-  const result = await pool.query<TripSeatRow>(
+export async function blockTripSeats(tripId, seatIds, reason) {
+  const result = await pool.query(
     `
       with updated as (
         update trip_seats

@@ -7,6 +7,6 @@ export const pool = new Pool({
   connectionString: config.databaseUrl
 });
 
-export async function closePostgres(): Promise<void> {
+export async function closePostgres() {
   await pool.end();
 }

@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 dotenv.config({ path: "../../.env" });
 dotenv.config();
 
-function readNumber(name: string, fallback: number): number {
+function readNumber(name, fallback) {
   const raw = process.env[name];
 
   if (!raw) {

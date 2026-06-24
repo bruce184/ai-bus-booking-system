@@ -1,56 +1,46 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   holdSeats,
-  releaseSeatHold,
-  type Seat,
-  type SeatHold,
-  type SeatStatus
+  releaseSeatHold
 } from "../graphql/seatOperations.js";
 
-type SeatMapProps = {
-  graphqlUrl: string;
-  tripId: string;
-  seats: Seat[];
-  onHoldCreated?: (hold: SeatHold) => void;
-};
-
-const seatStatusLabel: Record<SeatStatus, string> = {
+const seatStatusLabel = {
   AVAILABLE: "Trống",
   HELD: "Đang giữ",
   BOOKED: "Đã đặt",
   BLOCKED: "Khóa"
 };
 
-const seatClassName: Record<SeatStatus, string> = {
+const seatClassName = {
   AVAILABLE: "seat seat-available",
   HELD: "seat seat-held",
   BOOKED: "seat seat-booked",
   BLOCKED: "seat seat-blocked"
 };
 
-function isSelectable(seat: Seat): boolean {
+function isSelectable(seat) {
   return seat.status === "AVAILABLE";
 }
 
-function groupSeatsByDeck(seats: Seat[]): Map<number, Seat[]> {
+function groupSeatsByDeck(seats) {
   return seats.reduce((deckMap, seat) => {
     const deckSeats = deckMap.get(seat.deck) ?? [];
     deckSeats.push(seat);
     deckMap.set(seat.deck, deckSeats);
     return deckMap;
-  }, new Map<number, Seat[]>());
+  }, new Map());
 }
 
-function sortSeatLayout(seats: Seat[]): Seat[] {
+function sortSeatLayout(seats) {
   return [...seats].sort((a, b) => a.row - b.row || a.column - b.column || a.label.localeCompare(b.label));
 }
 
-export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }: SeatMapProps) {
-  const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
-  const [activeHold, setActiveHold] = useState<SeatHold | null>(null);
-  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }) {
+  const [selectedSeatIds, setSelectedSeatIds] = useState([]);
+  const [activeHold, setActiveHold] = useState(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(null);
   const [isHolding, setIsHolding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
 
   const seatsByDeck = useMemo(() => groupSeatsByDeck(seats), [seats]);
 
@@ -64,7 +54,7 @@ export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }: SeatMapPro
     let releaseStarted = false;
     let cancelled = false;
 
-    async function tick(): Promise<void> {
+    async function tick() {
       const secondsLeft = Math.max(
         0,
         Math.ceil((new Date(currentHold.expiresAt).getTime() - Date.now()) / 1000)
@@ -108,7 +98,7 @@ export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }: SeatMapPro
     };
   }, [activeHold, graphqlUrl]);
 
-  function toggleSeat(seat: Seat): void {
+  function toggleSeat(seat) {
     if (!isSelectable(seat) || isHolding) {
       return;
     }
@@ -121,7 +111,7 @@ export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }: SeatMapPro
     );
   }
 
-  async function handleHoldSeats(): Promise<void> {
+  async function handleHoldSeats() {
     if (selectedSeatIds.length === 0) {
       setError("Vui lòng chọn ít nhất một ghế.");
       return;
@@ -146,7 +136,7 @@ export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }: SeatMapPro
     <section className="seat-map" aria-label="Sơ đồ ghế">
       <div className="seat-map-toolbar">
         <div className="seat-legend" aria-label="Chú thích trạng thái ghế">
-          {(Object.keys(seatStatusLabel) as SeatStatus[]).map((status) => (
+          {Object.keys(seatStatusLabel).map((status) => (
             <span className="seat-legend-item" key={status}>
               <span className={seatClassName[status]} aria-hidden="true" />
               {seatStatusLabel[status]}

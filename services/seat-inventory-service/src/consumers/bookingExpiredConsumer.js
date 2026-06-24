@@ -1,29 +1,20 @@
-import amqp, { type Channel, type ConsumeMessage } from "amqplib";
+import amqp from "amqplib";
 import { config } from "../config.js";
 import { releaseHoldByToken, releaseSeatHolds } from "../redis/holdStore.js";
 
-type BookingExpiredPayload = {
-  holdToken?: unknown;
-  hold_token?: unknown;
-  tripId?: unknown;
-  trip_id?: unknown;
-  seatIds?: unknown;
-  seat_ids?: unknown;
-};
-
-function parseMessage(message: ConsumeMessage): BookingExpiredPayload {
+function parseMessage(message) {
   try {
-    return JSON.parse(message.content.toString("utf8")) as BookingExpiredPayload;
+    return JSON.parse(message.content.toString("utf8"));
   } catch {
     throw new Error("booking.expired payload must be valid JSON");
   }
 }
 
-function getString(value: unknown): string {
+function getString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function getSeatIds(payload: BookingExpiredPayload): string[] {
+function getSeatIds(payload) {
   const rawSeatIds = payload.seatIds ?? payload.seat_ids;
 
   if (!Array.isArray(rawSeatIds)) {
@@ -31,12 +22,12 @@ function getSeatIds(payload: BookingExpiredPayload): string[] {
   }
 
   return rawSeatIds
-    .filter((seatId): seatId is string => typeof seatId === "string")
+    .filter((seatId) => typeof seatId === "string")
     .map((seatId) => seatId.trim())
     .filter(Boolean);
 }
 
-async function releaseExpiredBookingHold(payload: BookingExpiredPayload): Promise<boolean> {
+async function releaseExpiredBookingHold(payload) {
   const holdToken = getString(payload.holdToken ?? payload.hold_token);
 
   if (holdToken) {
@@ -53,7 +44,7 @@ async function releaseExpiredBookingHold(payload: BookingExpiredPayload): Promis
   throw new Error("booking.expired payload requires holdToken or tripId + seatIds");
 }
 
-async function setupChannel(channel: Channel): Promise<void> {
+async function setupChannel(channel) {
   await channel.assertExchange(config.workflowExchange, "topic", { durable: true });
   await channel.assertQueue(config.bookingExpiredQueue, { durable: true });
   await channel.bindQueue(
@@ -63,7 +54,7 @@ async function setupChannel(channel: Channel): Promise<void> {
   );
 }
 
-export async function startBookingExpiredConsumer(): Promise<void> {
+export async function startBookingExpiredConsumer() {
   const connection = await amqp.connect(config.rabbitmqUrl);
   const channel = await connection.createChannel();
 
@@ -94,7 +85,7 @@ export async function startBookingExpiredConsumer(): Promise<void> {
     `Seat Inventory booking.expired consumer listening on ${config.bookingExpiredQueue}`
   );
 
-  async function shutdown(signal: NodeJS.Signals): Promise<void> {
+  async function shutdown(signal) {
     console.log(`Received ${signal}, shutting down booking.expired consumer`);
     await channel.close();
     await connection.close();

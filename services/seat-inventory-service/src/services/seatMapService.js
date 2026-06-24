@@ -15,96 +15,32 @@ import {
   releaseSeatHolds,
   releaseHoldByToken
 } from "../redis/holdStore.js";
-import type { SeatResponse, TripSeatRecord } from "../seatTypes.js";
 
-export type GetSeatMapRequest = {
-  tripId?: string;
-  trip_id?: string;
-};
-
-export type GetSeatMapResponse = {
-  seats: SeatResponse[];
-};
-
-export type HoldSeatsRequest = {
-  tripId?: string;
-  trip_id?: string;
-  seatIds?: string[];
-  seat_ids?: string[];
-  requesterId?: string;
-  requester_id?: string;
-};
-
-export type HoldSeatsResponse = {
-  holdToken: string;
-  tripId: string;
-  seats: SeatResponse[];
-  expiresAt: string;
-};
-
-export type ReleaseHoldRequest = {
-  holdToken?: string;
-  hold_token?: string;
-};
-
-export type ReleaseHoldResponse = {
-  released: boolean;
-};
-
-export type ConfirmSeatsRequest = {
-  tripId?: string;
-  trip_id?: string;
-  seatIds?: string[];
-  seat_ids?: string[];
-  holdToken?: string;
-  hold_token?: string;
-  bookingId?: string;
-  booking_id?: string;
-};
-
-export type ConfirmSeatsResponse = {
-  seats: SeatResponse[];
-};
-
-export type BlockSeatsRequest = {
-  tripId?: string;
-  trip_id?: string;
-  seatIds?: string[];
-  seat_ids?: string[];
-  reason?: string;
-  adminUserId?: string;
-  admin_user_id?: string;
-};
-
-export type BlockSeatsResponse = {
-  seats: SeatResponse[];
-};
-
-function getTripId(request: GetSeatMapRequest): string {
+function getTripId(request) {
   return request.tripId ?? request.trip_id ?? "";
 }
 
-function getSeatIds(request: HoldSeatsRequest): string[] {
+function getSeatIds(request) {
   return request.seatIds ?? request.seat_ids ?? [];
 }
 
-function getRequesterId(request: HoldSeatsRequest): string {
+function getRequesterId(request) {
   return request.requesterId ?? request.requester_id ?? "guest";
 }
 
-function getHoldToken(request: ReleaseHoldRequest): string {
+function getHoldToken(request) {
   return request.holdToken ?? request.hold_token ?? "";
 }
 
-function getBookingId(request: ConfirmSeatsRequest): string {
+function getBookingId(request) {
   return request.bookingId ?? request.booking_id ?? "";
 }
 
-function getAdminUserId(request: BlockSeatsRequest): string {
+function getAdminUserId(request) {
   return request.adminUserId ?? request.admin_user_id ?? "";
 }
 
-function toSeatResponse(seat: TripSeatRecord, heldSeatIds: Set<string>): SeatResponse {
+function toSeatResponse(seat, heldSeatIds) {
   let status = seat.status;
 
   if (status === "HELD" && !heldSeatIds.has(seat.id)) {
@@ -126,7 +62,7 @@ function toSeatResponse(seat: TripSeatRecord, heldSeatIds: Set<string>): SeatRes
   };
 }
 
-export async function getSeatMap(request: GetSeatMapRequest): Promise<GetSeatMapResponse> {
+export async function getSeatMap(request) {
   const tripId = getTripId(request).trim();
 
   if (!tripId) {
@@ -146,7 +82,7 @@ export async function getSeatMap(request: GetSeatMapRequest): Promise<GetSeatMap
   };
 }
 
-export async function holdSeats(request: HoldSeatsRequest): Promise<HoldSeatsResponse> {
+export async function holdSeats(request) {
   const tripId = getTripId(request).trim();
   const seatIds = [...new Set(getSeatIds(request).map((seatId) => seatId.trim()).filter(Boolean))];
   const requesterId = getRequesterId(request).trim() || "guest";
@@ -203,9 +139,7 @@ export async function holdSeats(request: HoldSeatsRequest): Promise<HoldSeatsRes
   };
 }
 
-export async function releaseHold(
-  request: ReleaseHoldRequest
-): Promise<ReleaseHoldResponse> {
+export async function releaseHold(request) {
   const holdToken = getHoldToken(request).trim();
 
   if (!holdToken) {
@@ -217,9 +151,7 @@ export async function releaseHold(
   };
 }
 
-export async function confirmSeats(
-  request: ConfirmSeatsRequest
-): Promise<ConfirmSeatsResponse> {
+export async function confirmSeats(request) {
   const tripId = getTripId(request).trim();
   const seatIds = [...new Set(getSeatIds(request).map((seatId) => seatId.trim()).filter(Boolean))];
   const holdToken = getHoldToken(request).trim();
@@ -283,7 +215,7 @@ export async function confirmSeats(
   };
 }
 
-export async function blockSeats(request: BlockSeatsRequest): Promise<BlockSeatsResponse> {
+export async function blockSeats(request) {
   const tripId = getTripId(request).trim();
   const seatIds = [...new Set(getSeatIds(request).map((seatId) => seatId.trim()).filter(Boolean))];
   const reason = request.reason?.trim() || null;

@@ -20,7 +20,7 @@ server.bindAsync(address, grpc.ServerCredentials.createInsecure(), (error, port)
   console.log(`Seat Inventory Service listening on ${address} (bound port ${port})`);
 });
 
-function shutdown(signal: NodeJS.Signals): void {
+function shutdown(signal) {
   console.log(`Received ${signal}, shutting down Seat Inventory Service`);
   server.tryShutdown(async (error) => {
     if (error) {

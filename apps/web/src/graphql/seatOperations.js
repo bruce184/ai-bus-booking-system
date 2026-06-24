@@ -1,26 +1,3 @@
-export type SeatStatus = "AVAILABLE" | "HELD" | "BOOKED" | "BLOCKED";
-
-export type Seat = {
-  id: string;
-  label: string;
-  deck: number;
-  row: number;
-  column: number;
-  status: SeatStatus;
-};
-
-export type SeatHold = {
-  holdToken: string;
-  tripId: string;
-  expiresAt: string;
-  seats: Seat[];
-};
-
-type GraphQLResponse<TData> = {
-  data?: TData;
-  errors?: { message: string }[];
-};
-
 const holdSeatsMutation = `
   mutation HoldSeats($input: HoldSeatsInput!) {
     holdSeats(input: $input) {
@@ -45,11 +22,7 @@ const releaseSeatHoldMutation = `
   }
 `;
 
-export async function holdSeats(
-  graphqlUrl: string,
-  tripId: string,
-  seatIds: string[]
-): Promise<SeatHold> {
+export async function holdSeats(graphqlUrl, tripId, seatIds) {
   const response = await fetch(graphqlUrl, {
     method: "POST",
     headers: {
@@ -66,7 +39,7 @@ export async function holdSeats(
     })
   });
 
-  const payload = (await response.json()) as GraphQLResponse<{ holdSeats: SeatHold }>;
+  const payload = await response.json();
 
   if (!response.ok || payload.errors?.length) {
     throw new Error(payload.errors?.[0]?.message ?? "Failed to hold seats");
@@ -79,10 +52,7 @@ export async function holdSeats(
   return payload.data.holdSeats;
 }
 
-export async function releaseSeatHold(
-  graphqlUrl: string,
-  holdToken: string
-): Promise<boolean> {
+export async function releaseSeatHold(graphqlUrl, holdToken) {
   const response = await fetch(graphqlUrl, {
     method: "POST",
     headers: {
@@ -98,9 +68,7 @@ export async function releaseSeatHold(
     })
   });
 
-  const payload = (await response.json()) as GraphQLResponse<{
-    releaseSeatHold: boolean;
-  }>;
+  const payload = await response.json();
 
   if (!response.ok || payload.errors?.length) {
     throw new Error(payload.errors?.[0]?.message ?? "Failed to release seat hold");
