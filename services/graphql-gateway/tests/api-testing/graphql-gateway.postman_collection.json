@@ -331,7 +331,7 @@
           "mode": "graphql",
           "graphql": {
             "query": "mutation HoldSeats($input: HoldSeatsInput!) {\n  holdSeats(input: $input) {\n    holdToken\n    tripId\n    expiresAt\n    seats {\n      id\n      label\n      status\n    }\n  }\n}",
-            "variables": "{\n  \"input\": {\n    \"tripId\": \"00000000-0000-4000-8004-000000000001\",\n    \"seatIds\": []\n  }\n}"
+            "variables": "{\n  \"input\": {\n    \"tripId\": \"00000000-0000-4000-8004-000000000001\",\n    \"seatIds\": [\"A04\"]\n  }\n}"
           }
         },
         "url": {
