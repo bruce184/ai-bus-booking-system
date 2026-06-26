@@ -4,11 +4,21 @@
   "private": true,
   "description": "Student microservices project for intercity bus booking with AI and MCP Server",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*",
+    "workers/*"
+  ],
   "scripts": {
     "check:docs": "node scripts/check-docs.mjs",
     "compose:config": "docker compose config",
-    "dev": "echo \"Baseline repo is ready. Implement service package scripts before running all services.\"",
-    "dev:web": "echo \"apps/web Next.js implementation is not scaffolded yet.\"",
-    "dev:gateway": "echo \"services/graphql-gateway implementation is not scaffolded yet.\""
+    "dev": "echo \"Run individual workspaces: dev:web, dev:gateway, dev:booking, dev:ticket-worker, dev:email-worker.\"",
+    "dev:web": "npm --workspace apps/web run dev",
+    "dev:gateway": "npm --workspace services/graphql-gateway run dev",
+    "dev:booking": "npm --workspace services/booking-service run dev",
+    "dev:payment": "npm --workspace services/payment-service run dev",
+    "dev:ticket-worker": "npm --workspace workers/ticket-worker run dev",
+    "dev:email-worker": "npm --workspace workers/email-worker run dev"
   }
 }

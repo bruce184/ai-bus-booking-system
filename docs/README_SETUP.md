@@ -18,8 +18,8 @@ Intercity Bus Booking AI lets customers search trips, select seats, hold seats, 
 Current repository status:
 
 ```text
-Baseline setup only. Docs, contracts, schema, proto files, and infrastructure are prepared.
-Application/service implementation files will be added later by assigned members.
+Baseline contracts and infrastructure are prepared.
+Module 3 has an initial implementation for booking-service, payment-service, ticket-worker, email-worker, GraphQL booking resolvers, and checkout/booking lookup UI.
 ```
 
 Local demo is required. Online deployment is optional.
@@ -119,6 +119,12 @@ Important local ports:
 
 ## 7. Local Infrastructure
 
+Install workspace dependencies:
+
+```bash
+npm install
+```
+
 Validate compose config:
 
 ```bash
@@ -159,13 +165,17 @@ On Windows PowerShell, if `npm run check:docs` is blocked by execution policy, u
 npm.cmd run check:docs
 ```
 
-## 9. Future Local Run Targets
+## 9. Local Run Targets
 
-When implementations exist, keep these commands updated:
+Module 3 services can be run with:
 
 ```bash
 npm run dev:web
 npm run dev:gateway
+npm run dev:booking
+npm run dev:payment
+npm run dev:ticket-worker
+npm run dev:email-worker
 npm run dev
 ```
 
@@ -174,9 +184,19 @@ Expected URLs:
 ```text
 Web:              http://localhost:3000
 GraphQL Gateway:  http://localhost:4000/graphql
+Booking gRPC:      localhost:50053
+Payment Service:   http://localhost:5010
 MCP Server:       http://localhost:4010/mcp
 Nginx:            http://localhost:8080
 ```
+
+For local service-only smoke tests without RabbitMQ/Kafka/Seat Inventory running, use:
+
+```bash
+DISABLE_RABBITMQ=true DISABLE_KAFKA=true SKIP_SEAT_CONFIRMATION=true npm run dev:booking
+```
+
+Do not use `SKIP_SEAT_CONFIRMATION=true` for the full integrated demo; it exists only for isolated Module 3 development before the Seat Inventory Service is available.
 
 ## 10. Demo Checklist
 

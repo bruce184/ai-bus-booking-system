@@ -1,0 +1,19 @@
+{
+  "name": "@bus/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./db.js": "./src/db.js",
+    "./events.js": "./src/events.js",
+    "./grpc.js": "./src/grpc.js",
+    "./errors.js": "./src/errors.js"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.13.4",
+    "@grpc/proto-loader": "^0.7.15",
+    "amqplib": "^0.10.8",
+    "kafkajs": "^2.2.4",
+    "pg": "^8.16.3"
+  }
+}
