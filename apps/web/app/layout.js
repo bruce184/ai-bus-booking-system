@@ -1,15 +1,16 @@
 import "./globals.css";
+import "./styles.css";
 
 export const metadata = {
-  title: "Intercity Bus Booking AI - Admin Portal",
-  description: "Admin portal for managing intercity bus routes, stops, vehicles, seat layouts, and trips.",
+  title: "AI Bus Booking",
+  description: "Intercity bus booking demo"
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="vi">
       <body>
-        {children}
+        <main className="shell">{children}</main>
       </body>
     </html>
   );

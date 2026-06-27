@@ -42,6 +42,31 @@ export const resolvers = {
   }),
   Query: {
     me: (_parent, _args, context) => context.user,
+    bookingStatus: async (_parent, args, context) => {
+      return callGrpc(
+        context.grpc.booking,
+        "getBookingStatus",
+        { bookingCode: args.bookingCode, email: args.email }
+      );
+    },
+    myBookings: async (_parent, _args, context) => {
+      const customerId = context.user?.id ?? "";
+      const response = await callGrpc(
+        context.grpc.booking,
+        "listCustomerBookings",
+        { customerUserId: customerId }
+      );
+      return response.bookings || [];
+    },
+    mySavedPassengers: async (_parent, _args, context) => {
+      const customerId = context.user?.id ?? "";
+      const response = await callGrpc(
+        context.grpc.booking,
+        "listPassengerProfiles",
+        { customerUserId: customerId }
+      );
+      return response.passengers || [];
+    },
     adminBookings: async (_parent, args, context) => {
       requireAdmin(context);
       const request = {
@@ -186,6 +211,66 @@ export const resolvers = {
       );
 
       return response.released;
+    },
+
+    createBooking: async (_parent, args, context) => {
+      const input = args.input;
+      return callGrpc(context.grpc.booking, "createBooking", {
+        tripId: input.tripId,
+        holdToken: input.holdToken,
+        customerUserId: context.user?.id ?? "",
+        contactEmail: input.contactEmail,
+        contactPhone: input.contactPhone ?? "",
+        passengers: (input.passengers || []).map((p) => ({
+          fullName: p.fullName,
+          phone: p.phone ?? "",
+          email: p.email ?? "",
+          documentNumber: p.documentNumber ?? "",
+          seatId: p.seatId
+        }))
+      });
+    },
+
+    simulatePayment: async (_parent, args, context) => {
+      return callGrpc(context.grpc.booking, "simulatePayment", {
+        bookingCode: args.input.bookingCode,
+        success: args.input.success
+      });
+    },
+
+    cancelBooking: async (_parent, args, context) => {
+      return callGrpc(context.grpc.booking, "cancelBooking", {
+        bookingCode: args.input.bookingCode,
+        email: args.input.email
+      });
+    },
+
+    savePassengerProfile: async (_parent, args, context) => {
+      const input = args.input;
+      const response = await callGrpc(context.grpc.booking, "savePassengerProfile", {
+        customerUserId: context.user?.id ?? "",
+        fullName: input.fullName,
+        phone: input.phone ?? "",
+        email: input.email ?? "",
+        documentNumber: input.documentNumber ?? ""
+      });
+      return response.passenger;
+    },
+
+    deleteSavedPassenger: async (_parent, args, context) => {
+      const response = await callGrpc(context.grpc.booking, "deletePassengerProfile", {
+        customerUserId: context.user?.id ?? "",
+        id: args.id
+      });
+      return response.deleted;
+    },
+
+    adminCheckIn: async (_parent, args, context) => {
+      requireAdmin(context);
+      return callGrpc(context.grpc.booking, "checkInPassenger", {
+        code: args.input.code,
+        staffUserId: context.user?.id ?? ""
+      });
     }
   },
   Booking: {

@@ -123,10 +123,11 @@ PAID -> CANCELLED
 
 1. Registered customer bookings link to `users.id`.
 2. Guest bookings use contact email and phone.
-3. Public booking lookup requires `booking_code` and `contact_email`.
-4. Admin/staff check-in may use booking code, ticket code, or simulated QR payload.
-5. Saved passenger profiles belong to a registered customer.
-6. Do not store real personal data in seed files.
+3. `bookings.hold_token` stores the internal Seat Inventory hold token captured at checkout so payment confirmation can call `ConfirmSeats`; it is not exposed through public GraphQL or gRPC responses.
+4. Public booking lookup requires `booking_code` and `contact_email`.
+5. Admin/staff check-in may use booking code, ticket code, or simulated QR payload.
+6. Saved passenger profiles belong to a registered customer.
+7. Do not store real personal data in seed files.
 
 ## 9. Ticket Data
 

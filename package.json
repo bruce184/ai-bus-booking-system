@@ -4,12 +4,22 @@
   "private": true,
   "description": "Student microservices project for intercity bus booking with AI and MCP Server",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*",
+    "workers/*"
+  ],
   "scripts": {
     "check:docs": "node scripts/check-docs.mjs",
     "compose:config": "docker compose config",
-    "dev": "echo \"Baseline repo is ready. Implement service package scripts before running all services.\"",
+    "dev": "echo \"Run individual workspaces: dev:web, dev:gateway, dev:booking, dev:ticket-worker, dev:email-worker.\"",
     "dev:web": "npm --prefix apps/web run dev",
     "dev:gateway": "npm --prefix services/graphql-gateway run dev",
+    "dev:booking": "npm --prefix services/booking-service run dev",
+    "dev:payment": "npm --prefix services/payment-service run dev",
+    "dev:ticket-worker": "npm --prefix workers/ticket-worker run dev",
+    "dev:email-worker": "npm --prefix workers/email-worker run dev",
     "build:gateway": "npm --prefix services/graphql-gateway run build",
     "typecheck:gateway": "npm --prefix services/graphql-gateway run typecheck",
     "test:gateway": "npm --prefix services/graphql-gateway test",

@@ -1,57 +1,62 @@
-import Link from 'next/link';
+import Link from "next/link";
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100vh',
-      background: 'radial-gradient(circle at top right, rgba(99, 102, 241, 0.15) 0%, transparent 40%), radial-gradient(circle at bottom left, rgba(16, 185, 129, 0.1) 0%, transparent 40%), var(--bg-main)',
-      padding: '20px',
-      textAlign: 'center'
-    }}>
-      <div className="glass-card animate-fade-in" style={{
-        maxWidth: '600px',
-        padding: '50px',
-        border: '1px solid var(--border-glass)'
-      }}>
-        <span style={{
-          fontSize: '48px',
-          display: 'block',
-          marginBottom: '20px'
-        }}>
-          🚌
-        </span>
-        <h1 style={{
-          fontSize: '36px',
-          fontWeight: '800',
-          marginBottom: '15px',
-          background: 'linear-gradient(135deg, #fff 0%, var(--color-text-secondary) 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent'
-        }}>
-          Intercity Bus Booking System
-        </h1>
-        <p style={{
-          color: 'var(--color-text-secondary)',
-          fontSize: '16px',
-          marginBottom: '35px',
-          lineHeight: '1.6'
-        }}>
-          Welcome to the Student Microservices Bus Booking Project. Access the management control panel below to configure routes, vehicles, schedules, and operational logistics.
-        </p>
-
-        <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-          <Link href="/admin/login" className="btn btn-primary" style={{ padding: '12px 28px', fontSize: '15px' }}>
-            Enter Admin Portal
-          </Link>
-          <a href="https://github.com/bruce184/ai-bus-booking-system" target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ padding: '12px 28px', fontSize: '15px' }}>
-            View Repository
-          </a>
+    <>
+      <header className="topbar">
+        <div className="brand-block">
+          <span className="eyebrow">AI Bus Booking</span>
+          <h1 className="brand">Module đặt vé & phát hành vé</h1>
+          <p className="lead">Demo luồng checkout, thanh toán mô phỏng, tạo vé điện tử và tra cứu booking.</p>
         </div>
-      </div>
-    </div>
+        <nav className="nav">
+          <Link href="/checkout">Checkout</Link>
+          <Link href="/lookup">Tra cứu vé</Link>
+        </nav>
+      </header>
+
+      <section className="hero">
+        <div className="hero-copy">
+          <span className="eyebrow">Guest checkout ready</span>
+          <h2 className="brand">Đặt vé xe liên tỉnh, xác nhận nhanh, vé rõ ràng.</h2>
+          <p className="lead">Module 3 xử lý booking, payment simulation, ticket worker và email worker theo đúng contract của nhóm.</p>
+          <div className="hero-actions">
+            <Link className="button primary" href="/checkout">Bắt đầu checkout</Link>
+            <Link className="button" href="/lookup">Tra cứu booking</Link>
+          </div>
+        </div>
+
+        <aside className="summary-panel">
+          <div className="metric">
+            <span className="muted">Trạng thái booking</span>
+            <strong>PENDING → PAID → TICKET</strong>
+          </div>
+          <div className="metric">
+            <span className="muted">Event workflow</span>
+            <strong>booking.paid</strong>
+          </div>
+          <div className="metric">
+            <span className="muted">Quy tắc riêng tư</span>
+            <strong>Code + email</strong>
+          </div>
+        </aside>
+      </section>
+
+      <section className="grid">
+        <div className="panel">
+          <h2>Luồng đặt vé</h2>
+          <ol className="step-list">
+            <li><span className="step-index">1</span><span>Tạo booking từ trip, hold token và thông tin hành khách.</span></li>
+            <li><span className="step-index">2</span><span>Thanh toán mô phỏng để xác nhận ghế và phát event.</span></li>
+            <li><span className="step-index">3</span><span>Worker tạo vé điện tử và log email gửi khách.</span></li>
+          </ol>
+        </div>
+        <div className="panel">
+          <h2>Tra cứu an toàn</h2>
+          <p className="muted">Trang tra cứu luôn yêu cầu cả mã booking và email, đúng ghi chú privacy rule trong bảng phân công.</p>
+          <Link className="button" href="/lookup">Mở tra cứu</Link>
+        </div>
+      </section>
+    </>
   );
 }

@@ -19,7 +19,8 @@ Current repository status:
 
 ```text
 Baseline setup plus the GraphQL Gateway/admin baseline. Docs, contracts, schema, proto files, infrastructure, demo auth, admin gateway wiring, frontend admin demo screens, and test harnesses are prepared.
-Most backend service runtimes, workers, AI chatbot runtime, and MCP Server implementation files will be added later by assigned members.
+Module 3 has an initial implementation for booking-service, payment-service, ticket-worker, email-worker, GraphQL booking resolvers, and checkout/booking lookup UI.
+Most backend service runtimes, AI chatbot runtime, and MCP Server implementation files will be added later by assigned members.
 ```
 
 Local demo is required. Online deployment is optional.
@@ -119,6 +120,12 @@ Important local ports:
 
 ## 7. Local Infrastructure
 
+Install workspace dependencies:
+
+```bash
+npm install
+```
+
 Validate compose config:
 
 ```bash
@@ -180,12 +187,30 @@ Implemented test targets:
 
 ## 9. Local Run Targets
 
-Current implemented run target:
+GraphQL Gateway:
 
 ```bash
 npm install --prefix services/graphql-gateway
 npm run dev:gateway
 ```
+
+Module 3 services:
+
+```bash
+npm run dev:web
+npm run dev:booking
+npm run dev:payment
+npm run dev:ticket-worker
+npm run dev:email-worker
+```
+
+For local service-only smoke tests without RabbitMQ/Kafka/Seat Inventory running, use:
+
+```bash
+DISABLE_RABBITMQ=true DISABLE_KAFKA=true SKIP_SEAT_CONFIRMATION=true npm run dev:booking
+```
+
+Do not use `SKIP_SEAT_CONFIRMATION=true` for the full integrated demo; it exists only for isolated Module 3 development before the Seat Inventory Service is available.
 
 Demo auth users:
 
@@ -195,18 +220,13 @@ Demo auth users:
 | Staff | `staff@example.com` | `staff123` |
 | Customer | `customer@example.com` | `customer123` |
 
-Future local run targets:
-
-```bash
-npm run dev:web
-npm run dev
-```
-
 Expected URLs:
 
 ```text
 Web:              http://localhost:3000
 GraphQL Gateway:  http://localhost:4000/graphql
+Booking gRPC:      localhost:50053
+Payment Service:   http://localhost:5010
 MCP Server:       http://localhost:4010/mcp
 Nginx:            http://localhost:8080
 ```
