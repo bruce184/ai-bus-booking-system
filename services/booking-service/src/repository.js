@@ -249,15 +249,24 @@ export async function markBookingPaid({ bookingId }) {
 export async function cancelBooking({ booking_code, email }) {
   return transaction(async (client) => {
     const result = await client.query(
-      "select * from bookings where booking_code = $1 and lower(contact_email) = lower($2) for update",
+      `
+        select b.*, t.departure_time
+        from bookings b
+        join trips t on t.id = b.trip_id
+        where b.booking_code = $1 and lower(b.contact_email) = lower($2)
+        for update of b
+      `,
       [booking_code, email]
     );
     const booking = result.rows[0];
     if (!booking) {
       fail("NOT_FOUND", "Booking not found");
     }
-    if (booking.status !== "PAID") {
-      fail("BOOKING_STATE_INVALID", "Only PAID bookings can be cancelled in the MVP");
+    if (booking.status !== "PAID" && booking.status !== "TICKET_ISSUED") {
+      fail("BOOKING_STATE_INVALID", "Only PAID or TICKET_ISSUED bookings can be cancelled");
+    }
+    if (new Date(booking.departure_time) <= new Date()) {
+      fail("BOOKING_STATE_INVALID", "Cannot cancel booking for a trip that has already departed");
     }
 
     await client.query(
@@ -274,6 +283,78 @@ export async function cancelBooking({ booking_code, email }) {
     );
 
     return fetchBookingById(booking.id, client);
+  });
+}
+
+export async function expirePendingBookings(ageSeconds = 300) {
+  return transaction(async (client) => {
+    const result = await client.query(
+      `
+        select id, booking_code, trip_id, hold_token
+        from bookings
+        where status = 'PENDING_PAYMENT'
+          and created_at < now() - $1 * interval '1 second'
+        for update
+      `,
+      [ageSeconds]
+    );
+
+    const expiredBookings = result.rows;
+    if (expiredBookings.length === 0) {
+      return [];
+    }
+
+    const ids = expiredBookings.map((b) => b.id);
+
+    await client.query(
+      `
+        update bookings
+        set status = 'EXPIRED', updated_at = now()
+        where id = any($1::uuid[])
+      `,
+      [ids]
+    );
+
+    const seatsResult = await client.query(
+      `
+        select booking_id, seat_label
+        from booking_passengers
+        where booking_id = any($1::uuid[])
+      `,
+      [ids]
+    );
+
+    const seatsByBooking = seatsResult.rows.reduce((acc, row) => {
+      const seats = acc.get(row.booking_id) ?? [];
+      seats.push(row.seat_label);
+      acc.set(row.booking_id, seats);
+      return acc;
+    }, new Map());
+
+    const expiredList = expiredBookings.map((b) => ({
+      bookingId: b.id,
+      bookingCode: b.booking_code,
+      tripId: b.trip_id,
+      holdToken: b.hold_token || "",
+      seatIds: seatsByBooking.get(b.id) ?? []
+    }));
+
+    for (const b of expiredList) {
+      await client.query(
+        `
+          insert into event_logs (event_type, entity_type, entity_id, payload)
+          values ($1, $2, $3, $4)
+        `,
+        [
+          "booking.expired",
+          "booking",
+          b.bookingId,
+          JSON.stringify({ bookingCode: b.bookingCode, seatIds: b.seatIds })
+        ]
+      );
+    }
+
+    return expiredList;
   });
 }
 

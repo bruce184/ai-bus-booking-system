@@ -13,7 +13,8 @@ import {
   listCustomerBookings,
   listPassengerProfiles,
   markBookingPaid,
-  savePassengerProfile
+  savePassengerProfile,
+  expirePendingBookings
 } from "./repository.js";
 
 async function handle(call, callback, work) {
@@ -132,3 +133,27 @@ server.bindAsync(address, grpc.ServerCredentials.createInsecure(), (error, port)
   server.start();
   console.log(`[booking-service] gRPC listening on ${address} (port ${port})`);
 });
+
+async function runExpirationJob() {
+  try {
+    const expiredList = await expirePendingBookings(300); // 5 minutes TTL
+    for (const b of expiredList) {
+      console.log(`[booking-service] Expired booking: ${b.bookingCode}`);
+      
+      const eventPayload = {
+        bookingId: b.bookingId,
+        bookingCode: b.bookingCode,
+        tripId: b.tripId,
+        holdToken: b.holdToken,
+        seatIds: b.seatIds
+      };
+
+      await publishWorkflowEvent("booking.expired", eventPayload);
+      await publishKafkaEvent("booking-events", "booking.expired", eventPayload);
+    }
+  } catch (error) {
+    console.error("[booking-service] Expiration job failed", error);
+  }
+}
+
+setInterval(runExpirationJob, 15_000);
