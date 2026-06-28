@@ -1,7 +1,54 @@
 import { status as grpcStatus } from "@grpc/grpc-js";
 import { gatewayError } from "../auth/errors.js";
 
+const STANDARD_ERROR_CODES = new Set([
+  "VALIDATION_ERROR",
+  "UNAUTHORIZED",
+  "FORBIDDEN",
+  "NOT_FOUND",
+  "SEAT_NOT_AVAILABLE",
+  "HOLD_EXPIRED",
+  "BOOKING_STATE_INVALID",
+  "PAYMENT_FAILED",
+  "INTERNAL_ERROR"
+]);
+
+function normalizeErrorCode(value) {
+  if (typeof value === "string" && STANDARD_ERROR_CODES.has(value)) {
+    return value;
+  }
+
+  return null;
+}
+
+function readMetadataErrorCode(error) {
+  const values = error.metadata?.get?.("error-code") || [];
+
+  for (const value of values) {
+    const code = normalizeErrorCode(Buffer.isBuffer(value) ? value.toString("utf8") : value);
+
+    if (code) {
+      return code;
+    }
+  }
+
+  return null;
+}
+
+function readPrefixedErrorCode(error) {
+  const details = error.details || error.message || "";
+  const [prefix] = details.split(":", 1);
+
+  return normalizeErrorCode(prefix);
+}
+
 function mapGrpcErrorCode(error) {
+  const explicitCode = readMetadataErrorCode(error) || readPrefixedErrorCode(error);
+
+  if (explicitCode) {
+    return explicitCode;
+  }
+
   switch (error.code) {
     case grpcStatus.INVALID_ARGUMENT:
       return "VALIDATION_ERROR";
