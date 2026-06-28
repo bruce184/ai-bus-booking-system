@@ -1,6 +1,7 @@
-const GRAPHQL_URL = typeof window !== 'undefined'
-  ? (window.location.origin.includes('localhost') ? 'http://localhost:4000/' : '/graphql')
-  : 'http://localhost:4000/';
+const GRAPHQL_URL = process.env.NEXT_PUBLIC_GRAPHQL_URL
+  || (typeof window !== 'undefined' && window.location.origin.includes('localhost')
+    ? 'http://localhost:4000/graphql'
+    : '/graphql');
 
 export async function queryGraphQL(query, variables = {}) {
   let token = null;

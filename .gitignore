@@ -31,15 +31,16 @@ tmp/
 .sample-*/
 assignment_sheet.xlsx
 AI Bus Booking System - Bảng Phân Công.xlsx
+docs/.md
 docs/TEAM_ASSIGNMENTS.md
+.claude/
+.serena/
 
-# JMeter performance output
+# Test and performance output
+apps/web/test-results/
 services/graphql-gateway/tests/performance/results*.jtl
 services/graphql-gateway/tests/performance/report/
 
 # Docker volumes / runtime artifacts
 data/
 *.sqlite
-
-*.xlsx
-*.md
