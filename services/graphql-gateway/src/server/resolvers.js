@@ -210,6 +210,18 @@ export const resolvers = {
         { holdToken: args.input.holdToken }
       );
 
+      if (response.released && response.tripId && response.seatIds?.length) {
+        const seats = response.seatIds.map((seatId) => ({
+          id: seatId,
+          label: seatId,
+          deck: 1,
+          row: 1,
+          column: 1,
+          status: "AVAILABLE"
+        }));
+        publishSeatStateChanged(response.tripId, seats);
+      }
+
       return response.released;
     },
 
@@ -232,17 +244,45 @@ export const resolvers = {
     },
 
     simulatePayment: async (_parent, args, context) => {
-      return callGrpc(context.grpc.booking, "simulatePayment", {
+      const booking = await callGrpc(context.grpc.booking, "simulatePayment", {
         bookingCode: args.input.bookingCode,
         success: args.input.success
       });
+
+      if (args.input.success && booking && booking.tripId && booking.passengers?.length) {
+        const seats = booking.passengers.map((p) => ({
+          id: p.seatId,
+          label: p.seatId,
+          deck: 1,
+          row: 1,
+          column: 1,
+          status: "BOOKED"
+        }));
+        publishSeatStateChanged(booking.tripId, seats);
+      }
+
+      return booking;
     },
 
     cancelBooking: async (_parent, args, context) => {
-      return callGrpc(context.grpc.booking, "cancelBooking", {
+      const booking = await callGrpc(context.grpc.booking, "cancelBooking", {
         bookingCode: args.input.bookingCode,
         email: args.input.email
       });
+
+      if (booking && booking.tripId && booking.passengers?.length) {
+        const seats = booking.passengers.map((p) => ({
+          id: p.seatId,
+          label: p.seatId,
+          deck: 1,
+          row: 1,
+          column: 1,
+          status: "AVAILABLE"
+        }));
+        publishSeatStateChanged(booking.tripId, seats);
+      }
+
+      return booking;
     },
 
     savePassengerProfile: async (_parent, args, context) => {

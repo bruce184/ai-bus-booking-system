@@ -13,7 +13,8 @@ import {
   holdSeatsAtomically,
   holdTokenCoversSeats,
   releaseSeatHolds,
-  releaseHoldByToken
+  releaseHoldByToken,
+  getHoldDetails
 } from "../redis/holdStore.js";
 
 function getTripId(request) {
@@ -146,8 +147,13 @@ export async function releaseHold(request) {
     throw serviceError(grpc.status.INVALID_ARGUMENT, "hold_token is required");
   }
 
+  const details = await getHoldDetails(holdToken);
+  const released = await releaseHoldByToken(holdToken);
+
   return {
-    released: await releaseHoldByToken(holdToken)
+    released,
+    tripId: details?.tripId ?? "",
+    seatIds: details?.seatIds ?? []
   };
 }
 

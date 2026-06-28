@@ -240,6 +240,33 @@ export async function releaseSeatHolds(tripId, seatIds) {
   return client.del(...keys, ...tokenKeys);
 }
 
+export async function getHoldDetails(holdToken) {
+  const client = getRedis();
+  const tokenKey = holdTokenKey(holdToken);
+  const raw = await client.get(tokenKey);
+  const indexedKeys = parseHoldKeyList(raw);
+
+  if (indexedKeys.length === 0) {
+    return null;
+  }
+
+  const seatIds = [];
+  let tripId = "";
+
+  for (const key of indexedKeys) {
+    const parts = key.split(":");
+    if (parts.length === 3) {
+      tripId = parts[1];
+      seatIds.push(parts[2]);
+    }
+  }
+
+  return {
+    tripId,
+    seatIds
+  };
+}
+
 export async function closeRedis() {
   if (!redis) {
     return;

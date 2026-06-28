@@ -1,6 +1,7 @@
 import { requireAdmin, requireAdminOrStaff } from "../auth/authorization.js";
 import { gatewayError } from "../auth/errors.js";
 import { callGrpc } from "../grpc/call.js";
+import { publishSeatStateChanged } from "./seatStatePubSub.js";
 
 function requireNonEmpty(value, fieldName) {
   const trimmed = typeof value === "string" ? value.trim() : "";
@@ -228,8 +229,9 @@ export const adminMutationResolvers = {
       throw gatewayError("At least one seat id is required.", "VALIDATION_ERROR");
     }
 
+    const tripId = requireNonEmpty(args.input.tripId, "tripId");
     const request = {
-      tripId: requireNonEmpty(args.input.tripId, "tripId"),
+      tripId,
       seatIds: args.input.seatIds.map((seatId) => requireNonEmpty(seatId, "seatId")),
       reason: args.input.reason ?? "",
       adminUserId: admin.id
@@ -239,6 +241,11 @@ export const adminMutationResolvers = {
       "blockSeats",
       request
     );
+
+    if (response.seats?.length) {
+      publishSeatStateChanged(tripId, response.seats);
+    }
+
     return response.seats;
   },
 
