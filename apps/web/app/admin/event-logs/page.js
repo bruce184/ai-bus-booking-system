@@ -153,6 +153,11 @@ export default function EventLogsDashboard() {
     }
   };
 
+  useEffect(() => {
+    handleQueryLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const formatDateTime = (isoString) => {
     const d = new Date(isoString);
     return d.toLocaleString('vi-VN', {

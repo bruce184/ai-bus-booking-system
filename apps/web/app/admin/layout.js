@@ -3,12 +3,19 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { queryGraphQL } from '../graphql.js';
 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const handleLogout = () => {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+    router.push('/admin/login');
+  };
 
   useEffect(() => {
     if (pathname === '/admin/login') {
@@ -24,25 +31,41 @@ export default function AdminLayout({ children }) {
       return;
     }
 
-    try {
-      const parsedUser = JSON.parse(userJson);
-      if (parsedUser.role !== 'ADMIN' && parsedUser.role !== 'STAFF') {
-        router.push('/admin/login');
-        return;
+    // Verify token with backend
+    const verifyToken = async () => {
+      try {
+        const data = await queryGraphQL(`
+          query Me {
+            me {
+              id
+              role
+            }
+          }
+        `);
+        if (!data.me || (data.me.role !== 'ADMIN' && data.me.role !== 'STAFF')) {
+          handleLogout();
+        } else {
+          setUser(data.me);
+        }
+      } catch (err) {
+        // Offline or error fallback to localStorage
+        try {
+          const parsedUser = JSON.parse(userJson);
+          if (parsedUser.role !== 'ADMIN' && parsedUser.role !== 'STAFF') {
+            handleLogout();
+          } else {
+            setUser(parsedUser);
+          }
+        } catch (e) {
+          handleLogout();
+        }
+      } finally {
+        setLoading(false);
       }
-      setTimeout(() => setUser(parsedUser), 0);
-    } catch (e) {
-      router.push('/admin/login');
-    } finally {
-      setTimeout(() => setLoading(false), 0);
-    }
-  }, [pathname, router]);
+    };
 
-  const handleLogout = () => {
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_user');
-    router.push('/admin/login');
-  };
+    verifyToken();
+  }, [pathname, router]);
 
   if (loading) {
     return (

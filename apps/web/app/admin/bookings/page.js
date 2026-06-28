@@ -136,6 +136,11 @@ export default function BookingsCrud() {
     }
   };
 
+  useEffect(() => {
+    handleQueryBookings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleCheckIn = async (codeValue) => {
     if (!codeValue) return;
     setLoading(true);
