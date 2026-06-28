@@ -11,6 +11,7 @@ import {
   getBookingStatus,
   listAdminBookings,
   listCustomerBookings,
+  listEventLogs,
   listPassengerProfiles,
   markBookingPaid,
   savePassengerProfile,
@@ -121,7 +122,8 @@ server.addService(proto.bus.booking.v1.BookingService.service, {
   CheckInPassenger: (call, callback) => handle(call, callback, checkInWithEvents),
   SavePassengerProfile: (call, callback) => handle(call, callback, savePassengerProfile),
   DeletePassengerProfile: (call, callback) => handle(call, callback, deletePassengerProfile),
-  ListPassengerProfiles: (call, callback) => handle(call, callback, listPassengerProfiles)
+  ListPassengerProfiles: (call, callback) => handle(call, callback, listPassengerProfiles),
+  ListEventLogs: (call, callback) => handle(call, callback, listEventLogs)
 });
 
 const address = process.env.BOOKING_GRPC_URL || `0.0.0.0:${process.env.BOOKING_SERVICE_PORT || 50053}`;

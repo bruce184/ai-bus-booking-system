@@ -452,6 +452,48 @@ export async function listAdminBookings({ trip_id, status, email, booking_code, 
   return { bookings, total: countResult.rows[0].total };
 }
 
+export async function listEventLogs({ event_type, entity_type, limit = 20, offset = 0 }) {
+  const params = [];
+  const where = [];
+
+  if (event_type) {
+    params.push(event_type);
+    where.push(`lower(event_type) = lower($${params.length})`);
+  }
+
+  if (entity_type) {
+    params.push(entity_type);
+    where.push(`lower(entity_type) = lower($${params.length})`);
+  }
+
+  const whereSql = where.length ? `where ${where.join(" and ")}` : "";
+  params.push(Math.min(100, Math.max(1, Number(limit) || 20)));
+  params.push(Math.max(0, Number(offset) || 0));
+
+  const result = await query(
+    `
+      select id, event_type, entity_type, entity_id, payload, created_at::text as created_at
+      from event_logs
+      ${whereSql}
+      order by created_at desc
+      limit $${params.length - 1}
+      offset $${params.length}
+    `,
+    params
+  );
+
+  return {
+    logs: result.rows.map((row) => ({
+      id: row.id,
+      event_type: row.event_type,
+      entity_type: row.entity_type || "",
+      entity_id: row.entity_id || "",
+      payload: JSON.stringify(row.payload || {}),
+      created_at: row.created_at
+    }))
+  };
+}
+
 export async function savePassengerProfile(input) {
   if (!input.customer_user_id || !input.full_name) {
     fail("VALIDATION_ERROR", "customer_user_id and full_name are required");

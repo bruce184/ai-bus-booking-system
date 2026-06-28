@@ -88,7 +88,9 @@ test.before(async () => {
     env: {
       ...process.env,
       GRAPHQL_GATEWAY_PORT: String(gatewayPort),
-      JWT_SECRET: "integration_test_secret_change_me_1234567890"
+      JWT_SECRET: "integration_test_secret_change_me_1234567890",
+      TRIP_SERVICE_GRPC_ADDRESS: "127.0.0.1:59951",
+      BOOKING_SERVICE_GRPC_ADDRESS: "127.0.0.1:59953"
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -186,6 +188,56 @@ test("admin analytics enforces authentication and admin role over HTTP", async (
   assert.equal(allowed.body.errors, undefined);
   assert.equal(allowed.body.data.adminAnalyticsDashboard.revenueSummary.totalRevenue, 1_860_000);
   assert.ok(allowed.body.data.adminAnalyticsDashboard.dailyRevenue.length >= 1);
+});
+
+test("public trip queries are routed through the Trip Service boundary", async () => {
+  const searchResult = await graphqlRequest({
+    query: `
+      query SearchTrips($input: SearchTripsInput!) {
+        searchTrips(input: $input) {
+          trips {
+            id
+          }
+          cacheHit
+        }
+      }
+    `,
+    variables: {
+      input: {
+        origin: "TP.HCM",
+        destination: "Da Lat",
+        departureDate: "2026-06-24"
+      }
+    }
+  });
+
+  assert.equal(searchResult.status, 200);
+  assert.equal(searchResult.body.data, null);
+  assert.equal(searchResult.body.errors[0].extensions.code, "INTERNAL_ERROR");
+});
+
+test("staff reaches adminCheckIn authorization boundary before booking service call", async () => {
+  const staff = await login("staff@example.com", "staff123");
+  const result = await graphqlRequest({
+    query: `
+      mutation AdminCheckIn($input: AdminCheckInInput!) {
+        adminCheckIn(input: $input) {
+          bookingCode
+          status
+        }
+      }
+    `,
+    variables: {
+      input: {
+        code: "BK202606240001"
+      }
+    },
+    token: staff.token
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.data, null);
+  assert.equal(result.body.errors[0].extensions.code, "INTERNAL_ERROR");
 });
 
 // When SEAT_INVENTORY_URL is not set, the gateway cannot reach the gRPC service.

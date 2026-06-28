@@ -42,6 +42,36 @@ export const resolvers = {
   }),
   Query: {
     me: (_parent, _args, context) => context.user,
+    autocompleteLocations: async (_parent, args, context) => {
+      const response = await callGrpc(
+        context.grpc.trip,
+        "autocompleteLocations",
+        { keyword: args.keyword }
+      );
+      return response.locations || [];
+    },
+    searchTrips: async (_parent, args, context) => {
+      return callGrpc(
+        context.grpc.trip,
+        "searchTrips",
+        args.input
+      );
+    },
+    trip: async (_parent, args, context) => {
+      return callGrpc(
+        context.grpc.trip,
+        "getTripDetail",
+        { tripId: args.id }
+      );
+    },
+    popularRoutes: async (_parent, args, context) => {
+      const response = await callGrpc(
+        context.grpc.trip,
+        "listPopularRoutes",
+        { limit: args.limit ?? 5 }
+      );
+      return response.routes || [];
+    },
     bookingStatus: async (_parent, args, context) => {
       return callGrpc(
         context.grpc.booking,
@@ -303,14 +333,6 @@ export const resolvers = {
         id: args.id
       });
       return response.deleted;
-    },
-
-    adminCheckIn: async (_parent, args, context) => {
-      requireAdmin(context);
-      return callGrpc(context.grpc.booking, "checkInPassenger", {
-        code: args.input.code,
-        staffUserId: context.user?.id ?? ""
-      });
     }
   },
   Booking: {
