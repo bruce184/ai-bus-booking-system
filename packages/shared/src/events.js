@@ -8,13 +8,47 @@ const kafkaBrokers = (process.env.KAFKA_BROKERS || "localhost:9092").split(",");
 let rabbitChannelPromise;
 let kafkaProducerPromise;
 
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function connectWithRetry(url, retries = 20, delay = 1500) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const conn = await amqp.connect(url);
+      conn.on("error", (err) => {
+        console.error("[RabbitMQ] Connection error", err);
+        rabbitChannelPromise = null;
+      });
+      conn.on("close", () => {
+        console.warn("[RabbitMQ] Connection closed");
+        rabbitChannelPromise = null;
+      });
+      return conn;
+    } catch (err) {
+      console.warn(`[RabbitMQ] Connection attempt ${i + 1}/${retries} failed: ${err.message}. Retrying in ${delay}ms...`);
+      await sleep(delay);
+    }
+  }
+  throw new Error(`Failed to connect to RabbitMQ at ${url} after ${retries} attempts.`);
+}
+
 async function rabbitChannel() {
   if (!rabbitChannelPromise) {
-    rabbitChannelPromise = amqp.connect(rabbitUrl).then(async (connection) => {
+    rabbitChannelPromise = (async () => {
+      const connection = await connectWithRetry(rabbitUrl);
       const channel = await connection.createChannel();
+      channel.on("error", (err) => {
+        console.error("[RabbitMQ] Channel error", err);
+        rabbitChannelPromise = null;
+      });
+      channel.on("close", () => {
+        console.warn("[RabbitMQ] Channel closed");
+        rabbitChannelPromise = null;
+      });
       await channel.assertExchange(workflowExchange, "topic", { durable: true });
       return channel;
-    });
+    })();
   }
   return rabbitChannelPromise;
 }

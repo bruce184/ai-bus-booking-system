@@ -2,6 +2,23 @@ import amqp from "amqplib";
 import { config } from "../config.js";
 import { releaseHoldByToken, releaseSeatHolds } from "../redis/holdStore.js";
 
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function connectWithRetry(url, retries = 20, delay = 1500) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const conn = await amqp.connect(url);
+      return conn;
+    } catch (err) {
+      console.warn(`[RabbitMQ Consumer] Connection attempt ${i + 1}/${retries} failed: ${err.message}. Retrying in ${delay}ms...`);
+      await sleep(delay);
+    }
+  }
+  throw new Error(`Failed to connect to RabbitMQ at ${url} after ${retries} attempts.`);
+}
+
 function parseMessage(message) {
   try {
     return JSON.parse(message.content.toString("utf8"));
@@ -55,7 +72,7 @@ async function setupChannel(channel) {
 }
 
 export async function startBookingExpiredConsumer() {
-  const connection = await amqp.connect(config.rabbitmqUrl);
+  const connection = await connectWithRetry(config.rabbitmqUrl);
   const channel = await connection.createChannel();
 
   await setupChannel(channel);
