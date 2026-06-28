@@ -21,7 +21,11 @@ async function connectWithRetry(url, retries = 20, delay = 1500) {
 
 function parseMessage(message) {
   try {
-    return JSON.parse(message.content.toString("utf8"));
+    const parsed = JSON.parse(message.content.toString("utf8"));
+    if (parsed && parsed.payload !== undefined) {
+      return parsed.payload;
+    }
+    return parsed;
   } catch {
     throw new Error("booking.expired payload must be valid JSON");
   }
