@@ -18,8 +18,10 @@
     "dev:gateway": "npm --prefix services/graphql-gateway run dev",
     "dev:booking": "npm --prefix services/booking-service run dev",
     "dev:payment": "npm --prefix services/payment-service run dev",
+    "dev:seat": "npm --prefix services/seat-inventory-service run dev",
     "dev:ticket-worker": "npm --prefix workers/ticket-worker run dev",
     "dev:email-worker": "npm --prefix workers/email-worker run dev",
+    "dev:all": "concurrently -k -s first -n \"gateway,web,booking,payment,seat,ticket,email\" -c \"magenta,cyan,green,yellow,blue,gray,white\" \"npm run dev:gateway\" \"npm run dev:web\" \"npm run dev:booking\" \"npm run dev:payment\" \"npm run dev:seat\" \"npm run dev:ticket-worker\" \"npm run dev:email-worker\"",
     "build:gateway": "npm --prefix services/graphql-gateway run build",
     "typecheck:gateway": "npm --prefix services/graphql-gateway run typecheck",
     "test:gateway": "npm --prefix services/graphql-gateway test",
@@ -28,6 +30,10 @@
     "test:gateway:perf": "npm --prefix services/graphql-gateway run test:perf",
     "test:seat:race": "npm --prefix services/seat-inventory-service run test:race",
     "test:seat:integration": "npm --prefix services/seat-inventory-service run test:integration",
-    "test:web:e2e": "npm --prefix apps/web run test:e2e"
+    "test:web:e2e": "npm --prefix apps/web run test:e2e",
+    "validate": "npm run check:docs && npm run test:gateway && npm run test:gateway:integration"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
   }
 }
