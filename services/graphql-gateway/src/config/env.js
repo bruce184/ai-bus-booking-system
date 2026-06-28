@@ -41,12 +41,12 @@ export function loadGatewayConfig(env = process.env) {
     },
     grpc: {
       tripAddress: readGrpcAddress(env, "TRIP_SERVICE_GRPC_ADDRESS", "TRIP_SERVICE_PORT", 50051),
-      bookingAddress: readGrpcAddress(env, "BOOKING_SERVICE_GRPC_ADDRESS", "BOOKING_SERVICE_PORT", 50052),
+      bookingAddress: readGrpcAddress(env, "BOOKING_SERVICE_GRPC_ADDRESS", "BOOKING_SERVICE_PORT", 50053),
       seatInventoryAddress: readGrpcAddress(
         env,
         "SEAT_INVENTORY_SERVICE_GRPC_ADDRESS",
         "SEAT_INVENTORY_SERVICE_PORT",
-        50053
+        50052
       )
     }
   };
