@@ -10,6 +10,12 @@ export function seatInventoryAddress(env = process.env) {
   );
 }
 
+export function releaseHoldRequest({ holdToken }) {
+  return {
+    hold_token: holdToken
+  };
+}
+
 function client() {
   if (!seatClient) {
     const proto = loadProto("seat_inventory.proto");
@@ -33,4 +39,8 @@ export async function confirmSeats({ tripId, seatIds, holdToken, bookingId }) {
     hold_token: holdToken,
     booking_id: bookingId
   });
+}
+
+export async function releaseSeatHold({ holdToken }) {
+  return promisifyGrpc(client(), "ReleaseHold", releaseHoldRequest({ holdToken }));
 }

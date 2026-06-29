@@ -59,7 +59,7 @@ npm run test:race
 Default gRPC address:
 
 ```text
-0.0.0.0:50053
+0.0.0.0:50052
 ```
 
 Required local dependencies for `GetSeatMap`:

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { seatInventoryAddress } from "../src/seat-client.js";
+import { releaseHoldRequest, seatInventoryAddress } from "../src/seat-client.js";
 
 test("seat inventory client prefers the documented service address env var", () => {
   assert.equal(
@@ -24,4 +24,11 @@ test("seat inventory client keeps the legacy env var as fallback", () => {
 
 test("seat inventory client defaults to the documented local port", () => {
   assert.equal(seatInventoryAddress({}), "localhost:50052");
+});
+
+test("seat inventory release hold request uses the documented proto field", () => {
+  assert.deepEqual(
+    releaseHoldRequest({ holdToken: "hold-demo-123" }),
+    { hold_token: "hold-demo-123" }
+  );
 });

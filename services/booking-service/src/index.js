@@ -1,7 +1,7 @@
 import { publishKafkaEvent, publishWorkflowEvent } from "@bus/shared/events.js";
 import { fail, toGrpcError } from "@bus/shared/errors.js";
 import { grpc, loadProto } from "@bus/shared/grpc.js";
-import { confirmSeats } from "./seat-client.js";
+import { confirmSeats, releaseSeatHold } from "./seat-client.js";
 import {
   cancelBooking,
   checkInPassenger,
@@ -149,6 +149,16 @@ async function runExpirationJob() {
         holdToken: b.holdToken,
         seatIds: b.seatIds
       };
+
+      if (b.holdToken) {
+        try {
+          await releaseSeatHold({ holdToken: b.holdToken });
+        } catch (error) {
+          console.warn(
+            `[booking-service] Failed to release expired hold ${b.holdToken}: ${error.message}`
+          );
+        }
+      }
 
       await publishWorkflowEvent("booking.expired", eventPayload);
       await publishKafkaEvent("booking-events", "booking.expired", eventPayload);
