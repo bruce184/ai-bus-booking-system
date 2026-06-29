@@ -89,9 +89,19 @@ create table if not exists bookings (
   updated_at timestamptz not null default now()
 );
 
-alter table trip_seats
-  add constraint fk_trip_seats_booking
-  foreign key (booking_id) references bookings(id);
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'fk_trip_seats_booking'
+      and conrelid = 'trip_seats'::regclass
+  ) then
+    alter table trip_seats
+      add constraint fk_trip_seats_booking
+      foreign key (booking_id) references bookings(id);
+  end if;
+end $$;
 
 create table if not exists booking_passengers (
   id uuid primary key default gen_random_uuid(),

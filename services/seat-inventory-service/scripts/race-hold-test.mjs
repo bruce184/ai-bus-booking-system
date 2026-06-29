@@ -11,7 +11,7 @@ const currentFile = fileURLToPath(import.meta.url);
 const serviceDir = path.resolve(path.dirname(currentFile), "..");
 const protoPath = path.resolve(serviceDir, "../../proto/seat_inventory.proto");
 
-const target = process.env.SEAT_INVENTORY_TEST_TARGET ?? "localhost:50053";
+const target = process.env.SEAT_INVENTORY_TEST_TARGET ?? "localhost:50052";
 const databaseUrl =
   process.env.DATABASE_URL ??
   "postgresql://bus_app:change_me_local_only@localhost:5432/bus_booking";

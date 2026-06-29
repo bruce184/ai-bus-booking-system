@@ -7,6 +7,10 @@ const gatewayRoot = fileURLToPath(new URL("../..", import.meta.url));
 const gatewayPort = 4100;
 const gatewayUrl = `http://127.0.0.1:${gatewayPort}/graphql`;
 const startupTimeoutMs = 10_000;
+const seatInventoryTestAddress =
+  process.env.SEAT_INVENTORY_SERVICE_GRPC_ADDRESS ||
+  process.env.SEAT_INVENTORY_URL ||
+  "";
 
 let gatewayProcess;
 let gatewayOutput = "";
@@ -90,7 +94,9 @@ test.before(async () => {
       GRAPHQL_GATEWAY_PORT: String(gatewayPort),
       JWT_SECRET: "integration_test_secret_change_me_1234567890",
       TRIP_SERVICE_GRPC_ADDRESS: "127.0.0.1:59951",
-      BOOKING_SERVICE_GRPC_ADDRESS: "127.0.0.1:59953"
+      BOOKING_SERVICE_GRPC_ADDRESS: "127.0.0.1:59953",
+      SEAT_INVENTORY_SERVICE_GRPC_ADDRESS:
+        seatInventoryTestAddress || "127.0.0.1:59952"
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -240,14 +246,13 @@ test("staff reaches adminCheckIn authorization boundary before booking service c
   assert.equal(result.body.errors[0].extensions.code, "INTERNAL_ERROR");
 });
 
-// When SEAT_INVENTORY_URL is not set, the gateway cannot reach the gRPC service.
+// When no seat inventory test address is set, the gateway cannot reach the gRPC service.
 // The gateway must translate the connection failure into a GraphQL INTERNAL_ERROR.
-// When SEAT_INVENTORY_URL is set, the gateway reaches the real service and returns data.
-const SEAT_INVENTORY_URL = process.env.SEAT_INVENTORY_URL;
+// When SEAT_INVENTORY_SERVICE_GRPC_ADDRESS is set, the gateway reaches the real service and returns data.
 
 test("seatMap returns INTERNAL_ERROR when seat inventory service is unreachable", {
-  skip: !!SEAT_INVENTORY_URL
-    ? "Seat inventory service is running — skipping the unavailability test"
+  skip: !!seatInventoryTestAddress
+    ? "Seat inventory service is running - skipping the unavailability test"
     : false
 }, async () => {
   // Business rule: gateway must never expose raw gRPC errors to clients.
@@ -272,8 +277,8 @@ test("seatMap returns INTERNAL_ERROR when seat inventory service is unreachable"
 });
 
 test("seatMap returns seat array when seat inventory service is available", {
-  skip: !SEAT_INVENTORY_URL
-    ? "Set SEAT_INVENTORY_URL=<host:port> to run this test against a live seat service"
+  skip: !seatInventoryTestAddress
+    ? "Set SEAT_INVENTORY_SERVICE_GRPC_ADDRESS=<host:port> to run this test against a live seat service"
     : false
 }, async () => {
   // Business rule: gateway must proxy the gRPC seat map to GraphQL clients.
@@ -307,10 +312,10 @@ test("seatMap returns seat array when seat inventory service is available", {
 
 // This test requires a live seat inventory service seeded with the race-test trip.
 // Run: docker compose up -d && node services/seat-inventory-service/src/server.js
-// Then: SEAT_INVENTORY_URL=localhost:50053 npm run test:gateway:integration
+// Then: SEAT_INVENTORY_SERVICE_GRPC_ADDRESS=localhost:50052 npm run test:gateway:integration
 test("gateway proxies holdSeats and releaseSeatHold through to the seat inventory service", {
-  skip: !SEAT_INVENTORY_URL
-    ? "Set SEAT_INVENTORY_URL=<host:port> to run this test against a live seat service"
+  skip: !seatInventoryTestAddress
+    ? "Set SEAT_INVENTORY_SERVICE_GRPC_ADDRESS=<host:port> to run this test against a live seat service"
     : false
 }, async () => {
   // Business rule: gateway must correctly relay hold/release operations to
