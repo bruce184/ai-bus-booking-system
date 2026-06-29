@@ -2,12 +2,20 @@ import { createInsecureClient, loadProto, promisifyGrpc } from "@bus/shared/grpc
 
 let seatClient;
 
+export function seatInventoryAddress(env = process.env) {
+  return (
+    env.SEAT_INVENTORY_SERVICE_GRPC_ADDRESS ||
+    env.SEAT_INVENTORY_GRPC_URL ||
+    "localhost:50052"
+  );
+}
+
 function client() {
   if (!seatClient) {
     const proto = loadProto("seat_inventory.proto");
     seatClient = createInsecureClient(
       proto.bus.seat.v1.SeatInventoryService,
-      process.env.SEAT_INVENTORY_GRPC_URL || "localhost:50052"
+      seatInventoryAddress()
     );
   }
   return seatClient;
