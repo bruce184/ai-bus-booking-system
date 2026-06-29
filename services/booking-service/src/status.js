@@ -18,5 +18,5 @@ export function canCancel(status) {
 }
 
 export function canCheckIn(status) {
-  return status === "PAID" || status === "TICKET_ISSUED";
+  return status === "TICKET_ISSUED";
 }

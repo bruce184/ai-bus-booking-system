@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { query, transaction } from "@bus/shared/db.js";
 import { fail } from "@bus/shared/errors.js";
+import { canCancel, canCheckIn } from "./status.js";
 
 function bookingCode() {
   const now = new Date();
@@ -262,8 +263,8 @@ export async function cancelBooking({ booking_code, email }) {
     if (!booking) {
       fail("NOT_FOUND", "Booking not found");
     }
-    if (booking.status !== "PAID" && booking.status !== "TICKET_ISSUED") {
-      fail("BOOKING_STATE_INVALID", "Only PAID or TICKET_ISSUED bookings can be cancelled");
+    if (!canCancel(booking.status)) {
+      fail("BOOKING_STATE_INVALID", "Only PAID bookings can be cancelled");
     }
     if (new Date(booking.departure_time) <= new Date()) {
       fail("BOOKING_STATE_INVALID", "Cannot cancel booking for a trip that has already departed");
@@ -382,8 +383,8 @@ export async function checkInPassenger({ code, staff_user_id }) {
     if (booking.status === "CHECKED_IN") {
       return fetchBookingById(booking.id, client);
     }
-    if (booking.status !== "PAID" && booking.status !== "TICKET_ISSUED") {
-      fail("BOOKING_STATE_INVALID", "Only PAID or TICKET_ISSUED bookings can be checked in");
+    if (!canCheckIn(booking.status)) {
+      fail("BOOKING_STATE_INVALID", "Only TICKET_ISSUED bookings can be checked in");
     }
 
     await client.query(
