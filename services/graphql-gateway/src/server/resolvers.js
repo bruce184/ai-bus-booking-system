@@ -7,9 +7,30 @@ import { adminMutationResolvers } from "./adminResolvers.js";
 import { callGrpc } from "../grpc/call.js";
 import { requireAdmin } from "../auth/authorization.js";
 import { publishSeatStateChanged, subscribeSeatStateChanged } from "./seatStatePubSub.js";
+import { publishBookingUpdated, subscribeBookingUpdated } from "./bookingUpdatedPubSub.js";
 
 function requesterIdFromContext(context) {
   return context.user?.id ?? context.requestId ?? "guest";
+}
+
+// Broadcast real seat states (from Seat Inventory) instead of fabricating
+// coordinates. Best-effort: a failed fetch must not fail the mutation.
+async function publishSeatStates(context, tripId, seatIds) {
+  if (!tripId || !seatIds?.length) {
+    return;
+  }
+
+  try {
+    const response = await callGrpc(context.grpc.seatInventory, "getSeatMap", { tripId });
+    const wanted = new Set(seatIds);
+    const seats = (response.seats || []).filter((seat) => wanted.has(seat.id));
+
+    if (seats.length) {
+      publishSeatStateChanged(tripId, seats);
+    }
+  } catch {
+    // Subscribers refetch on their next interaction.
+  }
 }
 
 function parseDateTime(value) {
@@ -240,16 +261,8 @@ export const resolvers = {
         { holdToken: args.input.holdToken }
       );
 
-      if (response.released && response.tripId && response.seatIds?.length) {
-        const seats = response.seatIds.map((seatId) => ({
-          id: seatId,
-          label: seatId,
-          deck: 1,
-          row: 1,
-          column: 1,
-          status: "AVAILABLE"
-        }));
-        publishSeatStateChanged(response.tripId, seats);
+      if (response.released) {
+        await publishSeatStates(context, response.tripId, response.seatIds);
       }
 
       return response.released;
@@ -279,16 +292,13 @@ export const resolvers = {
         success: args.input.success
       });
 
-      if (args.input.success && booking && booking.tripId && booking.passengers?.length) {
-        const seats = booking.passengers.map((p) => ({
-          id: p.seatId,
-          label: p.seatId,
-          deck: 1,
-          row: 1,
-          column: 1,
-          status: "BOOKED"
-        }));
-        publishSeatStateChanged(booking.tripId, seats);
+      if (args.input.success && booking) {
+        await publishSeatStates(
+          context,
+          booking.tripId,
+          (booking.passengers || []).map((p) => p.seatId)
+        );
+        publishBookingUpdated(booking);
       }
 
       return booking;
@@ -300,16 +310,13 @@ export const resolvers = {
         email: args.input.email
       });
 
-      if (booking && booking.tripId && booking.passengers?.length) {
-        const seats = booking.passengers.map((p) => ({
-          id: p.seatId,
-          label: p.seatId,
-          deck: 1,
-          row: 1,
-          column: 1,
-          status: "AVAILABLE"
-        }));
-        publishSeatStateChanged(booking.tripId, seats);
+      if (booking) {
+        await publishSeatStates(
+          context,
+          booking.tripId,
+          (booking.passengers || []).map((p) => p.seatId)
+        );
+        publishBookingUpdated(booking);
       }
 
       return booking;
@@ -351,6 +358,9 @@ export const resolvers = {
   Subscription: {
     seatStateChanged: {
       subscribe: (_parent, args) => subscribeSeatStateChanged(args.tripId)
+    },
+    bookingUpdated: {
+      subscribe: (_parent, args) => subscribeBookingUpdated(args.bookingCode)
     }
   }
 };

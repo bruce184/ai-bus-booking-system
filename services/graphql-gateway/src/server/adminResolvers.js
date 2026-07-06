@@ -2,6 +2,7 @@ import { requireAdmin, requireAdminOrStaff } from "../auth/authorization.js";
 import { gatewayError } from "../auth/errors.js";
 import { callGrpc } from "../grpc/call.js";
 import { publishSeatStateChanged } from "./seatStatePubSub.js";
+import { publishBookingUpdated } from "./bookingUpdatedPubSub.js";
 
 function requireNonEmpty(value, fieldName) {
   const trimmed = typeof value === "string" ? value.trim() : "";
@@ -255,6 +256,8 @@ export const adminMutationResolvers = {
       code: requireNonEmpty(args.input.code, "code"),
       staffUserId: staffUser.id
     };
-    return callGrpc(context.grpc.booking, "checkInPassenger", request);
+    const booking = await callGrpc(context.grpc.booking, "checkInPassenger", request);
+    publishBookingUpdated(booking);
+    return booking;
   }
 };
