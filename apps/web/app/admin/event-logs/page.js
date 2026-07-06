@@ -154,7 +154,10 @@ export default function EventLogsDashboard() {
   };
 
   useEffect(() => {
-    handleQueryLogs();
+    // setTimeout keeps the initial fetch's setState out of the synchronous
+    // effect body (react-hooks/set-state-in-effect).
+    const timer = setTimeout(() => handleQueryLogs(), 0);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

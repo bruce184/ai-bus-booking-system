@@ -10,7 +10,9 @@ export default function HomePage() {
           <p className="lead">Demo luồng checkout, thanh toán mô phỏng, tạo vé điện tử và tra cứu booking.</p>
         </div>
         <nav className="nav">
-          <Link href="/checkout">Checkout</Link>
+          <Link href="/search">Tìm chuyến</Link>
+          <Link href="/my-bookings">Vé của tôi</Link>
+          <Link href="/login">Đăng nhập</Link>
           <Link href="/lookup">Tra cứu vé</Link>
         </nav>
       </header>
@@ -21,7 +23,7 @@ export default function HomePage() {
           <h2 className="brand">Đặt vé xe liên tỉnh, xác nhận nhanh, vé rõ ràng.</h2>
           <p className="lead">Module 3 xử lý booking, payment simulation, ticket worker và email worker theo đúng contract của nhóm.</p>
           <div className="hero-actions">
-            <Link className="button primary" href="/checkout">Bắt đầu checkout</Link>
+            <Link className="button primary" href="/search">Tìm chuyến và chọn ghế</Link>
             <Link className="button" href="/lookup">Tra cứu booking</Link>
           </div>
         </div>

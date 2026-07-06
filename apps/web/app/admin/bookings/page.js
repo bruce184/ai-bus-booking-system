@@ -137,7 +137,10 @@ export default function BookingsCrud() {
   };
 
   useEffect(() => {
-    handleQueryBookings();
+    // setTimeout keeps the initial fetch's setState out of the synchronous
+    // effect body (react-hooks/set-state-in-effect).
+    const timer = setTimeout(() => handleQueryBookings(), 0);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

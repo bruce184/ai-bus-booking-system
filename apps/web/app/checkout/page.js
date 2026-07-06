@@ -21,6 +21,7 @@ function CheckoutContent() {
   const router = useRouter();
   const params = useSearchParams();
   const defaultSeats = useMemo(() => (params.get("seats") || "A01").split(","), [params]);
+  const fromSeatFlow = Boolean(params.get("tripId") && params.get("holdToken"));
   const [tripId, setTripId] = useState(params.get("tripId") || "");
   const [holdToken, setHoldToken] = useState(params.get("holdToken") || "");
   const [contactEmail, setContactEmail] = useState("");
@@ -74,15 +75,25 @@ function CheckoutContent() {
           <span className="status">{passengers.length} ghế</span>
         </div>
 
+        {fromSeatFlow ? (
+          <div className="notice">
+            Ghế {defaultSeats.join(", ")} đang được giữ cho bạn. Hoàn tất thông tin bên dưới trước khi hết thời gian giữ ghế.
+          </div>
+        ) : null}
+
         <div className="grid">
-          <div className="field">
-            <label>Trip ID</label>
-            <input value={tripId} onChange={(event) => setTripId(event.target.value)} placeholder="trip-demo-001" required />
-          </div>
-          <div className="field">
-            <label>Hold token</label>
-            <input value={holdToken} onChange={(event) => setHoldToken(event.target.value)} placeholder="Redis hold token" required />
-          </div>
+          {fromSeatFlow ? null : (
+            <>
+              <div className="field">
+                <label>Trip ID</label>
+                <input value={tripId} onChange={(event) => setTripId(event.target.value)} placeholder="trip-demo-001" required />
+              </div>
+              <div className="field">
+                <label>Hold token</label>
+                <input value={holdToken} onChange={(event) => setHoldToken(event.target.value)} placeholder="Redis hold token" required />
+              </div>
+            </>
+          )}
           <div className="field">
             <label>Email liên hệ</label>
             <input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} placeholder="guest@example.com" required />
