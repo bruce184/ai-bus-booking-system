@@ -1,20 +1,22 @@
+// IDs must match the users seeded in database/seed.sql: booking-service casts
+// them to uuid for bookings.customer_user_id / saved_passengers.customer_user_id.
 const DEMO_USERS = [
   {
-    id: "demo-admin",
+    id: "00000000-0000-4000-8000-000000000001",
     email: "admin@example.com",
     fullName: "Admin Demo",
     role: "ADMIN",
     password: "admin123"
   },
   {
-    id: "demo-staff",
+    id: "00000000-0000-4000-8000-000000000002",
     email: "staff@example.com",
     fullName: "Staff Demo",
     role: "STAFF",
     password: "staff123"
   },
   {
-    id: "demo-customer",
+    id: "00000000-0000-4000-8000-000000000003",
     email: "customer@example.com",
     fullName: "Customer Demo",
     role: "CUSTOMER",

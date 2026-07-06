@@ -128,7 +128,7 @@ test.after(async () => {
 test("login and me work through the real GraphQL HTTP gateway", async () => {
   const loginResult = await login("admin@example.com", "admin123");
 
-  assert.equal(loginResult.user.id, "demo-admin");
+  assert.equal(loginResult.user.id, "00000000-0000-4000-8000-000000000001");
   assert.equal(loginResult.user.role, "ADMIN");
 
   const meResult = await graphqlRequest({
@@ -139,7 +139,7 @@ test("login and me work through the real GraphQL HTTP gateway", async () => {
   assert.equal(meResult.status, 200);
   assert.equal(meResult.body.errors, undefined);
   assert.deepEqual(meResult.body.data.me, {
-    id: "demo-admin",
+    id: "00000000-0000-4000-8000-000000000001",
     email: "admin@example.com",
     role: "ADMIN"
   });

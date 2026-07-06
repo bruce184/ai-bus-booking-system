@@ -32,13 +32,13 @@ test("Users Module", async (t) => {
   await t.test("findDemoUserByCredentials should return correct user or null", () => {
     const admin = findDemoUserByCredentials("admin@example.com", "admin123");
     assert.ok(admin);
-    assert.strictEqual(admin.id, "demo-admin");
+    assert.strictEqual(admin.id, "00000000-0000-4000-8000-000000000001");
     assert.strictEqual(admin.role, "ADMIN");
     assert.strictEqual(admin.password, undefined);
 
     const lowercaseAdmin = findDemoUserByCredentials("  ADMIN@example.com  ", "admin123");
     assert.ok(lowercaseAdmin);
-    assert.strictEqual(lowercaseAdmin.id, "demo-admin");
+    assert.strictEqual(lowercaseAdmin.id, "00000000-0000-4000-8000-000000000001");
 
     const invalid = findDemoUserByCredentials("admin@example.com", "wrong-password");
     assert.strictEqual(invalid, null);
@@ -48,9 +48,9 @@ test("Users Module", async (t) => {
   });
 
   await t.test("findDemoUserById should return user or null", () => {
-    const staff = findDemoUserById("demo-staff");
+    const staff = findDemoUserById("00000000-0000-4000-8000-000000000002");
     assert.ok(staff);
-    assert.strictEqual(staff.id, "demo-staff");
+    assert.strictEqual(staff.id, "00000000-0000-4000-8000-000000000002");
     assert.strictEqual(staff.role, "STAFF");
     assert.strictEqual(staff.password, undefined);
 
@@ -61,7 +61,7 @@ test("Users Module", async (t) => {
 
 test("JWT Module", async (t) => {
   const testUser = {
-    id: "demo-admin",
+    id: "00000000-0000-4000-8000-000000000001",
     email: "admin@example.com",
     role: "ADMIN",
     fullName: "Admin Demo"
@@ -130,9 +130,9 @@ test("JWT Module", async (t) => {
 });
 
 test("Authorization Module", async (t) => {
-  const adminUser = { id: "demo-admin", role: "ADMIN", email: "admin@example.com" };
-  const staffUser = { id: "demo-staff", role: "STAFF", email: "staff@example.com" };
-  const customerUser = { id: "demo-customer", role: "CUSTOMER", email: "customer@example.com" };
+  const adminUser = { id: "00000000-0000-4000-8000-000000000001", role: "ADMIN", email: "admin@example.com" };
+  const staffUser = { id: "00000000-0000-4000-8000-000000000002", role: "STAFF", email: "staff@example.com" };
+  const customerUser = { id: "00000000-0000-4000-8000-000000000003", role: "CUSTOMER", email: "customer@example.com" };
 
   await t.test("requireUser should allow user and throw UNAUTHORIZED on missing user", () => {
     // Valid context
@@ -204,7 +204,7 @@ test("Authorization Module", async (t) => {
 
 test("Context Module", async (t) => {
   const testUser = {
-    id: "demo-admin",
+    id: "00000000-0000-4000-8000-000000000001",
     email: "admin@example.com",
     role: "ADMIN",
     fullName: "Admin Demo"
