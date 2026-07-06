@@ -5,7 +5,8 @@ import {
   BOOKING_STATUSES,
   assertPendingPayment,
   canCancel,
-  canCheckIn
+  canCheckIn,
+  canCheckInTripState
 } from "../src/status.js";
 
 test("booking status set matches documented state names", () => {
@@ -42,4 +43,12 @@ test("check-in follows TICKET_ISSUED to CHECKED_IN transition", () => {
   assert.equal(canCheckIn("PAID"), false);
   assert.equal(canCheckIn("PENDING_PAYMENT"), false);
   assert.equal(canCheckIn("CANCELLED"), false);
+});
+
+test("check-in is rejected for cancelled trips only", () => {
+  assert.equal(canCheckInTripState("CANCELLED"), false);
+  assert.equal(canCheckInTripState("ACTIVE"), true);
+  assert.equal(canCheckInTripState("LOCKED"), true);
+  assert.equal(canCheckInTripState("DEPARTED"), true);
+  assert.equal(canCheckInTripState("COMPLETED"), true);
 });

@@ -1,7 +1,7 @@
 import { publishKafkaEvent, publishWorkflowEvent } from "@bus/shared/events.js";
 import { fail, toGrpcError } from "@bus/shared/errors.js";
 import { grpc, loadProto } from "@bus/shared/grpc.js";
-import { confirmSeats, releaseSeatHold } from "./seat-client.js";
+import { confirmSeats, releaseBookedSeats, releaseSeatHold } from "./seat-client.js";
 import {
   cancelBooking,
   checkInPassenger,
@@ -91,6 +91,23 @@ async function createBookingWithEvents(request) {
 
 async function cancelBookingWithEvents(request) {
   const booking = await cancelBooking(request);
+
+  // Seat Inventory owns seat state; release the booked seats through its RPC
+  // after the cancellation transaction has committed. A failure here leaves
+  // the seats BOOKED (no overselling) and is logged for manual follow-up.
+  const seatIds = booking.passengers.map((passenger) => passenger.seat_id);
+  try {
+    await releaseBookedSeats({
+      tripId: booking.trip_id,
+      seatIds,
+      bookingId: booking.id
+    });
+  } catch (error) {
+    console.warn(
+      `[booking-service] Failed to release booked seats for cancelled booking ${booking.booking_code}: ${error.message}`
+    );
+  }
+
   await publishKafkaEvent("booking-events", "booking.cancelled", {
     bookingId: booking.id,
     bookingCode: booking.booking_code,

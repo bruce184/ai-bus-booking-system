@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { query, transaction } from "@bus/shared/db.js";
 import { fail } from "@bus/shared/errors.js";
-import { canCancel, canCheckIn } from "./status.js";
+import { canCancel, canCheckIn, canCheckInTripState } from "./status.js";
 
 function bookingCode() {
   const now = new Date();
@@ -274,10 +274,8 @@ export async function cancelBooking({ booking_code, email }) {
       "update bookings set status = 'CANCELLED', updated_at = now() where id = $1",
       [booking.id]
     );
-    await client.query(
-      "update trip_seats set status = 'AVAILABLE', booking_id = null, updated_at = now() where booking_id = $1 and status = 'BOOKED'",
-      [booking.id]
-    );
+    // Seat state is owned by Seat Inventory: the caller releases booked seats
+    // through the ReleaseBookedSeats RPC after this transaction commits.
     await client.query(
       "insert into event_logs (event_type, entity_type, entity_id, payload) values ($1, $2, $3, $4)",
       ["booking.cancelled", "booking", booking.id, JSON.stringify({ bookingCode: booking.booking_code })]
@@ -365,13 +363,20 @@ export async function checkInPassenger({ code, staff_user_id }) {
   }
 
   return transaction(async (client) => {
+    // Postgres rejects DISTINCT together with FOR UPDATE, so resolve the
+    // booking id in a subquery and lock only the target bookings row.
     const result = await client.query(
       `
-        select distinct b.*
+        select b.*, t.status as trip_status
         from bookings b
-        left join tickets tk on tk.booking_id = b.id
-        where b.booking_code = $1 or tk.ticket_code = $1 or tk.qr_payload = $1
-        limit 1
+        join trips t on t.id = b.trip_id
+        where b.id = (
+          select b2.id
+          from bookings b2
+          left join tickets tk on tk.booking_id = b2.id
+          where b2.booking_code = $1 or tk.ticket_code = $1 or tk.qr_payload = $1
+          limit 1
+        )
         for update of b
       `,
       [code]
@@ -385,6 +390,9 @@ export async function checkInPassenger({ code, staff_user_id }) {
     }
     if (!canCheckIn(booking.status)) {
       fail("BOOKING_STATE_INVALID", "Only TICKET_ISSUED bookings can be checked in");
+    }
+    if (!canCheckInTripState(booking.trip_status)) {
+      fail("BOOKING_STATE_INVALID", "Cannot check in a booking for a cancelled trip");
     }
 
     await client.query(

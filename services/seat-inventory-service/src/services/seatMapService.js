@@ -6,7 +6,8 @@ import {
   blockTripSeats,
   confirmTripSeats,
   listTripSeats,
-  listTripSeatsByIds
+  listTripSeatsByIds,
+  releaseBookedTripSeats
 } from "../repositories/seatRepository.js";
 import {
   getHeldSeatIds,
@@ -218,6 +219,32 @@ export async function confirmSeats(request) {
       ...toSeatResponse(seat, new Set()),
       status: "BOOKED"
     }))
+  };
+}
+
+export async function releaseBookedSeats(request) {
+  const tripId = getTripId(request).trim();
+  const seatIds = [...new Set(getSeatIds(request).map((seatId) => seatId.trim()).filter(Boolean))];
+  const bookingId = getBookingId(request).trim();
+
+  if (!tripId) {
+    throw serviceError(grpc.status.INVALID_ARGUMENT, "trip_id is required");
+  }
+
+  if (seatIds.length === 0) {
+    throw serviceError(grpc.status.INVALID_ARGUMENT, "seat_ids must contain at least one seat");
+  }
+
+  if (!bookingId) {
+    throw serviceError(grpc.status.INVALID_ARGUMENT, "booking_id is required");
+  }
+
+  // Only seats still BOOKED by this booking are released; anything else
+  // (already released, re-blocked by admin) is skipped rather than forced.
+  const releasedSeats = await releaseBookedTripSeats(tripId, seatIds, bookingId);
+
+  return {
+    seats: releasedSeats.map((seat) => toSeatResponse(seat, new Set()))
   };
 }
 

@@ -44,3 +44,16 @@ export async function confirmSeats({ tripId, seatIds, holdToken, bookingId }) {
 export async function releaseSeatHold({ holdToken }) {
   return promisifyGrpc(client(), "ReleaseHold", releaseHoldRequest({ holdToken }));
 }
+
+export async function releaseBookedSeats({ tripId, seatIds, bookingId }) {
+  if (process.env.SKIP_SEAT_CONFIRMATION === "true") {
+    console.warn("[booking-service] SKIP_SEAT_CONFIRMATION=true, not calling Seat Inventory Service");
+    return { seats: seatIds.map((seatId) => ({ id: seatId, label: seatId, status: "AVAILABLE" })) };
+  }
+
+  return promisifyGrpc(client(), "ReleaseBookedSeats", {
+    trip_id: tripId,
+    seat_ids: seatIds,
+    booking_id: bookingId
+  });
+}

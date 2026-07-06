@@ -20,3 +20,9 @@ export function canCancel(status) {
 export function canCheckIn(status) {
   return status === "TICKET_ISSUED";
 }
+
+// Docs only rule out cancelled trips explicitly ("check-in flows must respect
+// trip state"); DEPARTED stays allowed for late boarding in the local demo.
+export function canCheckInTripState(tripStatus) {
+  return tripStatus !== "CANCELLED";
+}

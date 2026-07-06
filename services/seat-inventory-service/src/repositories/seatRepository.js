@@ -109,6 +109,49 @@ export async function confirmTripSeats(tripId, seatIds, bookingId) {
   }));
 }
 
+export async function releaseBookedTripSeats(tripId, seatIds, bookingId) {
+  const result = await pool.query(
+    `
+      with updated as (
+        update trip_seats
+           set status = 'AVAILABLE',
+               booking_id = null,
+               updated_at = now()
+         where trip_id = $1
+           and seat_label = any($2::text[])
+           and status = 'BOOKED'
+           and booking_id = $3::uuid
+         returning *
+      )
+      select
+        updated.id,
+        updated.seat_label,
+        coalesce(vs.deck, 1) as deck,
+        coalesce(vs.seat_row, 1) as seat_row,
+        coalesce(vs.seat_column, 1) as seat_column,
+        updated.status,
+        updated.block_reason
+      from updated
+      join trips t on t.id = updated.trip_id
+      left join vehicle_seats vs
+        on vs.vehicle_id = t.vehicle_id
+       and vs.seat_label = updated.seat_label
+      order by coalesce(vs.deck, 1), coalesce(vs.seat_row, 1), coalesce(vs.seat_column, 1), updated.seat_label
+    `,
+    [tripId, seatIds, bookingId]
+  );
+
+  return result.rows.map((row) => ({
+    id: row.seat_label,
+    label: row.seat_label,
+    deck: Number(row.deck),
+    row: Number(row.seat_row),
+    column: Number(row.seat_column),
+    status: row.status,
+    blockReason: row.block_reason
+  }));
+}
+
 export async function blockTripSeats(tripId, seatIds, reason) {
   const result = await pool.query(
     `

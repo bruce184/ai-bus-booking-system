@@ -244,6 +244,7 @@ Owns seat map state, Redis holds, seat confirmation, and blocked seats.
 | `HoldSeats` | Atomically hold seats with Redis TTL |
 | `ReleaseHold` | Release a hold before TTL expiry |
 | `ConfirmSeats` | Convert held seats to booked after payment success |
+| `ReleaseBookedSeats` | Release seats booked by a cancelled booking back to available |
 | `BlockSeats` | Admin blocks seats from sale |
 
 ### Booking Service

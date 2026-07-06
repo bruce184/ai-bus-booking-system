@@ -5,6 +5,7 @@ import {
   confirmSeats,
   getSeatMap,
   holdSeats,
+  releaseBookedSeats,
   releaseHold
 } from "../services/seatMapService.js";
 
@@ -60,6 +61,19 @@ const handleConfirmSeats = async (call, callback) => {
   }
 };
 
+const handleReleaseBookedSeats = async (call, callback) => {
+  try {
+    callback(null, await releaseBookedSeats(call.request));
+  } catch (error) {
+    if (error && "code" in error) {
+      callback(error);
+      return;
+    }
+
+    callback(serviceError(grpc.status.INTERNAL, "Failed to release booked seats"));
+  }
+};
+
 const handleBlockSeats = async (call, callback) => {
   try {
     callback(null, await blockSeats(call.request));
@@ -78,5 +92,6 @@ export const seatInventoryHandlers = {
   holdSeats: handleHoldSeats,
   releaseHold: handleReleaseHold,
   confirmSeats: handleConfirmSeats,
+  releaseBookedSeats: handleReleaseBookedSeats,
   blockSeats: handleBlockSeats
 };
