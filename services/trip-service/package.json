@@ -1,0 +1,21 @@
+{
+  "name": "@bus/trip-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Trip Service: locations, routes, stops, vehicles, trips, search, and admin catalog (gRPC)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test:client": "node scripts/test-client.js"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.10.9",
+    "@grpc/proto-loader": "^0.7.13",
+    "dotenv": "^16.4.5",
+    "ioredis": "^5.4.1",
+    "kafkajs": "^2.2.4",
+    "pg": "^8.12.0"
+  }
+}
