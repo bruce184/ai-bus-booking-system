@@ -3,99 +3,19 @@
 import { useState, useEffect } from 'react';
 import { queryGraphQL } from '../../graphql.js';
 
-// Deterministic seed data based on B-3 specifications
-const SEEDED_EVENTS = [
-  {
-    id: 'log-01',
-    eventType: 'passenger.checked_in',
-    entityType: 'TICKET',
-    entityId: 'TK202606240001',
-    payload: JSON.stringify({
-      ticketCode: 'TK202606240001',
-      bookingCode: 'BK202606240001',
-      passengerName: 'Customer Demo',
-      seatId: 'L01',
-      staffUserId: 'staff-01',
-      timestamp: '2026-06-24T07:45:12.334Z'
-    }),
-    createdAt: '2026-06-24T07:45:12Z'
-  },
-  {
-    id: 'log-02',
-    eventType: 'booking.paid',
-    entityType: 'BOOKING',
-    entityId: 'BK202606240002',
-    payload: JSON.stringify({
-      bookingCode: 'BK202606240002',
-      totalAmount: 560000,
-      paymentMethod: 'VNPAY',
-      transactionId: 'TXN99882231',
-      timestamp: '2026-06-24T08:20:00.000Z'
-    }),
-    createdAt: '2026-06-24T08:20:00Z'
-  },
-  {
-    id: 'log-03',
-    eventType: 'booking.paid',
-    entityType: 'BOOKING',
-    entityId: 'BK202606240001',
-    payload: JSON.stringify({
-      bookingCode: 'BK202606240001',
-      totalAmount: 280000,
-      paymentMethod: 'MOMO',
-      transactionId: 'TXN11223344',
-      timestamp: '2026-06-24T08:15:00.000Z'
-    }),
-    createdAt: '2026-06-24T08:15:00Z'
-  },
-  {
-    id: 'log-04',
-    eventType: 'seat.blocked',
-    entityType: 'SEAT',
-    entityId: 'L04',
-    payload: JSON.stringify({
-      tripId: 'trip-1',
-      seatIds: ['L04', 'L05'],
-      reason: 'VIP seat reservation',
-      adminUserId: 'admin-01',
-      timestamp: '2026-06-23T11:00:00.000Z'
-    }),
-    createdAt: '2026-06-23T11:00:00Z'
-  },
-  {
-    id: 'log-05',
-    eventType: 'trip.created',
-    entityType: 'TRIP',
-    entityId: 'trip-2',
-    payload: JSON.stringify({
-      tripId: 'trip-2',
-      routeId: 'route-hcm-nt',
-      vehicleId: 'veh-03',
-      price: 320000,
-      departureTime: '2026-06-24T20:00:00.000Z',
-      timestamp: '2026-06-23T10:05:00.000Z'
-    }),
-    createdAt: '2026-06-23T10:05:00Z'
-  },
-  {
-    id: 'log-06',
-    eventType: 'trip.created',
-    entityType: 'TRIP',
-    entityId: 'trip-1',
-    payload: JSON.stringify({
-      tripId: 'trip-1',
-      routeId: 'route-hcm-dl',
-      vehicleId: 'veh-02',
-      price: 280000,
-      departureTime: '2026-06-24T08:00:00.000Z',
-      timestamp: '2026-06-23T10:00:00.000Z'
-    }),
-    createdAt: '2026-06-23T10:00:00Z'
+function parsePayload(payload) {
+  if (!payload) return {};
+  if (typeof payload !== 'string') return payload;
+
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return { raw: payload };
   }
-];
+}
 
 export default function EventLogsDashboard() {
-  const [logs, setLogs] = useState(SEEDED_EVENTS);
+  const [logs, setLogs] = useState([]);
   // Filters
   const [filterEventType, setFilterEventType] = useState('');
   const [filterEntityType, setFilterEntityType] = useState('');
@@ -109,7 +29,6 @@ export default function EventLogsDashboard() {
     setTimeout(() => setMessage(null), 3000);
   };
 
-  // Filter local list for instant responsiveness/demo purposes
   const filteredLogs = logs.filter(l => {
     if (filterEventType && l.eventType !== filterEventType) return false;
     if (filterEntityType && l.entityType !== filterEntityType) return false;
@@ -140,14 +59,16 @@ export default function EventLogsDashboard() {
           offset: 0
         }
       });
-      if (data.adminEventLogs && data.adminEventLogs.length > 0) {
-        setLogs(data.adminEventLogs);
+      const items = data.adminEventLogs || [];
+      setLogs(items);
+      if (items.length > 0) {
         showToast('Successfully synced logs from database!');
       } else {
-        showToast('No logs found in database. Using local demo logs.', 'info');
+        showToast('No event logs found for the current filters.', 'info');
       }
     } catch (err) {
-      console.log('Backend offline, using local logs.');
+      setLogs([]);
+      showToast(err.message || 'Failed to query event logs.', 'error');
     } finally {
       setLoading(false);
     }
@@ -223,6 +144,7 @@ export default function EventLogsDashboard() {
             <option value="booking.paid">booking.paid</option>
             <option value="seat.blocked">seat.blocked</option>
             <option value="passenger.checked_in">passenger.checked_in</option>
+            <option value="ticket.checked_in">ticket.checked_in</option>
           </select>
         </div>
         <div style={{ flex: 1, minWidth: '200px' }}>
@@ -325,6 +247,7 @@ export default function EventLogsDashboard() {
                         {log.eventType === 'booking.paid' && `Booking payment registered successfully.`}
                         {log.eventType === 'seat.blocked' && `Admin locked seat selection.`}
                         {log.eventType === 'passenger.checked_in' && `Passenger boarded bus.`}
+                        {log.eventType === 'ticket.checked_in' && `Passenger boarded bus.`}
                       </span>
                       <button
                         onClick={() => toggleExpand(log.id)}
@@ -355,7 +278,7 @@ export default function EventLogsDashboard() {
                         border: '1px solid rgba(255,255,255,0.05)',
                         animation: 'fadeIn 0.2s ease forwards'
                       }}>
-                        {JSON.stringify(JSON.parse(log.payload), null, 2)}
+                        {JSON.stringify(parsePayload(log.payload), null, 2)}
                       </pre>
                     )}
                   </div>
