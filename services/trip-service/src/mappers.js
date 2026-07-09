@@ -95,7 +95,7 @@ export function buildSeoTitle(origin, destination, departureTime, timezone) {
   }).formatToParts(d);
   const day = parts.find((p) => p.type === 'day')?.value ?? '';
   const month = parts.find((p) => p.type === 'month')?.value ?? '';
-  return `Ve xe ${origin} di ${destination} ngay ${day}/${month}`;
+  return `Vé xe ${origin} đi ${destination} ngày ${day}/${month}`;
 }
 
 // Maps a fully-joined trip row to a proto Trip. `extras` carries computed fields.
