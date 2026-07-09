@@ -4,15 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+function getDefaultDate() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().slice(0, 10);
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [from, setFrom] = useState("TP.HCM");
   const [to, setTo] = useState("Da Lat");
-  
-  // Tomorrow's date as default
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const defaultDate = tomorrow.toISOString().slice(0, 10);
-  const [date, setDate] = useState(defaultDate);
+  const [date, setDate] = useState(getDefaultDate);
 
   const handleSearch = (e) => {
     e.preventDefault();

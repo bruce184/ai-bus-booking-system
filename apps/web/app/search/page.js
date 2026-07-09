@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { graphqlRequest } from "../../lib/graphql";
@@ -29,7 +29,8 @@ const SEARCH_TRIPS = `
 `;
 
 function defaultSearchDate() {
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
   return tomorrow.toISOString().slice(0, 10);
 }
 
@@ -58,12 +59,13 @@ export default function SearchPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showSearchForm, setShowSearchForm] = useState(false);
+  const initialSearchStarted = useRef(false);
 
   // Client-side filter states
   const [selectedOperators, setSelectedOperators] = useState([]);
   const [sortBy, setSortBy] = useState("earliest"); // "earliest" | "price-asc" | "price-desc"
 
-  async function doSearch(originVal, destinationVal, dateVal) {
+  const doSearch = useCallback(async (originVal, destinationVal, dateVal) => {
     setLoading(true);
     setError("");
     try {
@@ -77,7 +79,7 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   async function submit(event) {
     event.preventDefault();
@@ -94,36 +96,25 @@ export default function SearchPage() {
   };
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const fromParam = params.get("from");
-      const toParam = params.get("to");
-      const dateParam = params.get("date");
-
-      let updatedOrigin = origin;
-      let updatedDestination = destination;
-      let updatedDate = departureDate;
-      let hasParams = false;
-
-      if (fromParam) {
-        setOrigin(fromParam);
-        updatedOrigin = fromParam;
-        hasParams = true;
-      }
-      if (toParam) {
-        setDestination(toParam);
-        updatedDestination = toParam;
-        hasParams = true;
-      }
-      if (dateParam) {
-        setDepartureDate(dateParam);
-        updatedDate = dateParam;
-        hasParams = true;
-      }
-
-      doSearch(updatedOrigin, updatedDestination, updatedDate);
+    if (initialSearchStarted.current) {
+      return undefined;
     }
-  }, []);
+    initialSearchStarted.current = true;
+
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      const nextOrigin = params.get("from") || origin;
+      const nextDestination = params.get("to") || destination;
+      const nextDate = params.get("date") || departureDate;
+
+      setOrigin(nextOrigin);
+      setDestination(nextDestination);
+      setDepartureDate(nextDate);
+      void doSearch(nextOrigin, nextDestination, nextDate);
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [departureDate, destination, doSearch, origin]);
 
   // Compute list of unique operators in the result for filter checkboxes
   const operators = useMemo(() => {
