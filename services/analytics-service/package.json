@@ -1,0 +1,14 @@
+{
+  "name": "@bus/analytics-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "pg": "^8.13.1"
+  }
+}

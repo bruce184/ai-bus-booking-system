@@ -21,3 +21,10 @@ Expected responsibilities:
 - Chatbot panel
 
 Web must call GraphQL Gateway, not internal gRPC services directly.
+
+Current Module 5 scaffold:
+
+- Next.js app scaffold with a chatbot panel on the search/booking landing page.
+- Chatbot actions call `searchTrips` and `getBookingStatus` tool functions through the GraphQL Gateway.
+- Booking lookup refuses to run without both booking code and email.
+- Cancellation/check-in answers come from internal policy resource text and include a source label.

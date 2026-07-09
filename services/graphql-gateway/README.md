@@ -17,3 +17,9 @@ docs/API_CONTRACT.md
 ```
 
 Internal service calls should use gRPC.
+
+Current Module 5 scaffold:
+
+- `src/resolvers/analyticsResolvers.js` implements `adminRevenueSummary`, `adminAnalyticsDashboard`, and `popularRoutes`.
+- The temporary HTTP runner in `src/index.js` executes those analytics queries only, so the team can demo TN-5 before the full GraphQL runtime is added.
+- Admin analytics requires demo header `x-demo-role: ADMIN`.
