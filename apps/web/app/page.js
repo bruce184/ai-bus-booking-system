@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ChatbotPanel } from "../components/ChatbotPanel";
 
 function getDefaultDate() {
   const tomorrow = new Date();
@@ -237,6 +238,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <ChatbotPanel />
 
       {/* Grid Panels (Illustrations) */}
       <section className="grid animate-fade-in">

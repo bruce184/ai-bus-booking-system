@@ -18,8 +18,7 @@ Intercity Bus Booking AI lets customers search trips, select seats, hold seats, 
 Current repository status:
 
 ```text
-The merged MVP modules include the GraphQL Gateway, Next.js web app, Trip Service, Seat Inventory Service, Booking Service, Payment Service, Ticket Worker, Email Worker, demo auth, admin wiring, and test harnesses.
-Analytics Service, AI chatbot runtime, and MCP Server runtime are still pending assigned implementation.
+The merged MVP modules include the GraphQL Gateway, Next.js web app, Trip Service, Seat Inventory Service, Booking Service, Payment Service, Ticket Worker, Email Worker, Analytics Service, web AI chatbot route, MCP Server runtime, demo auth, admin wiring, and test harnesses.
 ```
 
 Local demo is required. Online deployment is optional.
@@ -111,6 +110,7 @@ Important local ports:
 | Web | 3000 |
 | GraphQL Gateway | 4000 |
 | MCP Server | 4010 |
+| Analytics Service HTTP | 50056 |
 | Trip Service gRPC | 50051 |
 | Seat Inventory Service gRPC | 50052 |
 | Booking Service gRPC | 50053 |
@@ -207,6 +207,8 @@ npm run dev:gateway
 npm run dev:trip
 npm run dev:seat
 npm run dev:seat-consumer
+npm run dev:analytics
+npm run dev:mcp
 npm run dev:booking
 npm run dev:payment
 npm run dev:ticket-worker
@@ -236,6 +238,7 @@ Web:              http://localhost:3000
 GraphQL Gateway:  http://localhost:4000/graphql
 Booking gRPC:      localhost:50053
 Payment Service:   http://localhost:5010
+Analytics Service: http://localhost:50056/health
 MCP Server:       http://localhost:4010/mcp
 Nginx:            http://localhost:8080
 ```
@@ -273,7 +276,7 @@ Nginx:            http://localhost:8080
 [ ] Chatbot calls tools instead of inventing inventory
 [ ] Chatbot cites internal policy resources
 [ ] Chatbot refuses booking details without booking code and email
-[ ] MCP tools return demo data after MCP Server implementation is merged
+[ ] MCP tools return demo data
 ```
 
 ## 11. Common Problems

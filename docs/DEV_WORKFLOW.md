@@ -35,13 +35,11 @@ Admin Operations
 Analytics, AI Chatbot, MCP Server
 ```
 
-Current baseline status:
+Current repository status:
 
 ```text
-The B-1 GraphQL Gateway scaffold and B-2 demo auth exist.
-The B-3 deterministic database seed exists for local demo data.
-Members should add files/folders only inside their assigned module after task assignment.
-Contracts and source-of-truth docs define the required behavior before feature code exists.
+The merged MVP modules include the GraphQL Gateway, Next.js web app, Trip Service, Seat Inventory Service, Booking Service, Payment Service, Ticket Worker, Email Worker, Analytics Service, web AI chatbot route, MCP Server runtime, demo auth, admin wiring, and test harnesses.
+Contracts and source-of-truth docs define the required behavior for future changes.
 ```
 
 ## 3. Required Docs

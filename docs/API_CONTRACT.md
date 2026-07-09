@@ -4,7 +4,7 @@
 
 This file is the source of truth for public GraphQL operations, internal gRPC boundaries, workflow events, analytics events, and MCP tools/resources.
 
-The repository currently includes the GraphQL Gateway, web app, core trip, seat inventory, booking, payment, ticket, and email runtimes for the merged MVP modules. Remaining module code must follow this contract unless a task explicitly changes the contract and updates all affected files.
+The repository currently includes the GraphQL Gateway, web app, core trip, seat inventory, booking, payment, ticket, email, analytics, chatbot route, and MCP runtimes for the merged MVP modules. Remaining module code must follow this contract unless a task explicitly changes the contract and updates all affected files.
 
 ## 2. Public GraphQL Endpoint
 

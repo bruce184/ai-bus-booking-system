@@ -1,0 +1,18 @@
+import pg from "pg";
+import { config } from "../config.js";
+
+export const pool = new pg.Pool({
+  connectionString: config.databaseUrl,
+  max: 5,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000
+});
+
+export async function checkPostgres() {
+  const { rows } = await pool.query("select now() as now");
+  return rows[0];
+}
+
+export async function closePostgres() {
+  await pool.end();
+}
