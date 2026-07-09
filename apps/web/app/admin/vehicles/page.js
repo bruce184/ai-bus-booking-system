@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { queryGraphQL } from '../../graphql.js';
 
 export default function VehiclesCrud() {
@@ -8,7 +8,7 @@ export default function VehiclesCrud() {
   const [operatorName, setOperatorName] = useState('');
   const [vehicleCode, setVehicleCode] = useState('');
   const [licensePlate, setLicensePlate] = useState('');
-  const [vehicleType, setVehicleType] = useState('SEAT');
+  const [vehicleType, setVehicleType] = useState('seat_29');
   const [seatCount, setSeatCount] = useState('29');
 
   const [editingVehicle, setEditingVehicle] = useState(null);
@@ -228,7 +228,7 @@ export default function VehiclesCrud() {
     setOperatorName('');
     setVehicleCode('');
     setLicensePlate('');
-    setVehicleType('SEAT');
+    setVehicleType('seat_29');
     setSeatCount('29');
   };
 
@@ -279,8 +279,8 @@ export default function VehiclesCrud() {
                         borderRadius: '4px',
                         fontSize: '11px',
                         fontWeight: '700',
-                        backgroundColor: v.vehicleType === 'SEAT' ? 'rgba(59, 130, 246, 0.12)' : v.vehicleType === 'SLEEPER' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(139, 92, 246, 0.12)',
-                        color: v.vehicleType === 'SEAT' ? 'var(--info)' : v.vehicleType === 'SLEEPER' ? 'var(--secondary)' : '#8b5cf6'
+                        backgroundColor: v.vehicleType === 'seat_29' ? 'rgba(59, 130, 246, 0.12)' : v.vehicleType === 'sleeper_34' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(139, 92, 246, 0.12)',
+                        color: v.vehicleType === 'seat_29' ? 'var(--info)' : v.vehicleType === 'sleeper_34' ? 'var(--secondary)' : '#8b5cf6'
                       }}>
                         {v.vehicleType}
                       </span>
@@ -359,9 +359,9 @@ export default function VehiclesCrud() {
                   required
                   disabled={loading}
                 >
-                  <option value="SEAT">SEAT</option>
-                  <option value="SLEEPER">SLEEPER</option>
-                  <option value="LIMOSINE">LIMOUSINE</option>
+                  <option value="seat_29">seat_29</option>
+                  <option value="sleeper_34">sleeper_34</option>
+                  <option value="limousine_22">limousine_22</option>
                 </select>
               </div>
 
