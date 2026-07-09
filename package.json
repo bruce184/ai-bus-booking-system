@@ -1,5 +1,5 @@
 {
-  "name": "intercity-bus-booking-ai",
+  "name": "ai-bus-booking-system",
   "version": "0.1.0",
   "private": true,
   "description": "Student microservices project for intercity bus booking with AI and MCP Server",
@@ -27,7 +27,7 @@
     "infra:down": "docker compose down",
     "infra:reset": "docker compose down -v",
     "dev:services": "concurrently -k -s first -n \"gateway,web,trip,booking,payment,seat,seat-consumer,ticket,email,banner\" -c \"magenta,cyan,yellow,green,yellow,blue,red,gray,white,bgGreen.black.bold\" \"npm run dev:gateway\" \"npm run dev:web\" \"npm run dev:trip\" \"npm run dev:booking\" \"npm run dev:payment\" \"npm run dev:seat\" \"npm run dev:seat-consumer\" \"npm run dev:ticket-worker\" \"npm run dev:email-worker\" \"npm run dev:banner\"",
-    "dev:banner": "node -e \"setTimeout(() => { console.log('\\n===================================================\\n🚀 SYSTEM IS READY FOR DEMO!\\n===================================================\\n💻 Web App (Frontend):   http://localhost:3000\\n🌐 GraphQL Gateway:      http://localhost:4000/graphql\\n📁 Admin Dashboard:      http://localhost:3000/admin/login\\n===================================================\\n'); }, 20000)\"",
+    "dev:banner": "node -e \"setTimeout(() => { console.log('\\n===================================================\\n🚀 SYSTEM IS READY FOR DEMO!\\n===================================================\\n💻 Web App (Frontend):   http://localhost:3000\\n🌐 GraphQL Gateway:      http://localhost:4000/graphql\\n📁 Admin Dashboard:      http://localhost:3000/admin/login\\n===================================================\\n'); }, 20000); setInterval(() => {}, 3600000);\"",
     "dev:all": "npm run infra:up && npm run dev:services",
     "install:all": "npm install",
     "audit:fix": "node scripts/audit-packages.mjs",
