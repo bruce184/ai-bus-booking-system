@@ -68,7 +68,7 @@ function CheckoutContent() {
       <form className="panel form" onSubmit={submit}>
         <div className="row between">
           <div>
-            <h2>Thông tin booking</h2>
+            <h2>Thông tin đặt vé</h2>
             <p className="muted">Dữ liệu này thường được truyền sang từ màn chọn ghế.</p>
           </div>
           <span className="status">{passengers.length} ghế</span>
@@ -84,12 +84,12 @@ function CheckoutContent() {
           {fromSeatFlow ? null : (
             <>
               <div className="field">
-                <label>Trip ID</label>
+                <label>Mã chuyến xe (Trip ID)</label>
                 <input value={tripId} onChange={(event) => setTripId(event.target.value)} placeholder="trip-demo-001" required />
               </div>
               <div className="field">
-                <label>Hold token</label>
-                <input value={holdToken} onChange={(event) => setHoldToken(event.target.value)} placeholder="Redis hold token" required />
+                <label>Mã giữ chỗ (Hold token)</label>
+                <input value={holdToken} onChange={(event) => setHoldToken(event.target.value)} placeholder="Mã giữ chỗ Redis" required />
               </div>
             </>
           )}
@@ -109,7 +109,7 @@ function CheckoutContent() {
             <section className="passenger-card" key={passenger.seatId}>
               <div className="row between">
                 <h3>Ghế {passenger.seatId}</h3>
-                <span className="status">Passenger {index + 1}</span>
+                <span className="status">Hành khách {index + 1}</span>
               </div>
               <div className="grid">
                 <div className="field">

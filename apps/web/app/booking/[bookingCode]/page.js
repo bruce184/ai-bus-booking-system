@@ -89,10 +89,10 @@ export default async function BookingConfirmationPage({ params, searchParams }) 
                 <span className="muted">Vé đã phát hành</span>
                 <strong>{booking.tickets.length}</strong>
               </div>
-              <p className="muted">Ticket worker sẽ hiển thị vé ở đây sau khi xử lý event ticket.issued.</p>
+              <p className="muted">Vé điện tử sẽ hiển thị ở đây ngay sau khi hệ thống xuất vé hoàn tất.</p>
             </div>
           </div>
-
+ 
           <div className="form-section">
             <h2>Hành khách</h2>
             <div className="grid">
@@ -105,11 +105,11 @@ export default async function BookingConfirmationPage({ params, searchParams }) 
               ))}
             </div>
           </div>
-
+ 
           <div className="form-section">
             <h2>Vé điện tử</h2>
             {booking.tickets.length === 0 ? (
-              <div className="notice">Chưa có vé trong response. Kiểm tra ticket-worker nếu booking đã PAID.</div>
+              <div className="notice">Vé điện tử đang được xử lý và xuất phát hành. Vui lòng tải lại trang sau ít phút hoặc kiểm tra email của bạn.</div>
             ) : (
               <div className="grid">
                 {booking.tickets.map((ticket) => (

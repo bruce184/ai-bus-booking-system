@@ -93,7 +93,7 @@ function LoginContent() {
             <strong>customer@example.com</strong>
           </div>
           <p className="muted">Mật khẩu demo: customer123</p>
-          <div className="notice">Guest checkout không cần đăng nhập; tài khoản chỉ cần cho lịch sử đặt vé.</div>
+          <div className="notice">Mua vé nhanh không cần đăng nhập; tài khoản chỉ dùng khi cần xem lại lịch sử đơn đặt vé.</div>
         </aside>
       </section>
     </>

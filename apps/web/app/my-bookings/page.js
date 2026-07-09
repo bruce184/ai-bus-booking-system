@@ -87,7 +87,7 @@ export default function MyBookingsPage() {
           <div className="notice">Bạn chưa đăng nhập. Lịch sử đặt vé chỉ hiển thị cho khách hàng đã đăng nhập.</div>
           <div className="row">
             <Link className="button primary" href="/login?next=/my-bookings">Đăng nhập</Link>
-            <Link className="button" href="/lookup">Tra cứu bằng mã booking</Link>
+            <Link className="button" href="/lookup">Tra cứu bằng mã đặt vé</Link>
           </div>
         </section>
       ) : null}
@@ -97,13 +97,13 @@ export default function MyBookingsPage() {
       {state.phase === "ready" ? (
         <section className="panel form">
           <div className="row between">
-            <h2>Booking của bạn</h2>
-            <span className="status">{state.bookings.length} booking</span>
+            <h2>Đơn hàng của bạn</h2>
+            <span className="status">{state.bookings.length} đơn hàng</span>
           </div>
 
           {state.bookings.length === 0 ? (
             <div className="notice">
-              Chưa có booking nào gắn với tài khoản này. Đặt vé khi đang đăng nhập để booking xuất hiện ở đây.
+              Chưa có đơn hàng nào gắn với tài khoản này. Đặt vé khi đang đăng nhập để đơn đặt vé xuất hiện ở đây.
             </div>
           ) : (
             <div className="grid">

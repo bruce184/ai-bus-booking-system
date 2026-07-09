@@ -32,7 +32,7 @@ export default function LookupPage() {
         <form className="panel form" onSubmit={submit}>
           <h2>Thông tin tra cứu</h2>
           <div className="field">
-            <label>Mã booking</label>
+            <label>Mã đặt vé (Booking code)</label>
             <input value={bookingCode} onChange={(event) => setBookingCode(event.target.value)} placeholder="BK202606260001" required />
           </div>
           <div className="field">
@@ -40,17 +40,17 @@ export default function LookupPage() {
             <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="guest@example.com" required />
           </div>
           <button className="primary" type="submit">
-            Tra cứu booking
+            Tra cứu vé
           </button>
         </form>
 
         <aside className="summary-panel">
           <div className="metric">
-            <span className="muted">Privacy rule</span>
-            <strong>Code + email</strong>
+            <span className="muted">Quy tắc bảo mật (Privacy rule)</span>
+            <strong>Mã vé + Email</strong>
           </div>
-          <p className="muted">Hệ thống không trả thông tin booking nếu thiếu một trong hai trường này.</p>
-          <div className="notice">Dùng email khi checkout để tra cứu lại vé.</div>
+          <p className="muted">Hệ thống bảo mật không trả về thông tin đơn đặt vé nếu thiếu một trong hai trường này.</p>
+          <div className="notice">Sử dụng địa chỉ email bạn đã dùng khi đặt vé để tra cứu lại.</div>
         </aside>
       </section>
     </>

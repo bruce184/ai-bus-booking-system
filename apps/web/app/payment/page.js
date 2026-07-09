@@ -52,7 +52,7 @@ function PaymentContent() {
       <section className="grid">
         <div className="panel">
           <h2>Chọn kết quả giao dịch</h2>
-          <p className="muted">Thành công sẽ gọi simulatePayment, confirm ghế và phát event booking.paid cho worker.</p>
+          <p className="muted">Hệ thống sẽ mô phỏng kết quả giao dịch thanh toán trực tuyến để hoàn tất đặt vé.</p>
           <div className="row">
             <button className="primary" disabled={!bookingCode || loading} onClick={() => pay(true)}>
               Thanh toán thành công
@@ -65,14 +65,14 @@ function PaymentContent() {
         </div>
         <aside className="summary-panel">
           <div className="metric">
-            <span className="muted">Booking code</span>
+            <span className="muted">Mã đặt vé (Booking code)</span>
             <strong>{bookingCode || "N/A"}</strong>
           </div>
           <div className="metric">
             <span className="muted">Sau khi thành công</span>
-            <strong>PAID</strong>
+            <strong>PAID (Đã thanh toán)</strong>
           </div>
-          <div className="notice">Ticket worker sẽ tạo vé khi nhận event booking.paid.</div>
+          <div className="notice">Hệ thống xuất vé điện tử sẽ tự động tạo vé ngay khi thanh toán thành công.</div>
         </aside>
       </section>
     </>
