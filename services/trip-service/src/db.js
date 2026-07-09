@@ -21,8 +21,8 @@ export function query(text, params) {
 }
 
 export async function assertConnection() {
-  const retries = 20;
-  const delay = 1500;
+  const retries = 30;
+  const delay = 2500;
   for (let i = 0; i < retries; i++) {
     try {
       const { rows } = await pool.query('select 1 as ok');

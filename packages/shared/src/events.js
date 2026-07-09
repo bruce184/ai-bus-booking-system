@@ -12,7 +12,7 @@ async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function connectWithRetry(url, retries = 20, delay = 1500) {
+async function connectWithRetry(url, retries = 30, delay = 2500) {
   for (let i = 0; i < retries; i++) {
     try {
       const conn = await amqp.connect(url);
