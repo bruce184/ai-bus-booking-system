@@ -11,7 +11,7 @@ database/schema.sql
 database/seed.sql
 ```
 
-The repository is currently a contract/setup baseline with an expanded B-3 demo seed. `database/schema.sql` should stay aligned with this document, and `database/seed.sql` provides deterministic fake data for local admin/frontend demos.
+The repository currently includes merged service runtimes plus the expanded B-3 demo seed. `database/schema.sql` should stay aligned with this document, and `database/seed.sql` provides deterministic fake data for local admin/frontend demos.
 
 ## 2. Database Platform
 

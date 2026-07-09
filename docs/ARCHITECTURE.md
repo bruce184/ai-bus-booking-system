@@ -4,7 +4,7 @@
 
 This document is the architecture source of truth. It defines service boundaries, communication style, events, and ownership for the intercity bus booking project described in the teacher's specification.
 
-The current repository is a baseline for future member assignments. It defines contracts and folders first; implementation files will be added later by assigned owners.
+The current repository includes the merged GraphQL Gateway, web app, Trip Service, Seat Inventory Service, Booking Service, Payment Service, Ticket Worker, and Email Worker runtimes. Analytics Service, AI chatbot runtime, and MCP Server runtime remain assigned Module 5 work.
 
 ## 2. High-Level Flow
 
