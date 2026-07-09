@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { queryGraphQL } from '../../graphql.js';
 
 const getTomorrowString = (hours = 8, minutes = 0) => {
@@ -9,24 +9,6 @@ const getTomorrowString = (hours = 8, minutes = 0) => {
   tomorrow.setHours(hours, minutes, 0, 0);
   const pad = (n) => String(n).padStart(2, '0');
   return `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T${pad(tomorrow.getHours())}:${pad(tomorrow.getMinutes())}`;
-};
-
-const getFallbackSeatsForTrip = (tripId) => {
-  const seats = [];
-  // 34 seats sleeper (2 decks, A01-A17, B01-B17)
-  let count = 1;
-  for (let d = 1; d <= 2; d++) {
-    for (let r = 1; r <= 6; r++) {
-      for (let c = 1; c <= 3; c++) {
-        if (count > 34) break;
-        const prefix = d === 1 ? 'A' : 'B';
-        const label = `${prefix}${count < 10 ? '0' : ''}${count}`;
-        seats.push({ id: label, label, deck: d, row: r, column: c, status: 'AVAILABLE' });
-        count++;
-      }
-    }
-  }
-  return seats;
 };
 
 export default function TripsCrud() {
@@ -289,11 +271,12 @@ export default function TripsCrud() {
       if (data.seatMap && data.seatMap.length > 0) {
         setTripSeats(data.seatMap);
       } else {
-        setTripSeats(getFallbackSeatsForTrip(trip.id));
+        setTripSeats([]);
+        showToast('No seats found for this trip. Configure vehicle seats before blocking.', 'error');
       }
     } catch (err) {
-      console.log('Using fallback seats.');
-      setTripSeats(getFallbackSeatsForTrip(trip.id));
+      setTripSeats([]);
+      showToast(err.message || 'Failed to load seat map.', 'error');
     } finally {
       setLoading(false);
     }
@@ -319,7 +302,7 @@ export default function TripsCrud() {
     `;
 
     try {
-      await queryGraphQL(blockSeatsMutation, {
+      const data = await queryGraphQL(blockSeatsMutation, {
         input: {
           tripId: blockingSeatsTrip.id,
           seatIds: selectedSeatIds,
@@ -327,26 +310,16 @@ export default function TripsCrud() {
         }
       });
 
-      // Update local seats
-      setTripSeats(tripSeats.map(s => {
-        if (selectedSeatIds.includes(s.id)) {
-          return { ...s, status: 'BLOCKED' };
-        }
-        return s;
+      const blockedSeatsById = new Map((data.adminBlockSeats || []).map(seat => [seat.id, seat]));
+      setTripSeats(tripSeats.map(seat => {
+        const blockedSeat = blockedSeatsById.get(seat.id);
+        return blockedSeat ? { ...seat, ...blockedSeat } : seat;
       }));
 
       showToast(`Successfully blocked ${selectedSeatIds.length} seat(s)!`);
       setSelectedSeatIds([]);
     } catch (err) {
-      // Offline fallback
-      setTripSeats(tripSeats.map(s => {
-        if (selectedSeatIds.includes(s.id)) {
-          return { ...s, status: 'BLOCKED' };
-        }
-        return s;
-      }));
-      showToast(`Successfully blocked ${selectedSeatIds.length} seat(s)!`);
-      setSelectedSeatIds([]);
+      showToast(err.message || 'Error occurred.', 'error');
     } finally {
       setLoading(false);
     }
@@ -677,8 +650,12 @@ export default function TripsCrud() {
                   justifyContent: 'center',
                   alignItems: 'center'
                 }}>
-                  {tripSeats.length === 0 ? (
+                  {tripSeats.length === 0 && loading ? (
                     <div className="spinner"></div>
+                  ) : tripSeats.length === 0 ? (
+                    <div style={{ color: 'var(--color-text-muted)', fontSize: '14px', textAlign: 'center' }}>
+                      No seat map available for this trip.
+                    </div>
                   ) : (
                     <div style={{ display: 'flex', gap: '40px', justifyContent: 'center', flexWrap: 'wrap' }}>
                       {Array.from(new Set(tripSeats.map(s => s.deck))).sort((a,b) => a-b).map(deckNum => {
