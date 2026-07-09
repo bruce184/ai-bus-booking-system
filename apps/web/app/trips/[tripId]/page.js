@@ -90,7 +90,7 @@ export default function TripDetailPage() {
   function handleHoldCreated(hold) {
     const seats = hold.seats.map((seat) => seat.id).join(",");
     router.push(
-      `/checkout?tripId=${encodeURIComponent(tripId)}&holdToken=${encodeURIComponent(hold.holdToken)}&seats=${encodeURIComponent(seats)}`
+      `/checkout?tripId=${encodeURIComponent(tripId)}&holdToken=${encodeURIComponent(hold.holdToken)}&seats=${encodeURIComponent(seats)}&expiresAt=${encodeURIComponent(hold.expiresAt)}`
     );
   }
 

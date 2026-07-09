@@ -57,6 +57,7 @@ function CheckoutContent() {
   const params = useSearchParams();
   const defaultSeats = useMemo(() => (params.get("seats") || "A01").split(","), [params]);
   const fromSeatFlow = Boolean(params.get("tripId") && params.get("holdToken"));
+  const holdExpiresAt = params.get("expiresAt") || "";
   const [tripId, setTripId] = useState(params.get("tripId") || "");
   const [holdToken, setHoldToken] = useState(params.get("holdToken") || "");
   const [contactEmail, setContactEmail] = useState("");
@@ -70,6 +71,8 @@ function CheckoutContent() {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [remainingHoldSeconds, setRemainingHoldSeconds] = useState(null);
+  const holdExpired = fromSeatFlow && remainingHoldSeconds === 0;
 
   // Fetch trip details to show summary
   useEffect(() => {
@@ -82,12 +85,45 @@ function CheckoutContent() {
     }
   }, [tripId]);
 
+  useEffect(() => {
+    if (!holdExpiresAt) {
+      return undefined;
+    }
+
+    const updateRemainingSeconds = () => {
+      const expiresAtMs = new Date(holdExpiresAt).getTime();
+      if (Number.isNaN(expiresAtMs)) {
+        setRemainingHoldSeconds(null);
+        return;
+      }
+
+      const secondsLeft = Math.max(
+        0,
+        Math.ceil((expiresAtMs - Date.now()) / 1000)
+      );
+      setRemainingHoldSeconds(secondsLeft);
+    };
+
+    const startTimer = window.setTimeout(updateRemainingSeconds, 0);
+    const interval = window.setInterval(updateRemainingSeconds, 1000);
+
+    return () => {
+      window.clearTimeout(startTimer);
+      window.clearInterval(interval);
+    };
+  }, [holdExpiresAt]);
+
   function updatePassenger(index, field, value) {
     setPassengers((items) => items.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
   }
 
   async function submit(event) {
     event.preventDefault();
+    if (holdExpired) {
+      setError("Hold token has expired. Please go back and select seats again.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
@@ -158,6 +194,12 @@ function CheckoutContent() {
 
               {fromSeatFlow ? (
                 <div className="notice" style={{ marginBottom: "20px" }}>
+                  {remainingHoldSeconds !== null ? (
+                    <span>Thá»i gian cĂ²n láº¡i: <strong>{remainingHoldSeconds}s</strong>. </span>
+                  ) : null}
+                  {holdExpired ? (
+                    <span>MĂ£ giá»¯ chá»— Ä‘Ă£ háº¿t háº¡n, vui lĂ²ng quay láº¡i chá»n gháº¿. </span>
+                  ) : null}
                   Ghế <strong>{defaultSeats.join(", ")}</strong> đang được giữ cho bạn. Hoàn tất thông tin bên dưới trước khi hết thời gian giữ ghế.
                 </div>
               ) : null}
@@ -326,7 +368,7 @@ function CheckoutContent() {
 
             {error ? <p className="error" style={{ marginTop: "16px" }}>{error}</p> : null}
             
-            <button className="primary" disabled={loading} type="submit" style={{ width: "100%", height: "46px", marginTop: "24px" }}>
+            <button className="primary" disabled={loading || holdExpired} type="submit" style={{ width: "100%", height: "46px", marginTop: "24px" }}>
               {loading ? "Đang tạo booking..." : "Tạo booking và thanh toán"}
             </button>
           </aside>
