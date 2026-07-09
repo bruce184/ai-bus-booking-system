@@ -9,8 +9,10 @@ const gatewayUrl = `http://127.0.0.1:${gatewayPort}/graphql`;
 const startupTimeoutMs = 10_000;
 const seatInventoryTestAddress =
   process.env.SEAT_INVENTORY_SERVICE_GRPC_ADDRESS ||
+  process.env.SEAT_INVENTORY_GRPC_URL ||
   process.env.SEAT_INVENTORY_URL ||
-  "127.0.0.1:50052";
+  "";
+const runDatabaseBackedAnalytics = process.env.RUN_DB_INTEGRATION === "true";
 
 let gatewayProcess;
 let gatewayOutput = "";
@@ -182,6 +184,10 @@ test("admin analytics enforces authentication and admin role over HTTP", async (
 
   assert.equal(forbidden.status, 200);
   assert.equal(forbidden.body.errors[0].extensions.code, "FORBIDDEN");
+
+  if (!runDatabaseBackedAnalytics) {
+    return;
+  }
 
   const admin = await login("admin@example.com", "admin123");
   const allowed = await graphqlRequest({
