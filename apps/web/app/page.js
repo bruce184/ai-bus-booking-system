@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -264,7 +265,7 @@ export default function HomePage() {
               </div>
             </li>
           </ol>
-          <img src="/phone_ticket.png" alt="Phone ticket mockup" className="panel-illustration" />
+          <Image src="/phone_ticket.png" alt="Phone ticket mockup" className="panel-illustration" width={1024} height={1024} />
         </div>
 
         <div className="panel has-illustration">
@@ -279,7 +280,7 @@ export default function HomePage() {
             Mở cổng tra cứu
             <span style={{ marginLeft: "4px" }}>→</span>
           </Link>
-          <img src="/shield_lock.png" alt="Security shield lock illustration" className="panel-illustration" />
+          <Image src="/shield_lock.png" alt="Security shield lock illustration" className="panel-illustration" width={1024} height={1024} />
         </div>
       </section>
 
