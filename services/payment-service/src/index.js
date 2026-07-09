@@ -42,12 +42,21 @@ const server = http.createServer(async (request, response) => {
 
     const eventName = body.success ? "payment.simulated_success" : "payment.simulated_failure";
     await publishKafkaEvent("payment-events", eventName, {
+      bookingId: body.bookingId || null,
       bookingCode: body.bookingCode,
-      amount: Number(body.amount || 0)
+      tripId: body.tripId || null,
+      amount: Number(body.amount || 0),
+      success: Boolean(body.success)
     });
 
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ bookingCode: body.bookingCode, success: Boolean(body.success) }));
+    response.end(JSON.stringify({
+      bookingId: body.bookingId || null,
+      bookingCode: body.bookingCode,
+      tripId: body.tripId || null,
+      amount: Number(body.amount || 0),
+      success: Boolean(body.success)
+    }));
   } catch (error) {
     console.error("[payment-service]", error);
     response.writeHead(500, { "content-type": "application/json" });

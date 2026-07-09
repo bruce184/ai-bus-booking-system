@@ -1,6 +1,7 @@
 import { publishKafkaEvent, publishWorkflowEvent } from "@bus/shared/events.js";
 import { fail, toGrpcError } from "@bus/shared/errors.js";
 import { grpc, loadProto } from "@bus/shared/grpc.js";
+import { simulatePaymentWithService } from "./payment-client.js";
 import { confirmSeats, releaseBookedSeats, releaseSeatHold, validateSeatHold } from "./seat-client.js";
 import {
   cancelBooking,
@@ -37,19 +38,20 @@ async function simulatePayment(request) {
     fail("NOT_FOUND", "Booking not found");
   }
 
-  if (!request.success) {
-    await publishKafkaEvent("payment-events", "payment.simulated_failure", {
-      bookingId: booking.id,
-      bookingCode: booking.booking_code
-    });
-    fail("PAYMENT_FAILED", "Simulated payment failed");
-  }
-
-  if (booking.status === "PAID" || booking.status === "TICKET_ISSUED") {
+  if (request.success && (booking.status === "PAID" || booking.status === "TICKET_ISSUED")) {
     return booking;
   }
   if (booking.status !== "PENDING_PAYMENT") {
     fail("BOOKING_STATE_INVALID", `Cannot pay booking in ${booking.status} status`);
+  }
+
+  const payment = await simulatePaymentWithService({
+    booking,
+    success: request.success
+  });
+
+  if (!payment.success) {
+    fail("PAYMENT_FAILED", "Simulated payment failed");
   }
 
   const seatIds = booking.passengers.map((passenger) => passenger.seat_id);
@@ -72,7 +74,6 @@ async function simulatePayment(request) {
 
   await publishWorkflowEvent("booking.paid", eventPayload);
   await publishKafkaEvent("booking-events", "booking.paid", eventPayload);
-  await publishKafkaEvent("payment-events", "payment.simulated_success", eventPayload);
 
   return paidBooking;
 }
