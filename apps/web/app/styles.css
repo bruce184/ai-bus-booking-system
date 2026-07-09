@@ -1,16 +1,16 @@
 :root {
   color-scheme: light;
-  --bg: #f4f7fb;
+  --bg: #fdfbf7;
   --surface: #ffffff;
-  --surface-soft: #eef7f5;
-  --text: #182230;
-  --muted: #667085;
-  --line: #d9e2ec;
-  --brand: #0f766e;
-  --brand-dark: #115e59;
-  --brand-soft: #dff6f1;
+  --surface-soft: #fcf9f2;
+  --text: #1b2621;
+  --muted: #5a6861;
+  --line: #e5eae7;
+  --brand: #105c42;
+  --brand-dark: #093f2c;
+  --brand-soft: #eaf6f1;
   --danger: #b42318;
-  --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  --shadow: 0 16px 40px rgba(16, 92, 66, 0.06);
 }
 
 * {
@@ -74,11 +74,25 @@ body {
 
 .nav {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 20px;
   flex-wrap: wrap;
 }
 
-.nav a,
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+  transition: color 120ms ease;
+}
+
+.nav a:hover {
+  color: var(--brand);
+}
+
 .button,
 button {
   display: inline-flex;
@@ -87,7 +101,7 @@ button {
   min-height: 42px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 0 15px;
+  padding: 0 20px;
   background: var(--surface);
   color: var(--text);
   text-decoration: none;
@@ -96,10 +110,9 @@ button {
   transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
 }
 
-.nav a:hover,
 .button:hover,
 button:hover {
-  border-color: #aac6c2;
+  border-color: var(--brand);
   transform: translateY(-1px);
 }
 
@@ -128,36 +141,57 @@ button:disabled {
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
-  gap: 22px;
-  align-items: stretch;
-  margin-bottom: 22px;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 32px;
+  align-items: center;
+  margin-bottom: 24px;
+  position: relative;
+  min-height: 400px;
 }
 
 .hero-copy {
   display: grid;
   align-content: center;
   gap: 18px;
-  min-height: 360px;
-  border-radius: 8px;
-  padding: 32px;
-  background:
-    linear-gradient(135deg, rgba(15, 118, 110, 0.96), rgba(17, 94, 89, 0.82)),
-    url("https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1400&q=80");
-  background-position: center;
-  background-size: cover;
-  color: white;
-  box-shadow: var(--shadow);
+  padding: 0;
+  background: none;
+  color: var(--text);
+  box-shadow: none;
 }
 
-.hero-copy .eyebrow,
+.hero-image {
+  background-image: url("/hero_bus_scenic.png");
+  background-size: contain;
+  background-position: right center;
+  background-repeat: no-repeat;
+  height: 100%;
+  min-height: 380px;
+  width: 100%;
+}
+
+.serif-highlight {
+  font-family: Georgia, 'Times New Roman', Times, serif;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--brand);
+}
+
+.hero-copy .eyebrow {
+  color: #e07a5f;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
 .hero-copy .lead {
-  color: rgba(255, 255, 255, 0.86);
+  color: var(--muted);
 }
 
 .hero-copy .brand {
-  font-size: 42px;
+  font-size: 52px;
   max-width: 720px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--text);
 }
 
 .hero-actions {
@@ -655,4 +689,146 @@ input:focus {
     grid-template-columns: 1fr;
   }
 }
+
+/* EcoBus UI Mockup Polish */
+.has-illustration {
+  position: relative;
+  overflow: hidden;
+  padding-right: 180px !important;
+}
+
+.panel-illustration {
+  position: absolute;
+  right: 8px;
+  bottom: -20px;
+  width: 150px;
+  height: auto;
+  pointer-events: none;
+  opacity: 0.95;
+}
+
+.btn-lookup-portal {
+  width: 100%;
+  min-height: 48px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  transition: all 0.2s ease;
+}
+
+.btn-lookup-portal:hover {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+  color: var(--brand-dark);
+}
+
+.search-widget-footer {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.search-widget-footer span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.features-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 48px;
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.feature-icon-wrapper {
+  background: var(--brand-soft);
+  color: var(--brand);
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(16, 92, 66, 0.05);
+}
+
+.feature-content {
+  display: grid;
+  gap: 2px;
+}
+
+.feature-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.feature-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--brand);
+  pointer-events: none;
+}
+
+.input-with-icon input,
+.input-with-icon select {
+  padding-left: 42px !important;
+}
+
+@media (max-width: 860px) {
+  .features-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .has-illustration {
+    padding-right: 20px !important;
+  }
+  .panel-illustration {
+    display: none;
+  }
+  .features-bar {
+    grid-template-columns: 1fr;
+  }
+}
+
 
