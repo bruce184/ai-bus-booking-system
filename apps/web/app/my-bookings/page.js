@@ -61,16 +61,19 @@ export default function MyBookingsPage() {
   return (
     <>
       <header className="topbar">
-        <div className="brand-block">
-          <span className="eyebrow">My bookings</span>
-          <h1 className="brand">Lịch sử đặt vé</h1>
-          <p className="lead">
-            {state.user ? `Đang đăng nhập: ${state.user.email}` : "Đăng nhập để xem các booking gắn với tài khoản của bạn."}
-          </p>
+        <div className="logo-container">
+          <div className="logo-icon">🟢</div>
+          <div>
+            <span className="logo-text">EcoBus AI</span>
+            <p className="lead" style={{ fontSize: "14px", marginTop: "2px" }}>
+              {state.user ? `Đang đăng nhập: ${state.user.email}` : "Đăng nhập để xem các booking gắn với tài khoản của bạn."}
+            </p>
+          </div>
         </div>
         <nav className="nav">
+          <Link href="/">Trang chính</Link>
           <Link href="/search">Tìm chuyến</Link>
-          <Link href="/lookup">Tra cứu</Link>
+          <Link href="/lookup">Tra cứu vé</Link>
           {state.phase === "ready" ? (
             <button onClick={logout} type="button">Đăng xuất</button>
           ) : null}

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -17,14 +17,14 @@ export default function LookupPage() {
   return (
     <>
       <header className="topbar">
-        <div className="brand-block">
-          <span className="eyebrow">Booking lookup</span>
-          <h1 className="brand">Tra cứu vé điện tử</h1>
-          <p className="lead">Nhập đúng mã booking và email liên hệ để xem trạng thái, hành khách và vé đã phát hành.</p>
+        <div className="logo-container">
+          <div className="logo-icon">🟢</div>
+          <span className="logo-text">EcoBus AI</span>
         </div>
         <nav className="nav">
           <Link href="/">Trang chính</Link>
-          <Link href="/checkout">Checkout</Link>
+          <Link href="/search">Tìm chuyến</Link>
+          <Link href="/my-bookings">Vé của tôi</Link>
         </nav>
       </header>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { graphqlRequest } from "../../lib/graphql";
 
@@ -49,13 +49,12 @@ export default function SearchPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function submit(event) {
-    event.preventDefault();
+  async function doSearch(originVal, destinationVal, dateVal) {
     setLoading(true);
     setError("");
     try {
       const data = await graphqlRequest(SEARCH_TRIPS, {
-        input: { origin, destination, departureDate }
+        input: { origin: originVal, destination: destinationVal, departureDate: dateVal }
       });
       setResult(data.searchTrips);
     } catch (err) {
@@ -66,18 +65,56 @@ export default function SearchPage() {
     }
   }
 
+  async function submit(event) {
+    event.preventDefault();
+    await doSearch(origin, destination, departureDate);
+  }
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const fromParam = params.get("from");
+      const toParam = params.get("to");
+      const dateParam = params.get("date");
+
+      let updatedOrigin = origin;
+      let updatedDestination = destination;
+      let updatedDate = departureDate;
+      let hasParams = false;
+
+      if (fromParam) {
+        setOrigin(fromParam);
+        updatedOrigin = fromParam;
+        hasParams = true;
+      }
+      if (toParam) {
+        setDestination(toParam);
+        updatedDestination = toParam;
+        hasParams = true;
+      }
+      if (dateParam) {
+        setDepartureDate(dateParam);
+        updatedDate = dateParam;
+        hasParams = true;
+      }
+
+      if (hasParams) {
+        doSearch(updatedOrigin, updatedDestination, updatedDate);
+      }
+    }
+  }, []);
+
   return (
     <>
       <header className="topbar">
-        <div className="brand-block">
-          <span className="eyebrow">Trip search</span>
-          <h1 className="brand">Tìm chuyến xe liên tỉnh</h1>
-          <p className="lead">Chọn điểm đi, điểm đến và ngày khởi hành để xem các chuyến còn chỗ.</p>
+        <div className="logo-container">
+          <div className="logo-icon">🟢</div>
+          <span className="logo-text">EcoBus AI</span>
         </div>
         <nav className="nav">
           <Link href="/">Trang chính</Link>
           <Link href="/my-bookings">Vé của tôi</Link>
-          <Link href="/lookup">Tra cứu</Link>
+          <Link href="/lookup">Tra cứu vé</Link>
         </nav>
       </header>
 

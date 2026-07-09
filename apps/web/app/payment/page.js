@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -39,14 +39,13 @@ function PaymentContent() {
   return (
     <>
       <header className="topbar">
-        <div className="brand-block">
-          <span className="eyebrow">Payment simulation</span>
-          <h1 className="brand">Xác nhận thanh toán</h1>
-          <p className="lead">Booking {bookingCode || "chưa có mã"} sẽ được chuyển trạng thái sau khi mô phỏng kết quả.</p>
+        <div className="logo-container">
+          <div className="logo-icon">🟢</div>
+          <span className="logo-text">EcoBus AI</span>
         </div>
         <nav className="nav">
           <Link href="/">Trang chính</Link>
-          <Link href="/lookup">Tra cứu</Link>
+          <Link href="/lookup">Tra cứu vé</Link>
         </nav>
       </header>
 

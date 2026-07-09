@@ -90,18 +90,14 @@ export default function TripDetailPage() {
   return (
     <>
       <header className="topbar">
-        <div className="brand-block">
-          <span className="eyebrow">Trip detail</span>
-          <h1 className="brand">
-            {detail
-              ? `${detail.trip.route.origin.name} → ${detail.trip.route.destination.name}`
-              : "Chi tiết chuyến xe"}
-          </h1>
-          <p className="lead">Chọn ghế trên sơ đồ; ghế được giữ 5 phút để hoàn tất thanh toán.</p>
+        <div className="logo-container">
+          <div className="logo-icon">🟢</div>
+          <span className="logo-text">EcoBus AI</span>
         </div>
         <nav className="nav">
+          <Link href="/">Trang chính</Link>
           <Link href="/search">Tìm chuyến</Link>
-          <Link href="/lookup">Tra cứu</Link>
+          <Link href="/lookup">Tra cứu vé</Link>
         </nav>
       </header>
 

@@ -48,14 +48,14 @@ function LoginContent() {
   return (
     <>
       <header className="topbar">
-        <div className="brand-block">
-          <span className="eyebrow">Customer login</span>
-          <h1 className="brand">Đăng nhập tài khoản</h1>
-          <p className="lead">Đăng nhập để xem lịch sử đặt vé và gắn booking với tài khoản của bạn.</p>
+        <div className="logo-container">
+          <div className="logo-icon">🟢</div>
+          <span className="logo-text">EcoBus AI</span>
         </div>
         <nav className="nav">
           <Link href="/">Trang chính</Link>
           <Link href="/search">Tìm chuyến</Link>
+          <Link href="/lookup">Tra cứu vé</Link>
         </nav>
       </header>
 

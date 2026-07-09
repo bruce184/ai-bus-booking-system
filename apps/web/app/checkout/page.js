@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -55,14 +55,13 @@ function CheckoutContent() {
   return (
     <>
       <header className="topbar">
-        <div className="brand-block">
-          <span className="eyebrow">Checkout</span>
-          <h1 className="brand">Thông tin hành khách</h1>
-          <p className="lead">Nhập thông tin liên hệ và gán mỗi hành khách với một ghế đã được giữ.</p>
+        <div className="logo-container">
+          <div className="logo-icon">🟢</div>
+          <span className="logo-text">EcoBus AI</span>
         </div>
         <nav className="nav">
           <Link href="/">Trang chính</Link>
-          <Link href="/lookup">Tra cứu</Link>
+          <Link href="/lookup">Tra cứu vé</Link>
         </nav>
       </header>
 

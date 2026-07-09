@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { graphqlRequest } from "../../../lib/graphql";
 
 const BOOKING_STATUS = `
@@ -49,14 +49,13 @@ export default async function BookingConfirmationPage({ params, searchParams }) 
   return (
     <>
       <header className="topbar">
-        <div className="brand-block">
-          <span className="eyebrow">Booking confirmation</span>
-          <h1 className="brand">Xác nhận đặt vé</h1>
-          <p className="lead">Mã booking: {bookingCode}</p>
+        <div className="logo-container">
+          <div className="logo-icon">🟢</div>
+          <span className="logo-text">EcoBus AI</span>
         </div>
         <nav className="nav">
           <Link href="/">Trang chính</Link>
-          <Link href="/lookup">Tra cứu</Link>
+          <Link href="/lookup">Tra cứu vé</Link>
         </nav>
       </header>
 
