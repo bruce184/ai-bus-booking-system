@@ -23,8 +23,9 @@ Seat holds must be atomic and expire automatically.
 
 This service is scaffolded as a TypeScript gRPC service for task `Q-1`.
 `GetSeatMap` is implemented for task `Q-2`, `HoldSeats` is implemented for
-task `Q-3`, `ReleaseHold` is implemented for task `Q-4`, and `ConfirmSeats`
-is implemented for task `Q-5`; `BlockSeats` is implemented for task `Q-6`.
+task `Q-3`, `ValidateHold` and `ReleaseHold` are implemented for task `Q-4`,
+and `ConfirmSeats` is implemented for task `Q-5`; `BlockSeats` is implemented
+for task `Q-6`.
 
 Install dependencies:
 
@@ -82,6 +83,9 @@ hold keys with the same hold token and TTL.
 `ReleaseHold` deletes Redis hold keys by `holdToken`. New holds include a
 `hold-token:{holdToken}` index for fast release, with a scan fallback for
 older hold payloads.
+
+`ValidateHold` verifies that the hold token still covers every requested seat
+for the trip before Booking Service creates a booking.
 
 `ConfirmSeats` verifies that the hold token still covers every requested seat,
 updates `trip_seats.status` to `BOOKED`, stores `booking_id`, and clears the

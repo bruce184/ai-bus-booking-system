@@ -4,7 +4,7 @@
 
 This file is the source of truth for public GraphQL operations, internal gRPC boundaries, workflow events, analytics events, and MCP tools/resources.
 
-The repository is currently a baseline setup. Service code may be added later by assigned members, but new code must follow this contract unless a task explicitly changes the contract and updates all affected files.
+The repository currently includes the GraphQL Gateway, web app, core trip, seat inventory, booking, payment, ticket, and email runtimes for the merged MVP modules. Remaining module code must follow this contract unless a task explicitly changes the contract and updates all affected files.
 
 ## 2. Public GraphQL Endpoint
 
@@ -50,6 +50,11 @@ Admin login is required for admin screens in the MVP. Local demo auth may use se
 
 | Operation | Purpose |
 |---|---|
+| `adminLocations` | Admin catalog list of locations/stations used by route and stop screens |
+| `adminRoutes` | Admin catalog list of routes with origin, destination, distance, and stops |
+| `adminVehicles` | Admin catalog list of vehicles and seat counts |
+| `adminTrips` | Admin catalog list of scheduled trips |
+| `adminStops` | Admin catalog list of pickup/dropoff stops |
 | `adminBookings(input)` | Admin booking list, filterable by trip, status, email, or booking code |
 | `adminRevenueSummary(input)` | Revenue, paid booking count, ticket count, and search-to-paid rate |
 | `adminAnalyticsDashboard(input)` | Daily revenue, tickets by route, popular routes, and summary |
@@ -229,6 +234,7 @@ Owns locations, routes, stops, vehicles, vehicle seats, trips, popular routes, t
 | RPC Group | RPCs |
 |---|---|
 | Search/catalog | `AutocompleteLocations`, `SearchTrips`, `GetTripDetail`, `ListPopularRoutes` |
+| Admin catalog reads | `ListLocations`, `ListRoutes`, `ListVehicles`, `ListTrips` |
 | Route admin | `CreateRoute`, `UpdateRoute`, `DeleteRoute` |
 | Stop admin | `CreateStop`, `UpdateStop`, `DeleteStop` |
 | Vehicle admin | `CreateVehicle`, `UpdateVehicle`, `DeleteVehicle`, `ConfigureVehicleSeats` |
@@ -242,6 +248,7 @@ Owns seat map state, Redis holds, seat confirmation, and blocked seats.
 |---|---|
 | `GetSeatMap` | Get current seat states |
 | `HoldSeats` | Atomically hold seats with Redis TTL |
+| `ValidateHold` | Verify a hold token still covers the requested trip seats before booking creation |
 | `ReleaseHold` | Release a hold before TTL expiry |
 | `ConfirmSeats` | Convert held seats to booked after payment success |
 | `ReleaseBookedSeats` | Release seats booked by a cancelled booking back to available |

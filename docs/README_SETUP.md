@@ -18,9 +18,8 @@ Intercity Bus Booking AI lets customers search trips, select seats, hold seats, 
 Current repository status:
 
 ```text
-Baseline setup plus the GraphQL Gateway/admin baseline. Docs, contracts, schema, proto files, infrastructure, demo auth, admin gateway wiring, frontend admin demo screens, and test harnesses are prepared.
-Module 3 has an initial implementation for booking-service, payment-service, ticket-worker, email-worker, GraphQL booking resolvers, and checkout/booking lookup UI.
-Most backend service runtimes, AI chatbot runtime, and MCP Server implementation files will be added later by assigned members.
+The merged MVP modules include the GraphQL Gateway, Next.js web app, Trip Service, Seat Inventory Service, Booking Service, Payment Service, Ticket Worker, Email Worker, demo auth, admin wiring, and test harnesses.
+Analytics Service, AI chatbot runtime, and MCP Server runtime are still pending assigned implementation.
 ```
 
 Local demo is required. Online deployment is optional.
@@ -101,7 +100,7 @@ docs/                        Source-of-truth docs
 
 ## 6. Environment Setup
 
-Create local `.env` files from `.env.example` when services are implemented.
+Create local `.env` files from `.env.example` for local service runs.
 
 Do not commit real `.env` files.
 
@@ -112,6 +111,10 @@ Important local ports:
 | Web | 3000 |
 | GraphQL Gateway | 4000 |
 | MCP Server | 4010 |
+| Trip Service gRPC | 50051 |
+| Seat Inventory Service gRPC | 50052 |
+| Booking Service gRPC | 50053 |
+| Payment Service HTTP | 5010 |
 | PostgreSQL | 5432 |
 | Redis | 6379 |
 | RabbitMQ | 5672 / 15672 |
@@ -181,8 +184,10 @@ Implemented test targets:
 |---|---|---|
 | Gateway unit / whitebox | `npm run test:gateway` | Auth, JWT, role helpers, and context factory |
 | Gateway integration | `npm run test:gateway:integration` | Starts a real gateway on port `4100` and calls GraphQL over HTTP |
+| Booking service unit | `npm run test:booking` | Booking state machine and service client request contracts |
 | Gateway API / contract smoke | `npm run test:gateway:api` | Requires a gateway already running on `http://localhost:4000/graphql` |
 | Gateway performance | `npm run test:gateway:perf` | Requires Apache JMeter on `PATH` |
+| Web lint | `npm --prefix apps/web run lint` | Next.js/React lint |
 | Web admin E2E | `npm run test:web:e2e` | Uses Playwright and starts configured dev servers |
 
 ## 9. Local Run Targets
@@ -194,10 +199,14 @@ npm install --prefix services/graphql-gateway
 npm run dev:gateway
 ```
 
-Module 3 services:
+Core local services:
 
 ```bash
 npm run dev:web
+npm run dev:gateway
+npm run dev:trip
+npm run dev:seat
+npm run dev:seat-consumer
 npm run dev:booking
 npm run dev:payment
 npm run dev:ticket-worker
@@ -264,7 +273,7 @@ Nginx:            http://localhost:8080
 [ ] Chatbot calls tools instead of inventing inventory
 [ ] Chatbot cites internal policy resources
 [ ] Chatbot refuses booking details without booking code and email
-[ ] MCP tools return demo data
+[ ] MCP tools return demo data after MCP Server implementation is merged
 ```
 
 ## 11. Common Problems
@@ -302,7 +311,7 @@ Update:
 [ ] .env.example has placeholders only
 [ ] Branch/PR workflow is documented
 [ ] Task template exists
-[ ] README states the repo is baseline-only until members add implementation files
+[ ] README states which modules are implemented and which assigned modules are still pending
 ```
 
 ## 13. Security Rules

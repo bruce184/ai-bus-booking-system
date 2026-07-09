@@ -2,7 +2,7 @@
 
 Intercity Bus Booking AI is a student microservices project for searching intercity bus trips, selecting seats, holding seats with Redis TTL, simulating checkout, issuing e-tickets, supporting admin operations, providing analytics, and exposing AI/MCP tools.
 
-The repository is set up with a local-demo-first strategy. The current state is a contract and documentation baseline plus a GraphQL Gateway/admin baseline: folders, README files, source-of-truth docs, GraphQL schema, gRPC proto files, database schema, Docker infrastructure, gateway runtime, demo auth, admin demo screens, and test harnesses are prepared so members can add implementation files inside their assigned areas.
+The repository is set up with a local-demo-first strategy. The current state includes source-of-truth docs, GraphQL schema, gRPC proto files, database schema and seed data, Docker infrastructure, the GraphQL Gateway, Next.js web flows, core trip/seat/booking/payment services, ticket/email workers, demo auth, admin screens, and test harnesses. Remaining modules should still add implementation files only inside their assigned areas.
 
 ## Required Stack
 
@@ -76,7 +76,11 @@ intercity-bus-booking-ai/
 
 ## Quick Start
 
-This baseline does not install full app dependencies yet. It prepares the repository for team work and contract-first development.
+Install workspace dependencies:
+
+```bash
+npm install
+```
 
 Check required documents:
 
@@ -90,7 +94,7 @@ View the planned local infrastructure:
 docker compose config
 ```
 
-Run the B-1 GraphQL Gateway scaffold:
+Run the GraphQL Gateway:
 
 ```bash
 npm install --prefix services/graphql-gateway
@@ -103,9 +107,11 @@ Run implemented verification targets:
 npm run check:docs
 npm run test:gateway
 npm run test:gateway:integration
+npm run test:booking
+npm --prefix apps/web run lint
 ```
 
-When service implementations are added, the expected local URLs are:
+Expected local URLs:
 
 ```text
 Web:              http://localhost:3000
@@ -130,12 +136,16 @@ Implemented now:
 - GraphQL Gateway B-2 demo auth with login, me, JWT token handling, and role helpers
 - GraphQL Gateway admin baseline resolvers, API smoke tests, integration tests, and JMeter performance benchmark
 - Next.js admin baseline screens and Playwright admin E2E tests
+- Trip Service runtime for catalog, search, and admin trip data
+- Seat Inventory Service runtime for seat maps, Redis holds, hold validation, confirmation, release, and admin blocks
+- Booking Service runtime for booking lifecycle, payment simulation coordination, cancellation, lookup, check-in, and saved passengers
+- Payment Service simulation runtime
+- Ticket Worker and Email Worker runtimes for e-ticket creation and simulated delivery
 
 Not implemented yet:
 
-- Node.js service runtimes
-- Workers
 - AI SDK chatbot runtime
+- Analytics Service runtime
 - MCP Server runtime
 
 Members should add implementation files only inside their assigned module and keep the matching docs/contracts updated.
