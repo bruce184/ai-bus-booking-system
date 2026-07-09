@@ -59,6 +59,8 @@ type Stop {
   address: String
   stopType: String!
   stopOrder: Int!
+  routeId: ID
+  locationId: ID
 }
 
 type Route {
@@ -377,6 +379,11 @@ type Query {
   adminBookings(input: AdminBookingFilterInput!): BookingConnection!
   adminEventLogs(input: AdminEventLogFilterInput): [EventLog!]!
   popularRoutes(limit: Int = 5): [PopularRoute!]!
+  adminLocations: [Location!]!
+  adminRoutes: [Route!]!
+  adminVehicles: [Vehicle!]!
+  adminTrips: [Trip!]!
+  adminStops: [Stop!]!
 }
 
 type Mutation {

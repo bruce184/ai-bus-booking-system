@@ -3,36 +3,10 @@
 import { useState, useRef } from 'react';
 import { queryGraphQL } from '../../graphql.js';
 
-// Pre-seeded locations from B-3
-const SEEDED_LOCATIONS = [
-  { id: 'loc-hcm-md', name: 'TP.HCM (Bến Xe Miền Đông)', type: 'STATION' },
-  { id: 'loc-hcm-mt', name: 'TP.HCM (Bến Xe Miền Tây)', type: 'STATION' },
-  { id: 'loc-dl', name: 'Đà Lạt (Bến Xe Liên Tỉnh)', type: 'STATION' },
-  { id: 'loc-nt', name: 'Nha Trang (Bến Xe Phía Nam)', type: 'STATION' },
-  { id: 'loc-ct', name: 'Cần Thơ (Bến Xe Cần Thơ)', type: 'STATION' },
-  { id: 'loc-dn', name: 'Đà Nẵng (Bến Xe Đà Nẵng)', type: 'STATION' },
-  { id: 'loc-hn', name: 'Hà Nội (Bến Xe Mỹ Đình)', type: 'STATION' }
-];
-
-// Pre-seeded routes from B-3
-const SEEDED_ROUTES = [
-  { id: 'route-hcm-dl', name: 'TP.HCM -> Đà Lạt' },
-  { id: 'route-hcm-nt', name: 'TP.HCM -> Nha Trang' },
-  { id: 'route-hcm-ct', name: 'TP.HCM -> Cần Thơ' },
-  { id: 'route-dn-hn', name: 'Đà Nẵng -> Hà Nội' },
-  { id: 'route-hn-dn', name: 'Hà Nội -> Đà Nẵng' }
-];
-
-// Pre-seeded stops from B-3
-const INITIAL_STOPS = [
-  { id: 'stop-1', route: SEEDED_ROUTES[0], location: SEEDED_LOCATIONS[0], stopType: 'PICKUP', stopOrder: 1 },
-  { id: 'stop-2', route: SEEDED_ROUTES[0], location: SEEDED_LOCATIONS[2], stopType: 'DROPOFF', stopOrder: 2 },
-  { id: 'stop-3', route: SEEDED_ROUTES[1], location: SEEDED_LOCATIONS[0], stopType: 'PICKUP', stopOrder: 1 },
-  { id: 'stop-4', route: SEEDED_ROUTES[1], location: SEEDED_LOCATIONS[3], stopType: 'DROPOFF', stopOrder: 2 }
-];
-
 export default function StopsCrud() {
-  const [stops, setStops] = useState(INITIAL_STOPS);
+  const [stops, setStops] = useState([]);
+  const [routes, setRoutes] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [routeId, setRouteId] = useState('');
   const [locationId, setLocationId] = useState('');
   const [stopType, setStopType] = useState('PICKUP');
@@ -41,12 +15,63 @@ export default function StopsCrud() {
   const [editingStop, setEditingStop] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const nextId = useRef(0);
 
   const showToast = (text, type = 'success') => {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 3000);
   };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const data = await queryGraphQL(`
+          query AdminStopsData {
+            adminLocations { id name type address }
+            adminRoutes {
+              id
+              origin { id name }
+              destination { id name }
+            }
+            adminStops {
+              id
+              routeId
+              locationId
+              stopType
+              stopOrder
+            }
+          }
+        `);
+        if (data) {
+          const locs = data.adminLocations || [];
+          const rts = (data.adminRoutes || []).map(r => ({
+            id: r.id,
+            name: `${r.origin.name} -> ${r.destination.name}`
+          }));
+          setLocations(locs);
+          setRoutes(rts);
+          
+          const mappedStops = (data.adminStops || []).map(s => {
+            const r = rts.find(route => route.id === s.routeId);
+            const l = locs.find(loc => loc.id === s.locationId);
+            return {
+              id: s.id,
+              route: r ? { id: r.id, name: r.name } : { id: s.routeId, name: 'Unknown Route' },
+              location: l ? { id: l.id, name: l.name } : { id: s.locationId, name: 'Unknown Location' },
+              stopType: s.stopType,
+              stopOrder: s.stopOrder
+            };
+          });
+          setStops(mappedStops);
+        }
+      } catch (err) {
+        showToast(err.message || 'Failed to fetch data', 'error');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const handleCreateOrUpdate = async (e) => {
     e.preventDefault();
@@ -89,30 +114,24 @@ export default function StopsCrud() {
         variables.id = editingStop.id;
       }
 
-      await queryGraphQL(mutation, variables);
+      const data = await queryGraphQL(mutation, variables);
+      const returnedStop = data.adminCreateStop || data.adminUpdateStop;
 
-      const routeObj = SEEDED_ROUTES.find(r => r.id === routeId);
-      const locObj = SEEDED_LOCATIONS.find(l => l.id === locationId);
+      const r = routes.find(route => route.id === routeId);
+      const l = locations.find(loc => loc.id === locationId);
+      const newStopMapped = {
+        id: returnedStop.id,
+        route: r ? { id: r.id, name: r.name } : { id: routeId, name: 'Unknown Route' },
+        location: l ? { id: l.id, name: l.name } : { id: locationId, name: 'Unknown Location' },
+        stopType: returnedStop.stopType,
+        stopOrder: returnedStop.stopOrder
+      };
 
       if (isEditing) {
-        setStops(stops.map(s => s.id === editingStop.id ? {
-          ...s,
-          route: routeObj,
-          location: locObj,
-          stopType,
-          stopOrder: stopOrder ? parseInt(stopOrder, 10) : 1
-        } : s));
+        setStops(stops.map(s => s.id === editingStop.id ? newStopMapped : s));
         showToast('Stop updated successfully!');
       } else {
-        nextId.current += 1;
-        const newId = `stop-new-${nextId.current}`;
-        setStops([...stops, {
-          id: newId,
-          route: routeObj,
-          location: locObj,
-          stopType,
-          stopOrder: stopOrder ? parseInt(stopOrder, 10) : 1
-        }]);
+        setStops([...stops, newStopMapped]);
         showToast('Stop created successfully!');
       }
 
@@ -251,7 +270,7 @@ export default function StopsCrud() {
                 disabled={loading}
               >
                 <option value="">Select route...</option>
-                {SEEDED_ROUTES.map(r => (
+                {routes.map(r => (
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
               </select>
@@ -267,7 +286,7 @@ export default function StopsCrud() {
                 disabled={loading}
               >
                 <option value="">Select location...</option>
-                {SEEDED_LOCATIONS.map(loc => (
+                {locations.map(loc => (
                   <option key={loc.id} value={loc.id}>{loc.name}</option>
                 ))}
               </select>

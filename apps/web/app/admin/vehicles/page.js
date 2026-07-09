@@ -3,15 +3,8 @@
 import { useState, useRef } from 'react';
 import { queryGraphQL } from '../../graphql.js';
 
-// Pre-seeded vehicles from B-3
-const INITIAL_VEHICLES = [
-  { id: 'veh-01', operatorName: 'Phương Trang Demo', vehicleCode: 'V01', licensePlate: '51B-123.45', vehicleType: 'SEAT', seatCount: 29 },
-  { id: 'veh-02', operatorName: 'Thành Bưởi Demo', vehicleCode: 'V02', licensePlate: '49B-678.90', vehicleType: 'SLEEPER', seatCount: 34 },
-  { id: 'veh-03', operatorName: 'Kumho Samco Demo', vehicleCode: 'V03', licensePlate: '51B-555.22', vehicleType: 'LIMOUSINE', seatCount: 22 }
-];
-
 export default function VehiclesCrud() {
-  const [vehicles, setVehicles] = useState(INITIAL_VEHICLES);
+  const [vehicles, setVehicles] = useState([]);
   const [operatorName, setOperatorName] = useState('');
   const [vehicleCode, setVehicleCode] = useState('');
   const [licensePlate, setLicensePlate] = useState('');
@@ -29,12 +22,39 @@ export default function VehiclesCrud() {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const nextId = useRef(0);
 
   const showToast = (text, type = 'success') => {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 3000);
   };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const data = await queryGraphQL(`
+          query AdminVehiclesData {
+            adminVehicles {
+              id
+              operatorName
+              vehicleCode
+              licensePlate
+              vehicleType
+              seatCount
+            }
+          }
+        `);
+        if (data) {
+          setVehicles(data.adminVehicles || []);
+        }
+      } catch (err) {
+        showToast(err.message || 'Failed to fetch vehicles.', 'error');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const handleCreateOrUpdate = async (e) => {
     e.preventDefault();
@@ -50,6 +70,10 @@ export default function VehiclesCrud() {
       mutation UpdateVehicle($id: ID!, $input: AdminVehicleInput!) {
         adminUpdateVehicle(id: $id, input: $input) {
           id
+          operatorName
+          vehicleCode
+          licensePlate
+          vehicleType
           seatCount
         }
       }
@@ -57,6 +81,10 @@ export default function VehiclesCrud() {
       mutation CreateVehicle($input: AdminVehicleInput!) {
         adminCreateVehicle(input: $input) {
           id
+          operatorName
+          vehicleCode
+          licensePlate
+          vehicleType
           seatCount
         }
       }
@@ -76,29 +104,14 @@ export default function VehiclesCrud() {
         variables.id = editingVehicle.id;
       }
 
-      await queryGraphQL(mutation, variables);
+      const data = await queryGraphQL(mutation, variables);
+      const returnedVehicle = data.adminCreateVehicle || data.adminUpdateVehicle;
 
       if (isEditing) {
-        setVehicles(vehicles.map(v => v.id === editingVehicle.id ? {
-          ...v,
-          operatorName,
-          vehicleCode,
-          licensePlate,
-          vehicleType,
-          seatCount: seatCount ? parseInt(seatCount, 10) : 0
-        } : v));
+        setVehicles(vehicles.map(v => v.id === editingVehicle.id ? returnedVehicle : v));
         showToast('Vehicle updated successfully!');
       } else {
-        nextId.current += 1;
-        const newId = `veh-new-${nextId.current}`;
-        setVehicles([...vehicles, {
-          id: newId,
-          operatorName,
-          vehicleCode,
-          licensePlate,
-          vehicleType,
-          seatCount: seatCount ? parseInt(seatCount, 10) : 0
-        }]);
+        setVehicles([...vehicles, returnedVehicle]);
         showToast('Vehicle created successfully!');
       }
 

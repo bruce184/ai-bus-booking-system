@@ -20,6 +20,8 @@ export function mapStop(row) {
     address: row.location_address || '',
     stop_type: row.stop_type,
     stop_order: row.stop_order,
+    route_id: row.route_id,
+    location_id: row.location_id,
   };
 }
 

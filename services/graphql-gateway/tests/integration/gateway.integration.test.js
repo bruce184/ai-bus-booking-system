@@ -10,7 +10,7 @@ const startupTimeoutMs = 10_000;
 const seatInventoryTestAddress =
   process.env.SEAT_INVENTORY_SERVICE_GRPC_ADDRESS ||
   process.env.SEAT_INVENTORY_URL ||
-  "";
+  "127.0.0.1:50052";
 
 let gatewayProcess;
 let gatewayOutput = "";

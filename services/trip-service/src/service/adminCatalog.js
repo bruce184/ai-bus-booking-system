@@ -1,7 +1,7 @@
 // Admin catalog RPCs: route, stop, vehicle (+ seat layout), and trip management.
 import { pool, query } from '../db.js';
 import { notFound, invalidArgument } from '../errors.js';
-import { mapStop, mapVehicleSeat, mapRoute, mapVehicle } from '../mappers.js';
+import { mapStop, mapVehicleSeat, mapRoute, mapVehicle, mapLocation } from '../mappers.js';
 import { TRIP_SELECT, rowToTrip } from '../tripQuery.js';
 import { logger } from '../logger.js';
 
@@ -304,4 +304,60 @@ export async function updateTripStatus(call) {
   if (rowCount === 0) throw notFound('Trip not found');
   await logEvent('trip.status_changed', 'trip', trip_id, { status });
   return { trip: await fetchTrip(trip_id) };
+}
+
+export async function listLocations(call) {
+  const { rows } = await query(
+    `select id, name, type, address from locations order by name`
+  );
+  return { locations: rows.map(mapLocation) };
+}
+
+export async function listRoutes(call) {
+  const { rows } = await query(
+    `select r.id as route_id, r.distance_km,
+            ol.id as origin_id, ol.name as origin_name, ol.type as origin_type, ol.address as origin_address,
+            dl.id as destination_id, dl.name as destination_name, dl.type as destination_type, dl.address as destination_address
+       from routes r
+       join locations ol on ol.id = r.origin_location_id
+       join locations dl on dl.id = r.destination_location_id
+      order by r.id`
+  );
+  const routes = [];
+  for (const row of rows) {
+    const stopRes = await query(
+      `select rs.id, rs.route_id, rs.location_id, rs.stop_type, rs.stop_order,
+              l.name as location_name, l.address as location_address
+         from route_stops rs
+         join locations l on l.id = rs.location_id
+        where rs.route_id = $1
+        order by rs.stop_order`,
+      [row.route_id]
+    );
+    routes.push(mapRoute(row, stopRes.rows.map(mapStop)));
+  }
+  return { routes };
+}
+
+export async function listVehicles(call) {
+  const { rows } = await query(
+    `select id, operator_name, vehicle_code, license_plate, vehicle_type, seat_count
+       from vehicles order by id`
+  );
+  const vehicles = [];
+  for (const v of rows) {
+    const seatRes = await query(
+      `select id, seat_label, deck, seat_row, seat_column
+         from vehicle_seats where vehicle_id = $1
+         order by deck, seat_row, seat_column`,
+      [v.id]
+    );
+    vehicles.push(mapVehicle(v, seatRes.rows.map(mapVehicleSeat)));
+  }
+  return { vehicles };
+}
+
+export async function listTrips(call) {
+  const { rows } = await query(`${TRIP_SELECT} order by t.departure_time desc`);
+  return { trips: rows.map(rowToTrip) };
 }

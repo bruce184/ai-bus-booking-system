@@ -3,103 +3,46 @@
 import { useState, useRef } from 'react';
 import { queryGraphQL } from '../../graphql.js';
 
-// Seeded routes from B-3
-const SEEDED_ROUTES = [
-  { id: 'route-hcm-dl', name: 'TP.HCM -> Đà Lạt (310 km)' },
-  { id: 'route-hcm-nt', name: 'TP.HCM -> Nha Trang (430 km)' },
-  { id: 'route-hcm-ct', name: 'TP.HCM -> Cần Thơ (170 km)' },
-  { id: 'route-dn-hn', name: 'Đà Nẵng -> Hà Nội (760 km)' },
-  { id: 'route-hn-dn', name: 'Hà Nội -> Đà Nẵng (760 km)' }
-];
-
-// Seeded vehicles from B-3
-const SEEDED_VEHICLES = [
-  { id: 'veh-01', name: 'Phương Trang Demo (V01 - SEAT)' },
-  { id: 'veh-02', name: 'Thành Bưởi Demo (V02 - SLEEPER)' },
-  { id: 'veh-03', name: 'Kumho Samco Demo (V03 - LIMOUSINE)' }
-];
-
-// Pre-seeded trips from B-3
-const INITIAL_TRIPS = [
-  {
-    id: 'trip-1',
-    route: SEEDED_ROUTES[0],
-    vehicle: SEEDED_VEHICLES[1],
-    departureTime: '2026-06-24T08:00:00.000Z',
-    arrivalTime: '2026-06-24T14:00:00.000Z',
-    price: 280000,
-    status: 'ACTIVE'
-  },
-  {
-    id: 'trip-2',
-    route: SEEDED_ROUTES[1],
-    vehicle: SEEDED_VEHICLES[2],
-    departureTime: '2026-06-24T20:00:00.000Z',
-    arrivalTime: '2026-06-25T05:30:00.000Z',
-    price: 320000,
-    status: 'DRAFT'
-  },
-  {
-    id: 'trip-3',
-    route: SEEDED_ROUTES[2],
-    vehicle: SEEDED_VEHICLES[0],
-    departureTime: '2026-06-25T14:30:00.000Z',
-    arrivalTime: '2026-06-25T18:00:00.000Z',
-    price: 180000,
-    status: 'LOCKED'
-  }
-];
+const getTomorrowString = (hours = 8, minutes = 0) => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(hours, minutes, 0, 0);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T${pad(tomorrow.getHours())}:${pad(tomorrow.getMinutes())}`;
+};
 
 const getFallbackSeatsForTrip = (tripId) => {
   const seats = [];
-  if (tripId === 'trip-1') {
-    // 34 seats sleeper (2 decks, A01-A17, B01-B17)
-    let count = 1;
-    for (let d = 1; d <= 2; d++) {
-      for (let r = 1; r <= 6; r++) {
-        for (let c = 1; c <= 3; c++) {
-          if (count > 34) break;
-          const prefix = d === 1 ? 'A' : 'B';
-          const label = `${prefix}${count < 10 ? '0' : ''}${count}`;
-          let status = 'AVAILABLE';
-          if (label === 'A01' || label === 'A02' || label === 'A03') status = 'BOOKED';
-          if (label === 'A10') status = 'BLOCKED';
-          seats.push({ id: label, label, deck: d, row: r, column: c, status });
-          count++;
-        }
+  // 34 seats sleeper (2 decks, A01-A17, B01-B17)
+  let count = 1;
+  for (let d = 1; d <= 2; d++) {
+    for (let r = 1; r <= 6; r++) {
+      for (let c = 1; c <= 3; c++) {
+        if (count > 34) break;
+        const prefix = d === 1 ? 'A' : 'B';
+        const label = `${prefix}${count < 10 ? '0' : ''}${count}`;
+        seats.push({ id: label, label, deck: d, row: r, column: c, status: 'AVAILABLE' });
+        count++;
       }
-    }
-  } else if (tripId === 'trip-2') {
-    // 22 seats limousine (1 deck, A01-A22)
-    for (let i = 1; i <= 22; i++) {
-      const label = `A${i < 10 ? '0' : ''}${i}`;
-      let status = 'AVAILABLE';
-      if (label === 'A01') status = 'BOOKED';
-      seats.push({ id: label, label, deck: 1, row: Math.ceil(i / 3), column: (i - 1) % 3 + 1, status });
-    }
-  } else {
-    // 29 seats seat (1 deck, A01-A29)
-    for (let i = 1; i <= 29; i++) {
-      const label = `A${i < 10 ? '0' : ''}${i}`;
-      seats.push({ id: label, label, deck: 1, row: Math.ceil(i / 4), column: (i - 1) % 4 + 1, status: 'AVAILABLE' });
     }
   }
   return seats;
 };
 
 export default function TripsCrud() {
-  const [trips, setTrips] = useState(INITIAL_TRIPS);
+  const [trips, setTrips] = useState([]);
+  const [routes, setRoutes] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [routeId, setRouteId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
-  const [departureTime, setDepartureTime] = useState('');
-  const [arrivalTime, setArrivalTime] = useState('');
+  const [departureTime, setDepartureTime] = useState(getTomorrowString(8, 0));
+  const [arrivalTime, setArrivalTime] = useState(getTomorrowString(14, 0));
   const [price, setPrice] = useState('');
   const [status, setStatus] = useState('DRAFT');
 
   const [editingTrip, setEditingTrip] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const nextId = useRef(0);
 
   // Seat blocking states
   const [blockingSeatsTrip, setBlockingSeatsTrip] = useState(null);
@@ -111,6 +54,81 @@ export default function TripsCrud() {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 3000);
   };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const data = await queryGraphQL(`
+          query AdminTripsData {
+            adminRoutes {
+              id
+              origin { id name }
+              destination { id name }
+            }
+            adminVehicles {
+              id
+              operatorName
+              vehicleCode
+              vehicleType
+              seatCount
+            }
+            adminTrips {
+              id
+              route {
+                id
+                origin { id name }
+                destination { id name }
+              }
+              vehicle {
+                id
+                operatorName
+                vehicleCode
+                vehicleType
+                seatCount
+              }
+              departureTime
+              arrivalTime
+              price
+              status
+            }
+          }
+        `);
+        if (data) {
+          const rts = (data.adminRoutes || []).map(r => ({
+            id: r.id,
+            name: `${r.origin.name} -> ${r.destination.name}`
+          }));
+          const vehs = (data.adminVehicles || []).map(v => ({
+            id: v.id,
+            name: `${v.operatorName} (${v.vehicleCode} - ${v.vehicleType})`
+          }));
+          setRoutes(rts);
+          setVehicles(vehs);
+
+          const mappedTrips = (data.adminTrips || []).map(t => {
+            const r = rts.find(route => route.id === t.route?.id);
+            const v = vehs.find(veh => veh.id === t.vehicle?.id);
+            return {
+              id: t.id,
+              route: r ? { id: r.id, name: r.name } : { id: t.route?.id, name: 'Unknown Route' },
+              vehicle: v ? { id: v.id, name: v.name } : { id: t.vehicle?.id, name: 'Unknown Vehicle' },
+              departureTime: t.departureTime,
+              arrivalTime: t.arrivalTime,
+              price: t.price,
+              status: t.status
+            };
+          });
+          setTrips(mappedTrips);
+        }
+      } catch (err) {
+        showToast(err.message || 'Failed to fetch initial data.', 'error');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const handleCreateOrUpdate = async (e) => {
     e.preventDefault();
@@ -126,6 +144,11 @@ export default function TripsCrud() {
       mutation UpdateTrip($id: ID!, $input: AdminTripInput!) {
         adminUpdateTrip(id: $id, input: $input) {
           id
+          route { id origin { name } destination { name } }
+          vehicle { id operatorName vehicleCode vehicleType seatCount }
+          departureTime
+          arrivalTime
+          price
           status
         }
       }
@@ -133,6 +156,11 @@ export default function TripsCrud() {
       mutation CreateTrip($input: AdminTripInput!) {
         adminCreateTrip(input: $input) {
           id
+          route { id origin { name } destination { name } }
+          vehicle { id operatorName vehicleCode vehicleType seatCount }
+          departureTime
+          arrivalTime
+          price
           status
         }
       }
@@ -156,34 +184,26 @@ export default function TripsCrud() {
         variables.id = editingTrip.id;
       }
 
-      await queryGraphQL(mutation, variables);
+      const data = await queryGraphQL(mutation, variables);
+      const returnedTrip = data.adminCreateTrip || data.adminUpdateTrip;
 
-      const routeObj = SEEDED_ROUTES.find(r => r.id === routeId);
-      const vehicleObj = SEEDED_VEHICLES.find(v => v.id === vehicleId);
+      const r = routes.find(route => route.id === routeId);
+      const v = vehicles.find(veh => veh.id === vehicleId);
+      const newTripMapped = {
+        id: returnedTrip.id,
+        route: r ? { id: r.id, name: r.name } : { id: routeId, name: 'Unknown Route' },
+        vehicle: v ? { id: v.id, name: v.name } : { id: vehicleId, name: 'Unknown Vehicle' },
+        departureTime: returnedTrip.departureTime,
+        arrivalTime: returnedTrip.arrivalTime,
+        price: returnedTrip.price,
+        status: returnedTrip.status
+      };
 
       if (isEditing) {
-        setTrips(trips.map(t => t.id === editingTrip.id ? {
-          ...t,
-          route: routeObj,
-          vehicle: vehicleObj,
-          departureTime: formattedDepTime,
-          arrivalTime: formattedArrTime,
-          price: parseInt(price, 10),
-          status
-        } : t));
+        setTrips(trips.map(t => t.id === editingTrip.id ? newTripMapped : t));
         showToast('Trip updated successfully!');
       } else {
-        nextId.current += 1;
-        const newId = `trip-new-${nextId.current}`;
-        setTrips([...trips, {
-          id: newId,
-          route: routeObj,
-          vehicle: vehicleObj,
-          departureTime: formattedDepTime,
-          arrivalTime: formattedArrTime,
-          price: parseInt(price, 10),
-          status
-        }]);
+        setTrips([...trips, newTripMapped]);
         showToast('Trip created successfully!');
       }
 
@@ -503,7 +523,7 @@ export default function TripsCrud() {
                 disabled={loading}
               >
                 <option value="">Select route...</option>
-                {SEEDED_ROUTES.map(r => (
+                {routes.map(r => (
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
               </select>
@@ -519,7 +539,7 @@ export default function TripsCrud() {
                 disabled={loading}
               >
                 <option value="">Select vehicle...</option>
-                {SEEDED_VEHICLES.map(v => (
+                {vehicles.map(v => (
                   <option key={v.id} value={v.id}>{v.name}</option>
                 ))}
               </select>

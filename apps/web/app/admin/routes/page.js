@@ -3,28 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { queryGraphQL } from '../../graphql.js';
 
-// Pre-seeded locations from B-3
-const SEEDED_LOCATIONS = [
-  { id: 'loc-hcm-md', name: 'TP.HCM (Bến Xe Miền Đông)', type: 'STATION' },
-  { id: 'loc-hcm-mt', name: 'TP.HCM (Bến Xe Miền Tây)', type: 'STATION' },
-  { id: 'loc-dl', name: 'Đà Lạt (Bến Xe Liên Tỉnh)', type: 'STATION' },
-  { id: 'loc-nt', name: 'Nha Trang (Bến Xe Phía Nam)', type: 'STATION' },
-  { id: 'loc-ct', name: 'Cần Thơ (Bến Xe Cần Thơ)', type: 'STATION' },
-  { id: 'loc-dn', name: 'Đà Nẵng (Bến Xe Đà Nẵng)', type: 'STATION' },
-  { id: 'loc-hn', name: 'Hà Nội (Bến Xe Mỹ Đình)', type: 'STATION' }
-];
-
-// Pre-seeded routes from B-3
-const INITIAL_ROUTES = [
-  { id: 'route-hcm-dl', origin: SEEDED_LOCATIONS[0], destination: SEEDED_LOCATIONS[2], distanceKm: 310 },
-  { id: 'route-hcm-nt', origin: SEEDED_LOCATIONS[0], destination: SEEDED_LOCATIONS[3], distanceKm: 430 },
-  { id: 'route-hcm-ct', origin: SEEDED_LOCATIONS[1], destination: SEEDED_LOCATIONS[4], distanceKm: 170 },
-  { id: 'route-dn-hn', origin: SEEDED_LOCATIONS[5], destination: SEEDED_LOCATIONS[6], distanceKm: 760 },
-  { id: 'route-hn-dn', origin: SEEDED_LOCATIONS[6], destination: SEEDED_LOCATIONS[5], distanceKm: 760 }
-];
-
 export default function RoutesCrud() {
-  const [routes, setRoutes] = useState(INITIAL_ROUTES);
+  const [routes, setRoutes] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [originId, setOriginId] = useState('');
   const [destinationId, setDestinationId] = useState('');
   const [distanceKm, setDistanceKm] = useState('');
@@ -32,12 +13,39 @@ export default function RoutesCrud() {
   const [editingRoute, setEditingRoute] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const nextId = useRef(0);
 
   const showToast = (text, type = 'success') => {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 3000);
   };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const data = await queryGraphQL(`
+          query AdminRoutesData {
+            adminLocations { id name type address }
+            adminRoutes {
+              id
+              distanceKm
+              origin { id name type address }
+              destination { id name type address }
+            }
+          }
+        `);
+        if (data) {
+          setLocations(data.adminLocations || []);
+          setRoutes(data.adminRoutes || []);
+        }
+      } catch (err) {
+        showToast(err.message || 'Failed to fetch initial data.', 'error');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const handleCreateOrUpdate = async (e) => {
     e.preventDefault();
@@ -58,6 +66,8 @@ export default function RoutesCrud() {
         adminUpdateRoute(id: $id, input: $input) {
           id
           distanceKm
+          origin { id name type address }
+          destination { id name type address }
         }
       }
     ` : `
@@ -65,6 +75,8 @@ export default function RoutesCrud() {
         adminCreateRoute(input: $input) {
           id
           distanceKm
+          origin { id name type address }
+          destination { id name type address }
         }
       }
     `;
@@ -81,28 +93,14 @@ export default function RoutesCrud() {
         variables.id = editingRoute.id;
       }
 
-      await queryGraphQL(mutation, variables);
-
-      const originLoc = SEEDED_LOCATIONS.find(l => l.id === originId);
-      const destLoc = SEEDED_LOCATIONS.find(l => l.id === destinationId);
+      const data = await queryGraphQL(mutation, variables);
+      const returnedRoute = data.adminCreateRoute || data.adminUpdateRoute;
 
       if (isEditing) {
-        setRoutes(routes.map(r => r.id === editingRoute.id ? {
-          ...r,
-          origin: originLoc,
-          destination: destLoc,
-          distanceKm: distanceKm ? parseInt(distanceKm, 10) : 0
-        } : r));
+        setRoutes(routes.map(r => r.id === editingRoute.id ? returnedRoute : r));
         showToast('Route updated successfully!');
       } else {
-        nextId.current += 1;
-        const newId = `route-new-${nextId.current}`;
-        setRoutes([...routes, {
-          id: newId,
-          origin: originLoc,
-          destination: destLoc,
-          distanceKm: distanceKm ? parseInt(distanceKm, 10) : 0
-        }]);
+        setRoutes([...routes, returnedRoute]);
         showToast('Route created successfully!');
       }
 
@@ -230,7 +228,7 @@ export default function RoutesCrud() {
                 disabled={loading}
               >
                 <option value="">Select origin...</option>
-                {SEEDED_LOCATIONS.map(loc => (
+                {locations.map(loc => (
                   <option key={loc.id} value={loc.id}>{loc.name}</option>
                 ))}
               </select>
@@ -246,7 +244,7 @@ export default function RoutesCrud() {
                 disabled={loading}
               >
                 <option value="">Select destination...</option>
-                {SEEDED_LOCATIONS.map(loc => (
+                {locations.map(loc => (
                   <option key={loc.id} value={loc.id}>{loc.name}</option>
                 ))}
               </select>

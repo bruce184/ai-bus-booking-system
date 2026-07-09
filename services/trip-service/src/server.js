@@ -43,6 +43,10 @@ export function buildServer() {
     UpdateTrip: admin.updateTrip,
     DeleteTrip: admin.deleteTrip,
     UpdateTripStatus: admin.updateTripStatus,
+    ListLocations: admin.listLocations,
+    ListRoutes: admin.listRoutes,
+    ListVehicles: admin.listVehicles,
+    ListTrips: admin.listTrips,
   };
 
   const handlers = {};

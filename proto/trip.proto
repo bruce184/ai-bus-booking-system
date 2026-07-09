@@ -21,6 +21,10 @@ service TripService {
   rpc UpdateTrip(TripMutationRequest) returns (TripResponse);
   rpc DeleteTrip(DeleteEntityRequest) returns (DeleteEntityResponse);
   rpc UpdateTripStatus(UpdateTripStatusRequest) returns (TripResponse);
+  rpc ListLocations(ListLocationsRequest) returns (ListLocationsResponse);
+  rpc ListRoutes(ListRoutesRequest) returns (ListRoutesResponse);
+  rpc ListVehicles(ListVehiclesRequest) returns (ListVehiclesResponse);
+  rpc ListTrips(ListTripsRequest) returns (ListTripsResponse);
 }
 
 enum TripStatus {
@@ -31,6 +35,26 @@ enum TripStatus {
   DEPARTED = 4;
   COMPLETED = 5;
   CANCELLED = 6;
+}
+
+message ListLocationsRequest {}
+message ListLocationsResponse {
+  repeated Location locations = 1;
+}
+
+message ListRoutesRequest {}
+message ListRoutesResponse {
+  repeated Route routes = 1;
+}
+
+message ListVehiclesRequest {}
+message ListVehiclesResponse {
+  repeated Vehicle vehicles = 1;
+}
+
+message ListTripsRequest {}
+message ListTripsResponse {
+  repeated Trip trips = 1;
 }
 
 message AutocompleteLocationsRequest {
@@ -96,6 +120,8 @@ message Stop {
   string address = 3;
   string stop_type = 4;
   int32 stop_order = 5;
+  string route_id = 6;
+  string location_id = 7;
 }
 
 message Route {

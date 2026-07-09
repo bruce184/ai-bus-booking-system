@@ -10,14 +10,17 @@ function ticketCode(index) {
   return `TK${ymd}${String(index + 1).padStart(3, "0")}${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
-function ticketHtml({ booking, passenger, trip, qrPayload }) {
+function ticketHtml({ booking, passenger, trip, qrPayload, ticketCode }) {
   const route = `${trip.origin_name} -> ${trip.destination_name}`;
   return `
     <article class="ticket">
       <h1>Ve xe ${route}</h1>
+      <p><strong>Ma ve:</strong> ${ticketCode}</p>
       <p><strong>Ma booking:</strong> ${booking.booking_code}</p>
       <p><strong>Hanh khach:</strong> ${passenger.full_name}</p>
       <p><strong>Ghe:</strong> ${passenger.seat_label}</p>
+      <p><strong>Diem don:</strong> ${trip.pickup_point}</p>
+      <p><strong>Diem tra:</strong> ${trip.dropoff_point}</p>
       <p><strong>Khoi hanh:</strong> ${trip.departure_time}</p>
       <p><strong>Xe:</strong> ${trip.vehicle_code}</p>
       <p><strong>QR:</strong> ${qrPayload}</p>
@@ -109,7 +112,7 @@ async function issueTickets(event) {
           passenger.id,
           ticketCode(index),
           qrPayload,
-          ticketHtml({ booking, passenger, trip: booking, qrPayload }),
+          ticketHtml({ booking, passenger, trip: booking, qrPayload, ticketCode: ticketCode(index) }),
           CHECKIN_POLICY
         ]
       );
