@@ -35,7 +35,7 @@ function sortSeatLayout(seats) {
   return [...seats].sort((a, b) => a.row - b.row || a.column - b.column || a.label.localeCompare(b.label));
 }
 
-export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }) {
+export function SeatMap({ graphqlUrl, tripId, seats, price = 220000, onHoldCreated }) {
   const [selectedSeatIds, setSelectedSeatIds] = useState([]);
   const [activeHold, setActiveHold] = useState(null);
   const [remainingSeconds, setRemainingSeconds] = useState(null);
@@ -43,6 +43,12 @@ export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }) {
   const [error, setError] = useState(null);
 
   const seatsByDeck = useMemo(() => groupSeatsByDeck(seats), [seats]);
+
+  const selectedSeatsLabels = useMemo(() => {
+    return seats
+      .filter((s) => selectedSeatIds.includes(s.id))
+      .map((s) => s.label);
+  }, [seats, selectedSeatIds]);
 
   useEffect(() => {
     if (!activeHold) {
@@ -133,7 +139,7 @@ export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }) {
   }
 
   return (
-    <section className="seat-map" aria-label="Sơ đồ ghế">
+    <section className="seat-map animate-fade-in" aria-label="Sơ đồ ghế">
       <div className="seat-map-toolbar">
         <div className="seat-legend" aria-label="Chú thích trạng thái ghế">
           {Object.keys(seatStatusLabel).map((status) => (
@@ -143,52 +149,75 @@ export function SeatMap({ graphqlUrl, tripId, seats, onHoldCreated }) {
             </span>
           ))}
         </div>
-        <button
-          className="seat-hold-button"
-          disabled={isHolding || selectedSeatIds.length === 0}
-          onClick={handleHoldSeats}
-          type="button"
-        >
-          {isHolding ? "Đang giữ..." : `Giữ ${selectedSeatIds.length} ghế`}
-        </button>
       </div>
 
       {activeHold && remainingSeconds !== null ? (
-        <div className="seat-hold-countdown" role="status">
+        <div className="seat-hold-countdown" role="status" style={{ marginBottom: "16px" }}>
           Giữ ghế còn {remainingSeconds}s
         </div>
       ) : null}
 
-      {Array.from(seatsByDeck.entries()).map(([deck, deckSeats]) => (
-        <div className="seat-deck" key={deck}>
-          <h3>Tầng {deck}</h3>
-          <div className="seat-grid">
-            {sortSeatLayout(deckSeats).map((seat) => {
-              const selected = selectedSeatIds.includes(seat.id);
+      <div className="seat-decks-container">
+        {Array.from(seatsByDeck.entries()).map(([deck, deckSeats]) => (
+          <div className="seat-deck animate-fade-in" key={deck}>
+            <h3 style={{ fontSize: "16px", fontWeight: "800", color: "var(--brand)", marginBottom: "16px", textAlign: "center" }}>
+              Tầng {deck}
+            </h3>
+            <div className="seat-grid">
+              {sortSeatLayout(deckSeats).map((seat) => {
+                const selected = selectedSeatIds.includes(seat.id);
 
-              return (
-                <button
-                  aria-pressed={selected}
-                  className={`${seatClassName[seat.status]}${selected ? " seat-selected" : ""}`}
-                  disabled={!isSelectable(seat) || isHolding}
-                  key={seat.id}
-                  onClick={() => toggleSeat(seat)}
-                  style={{
-                    gridColumn: seat.column,
-                    gridRow: seat.row
-                  }}
-                  title={`${seat.label} - ${seatStatusLabel[seat.status]}`}
-                  type="button"
-                >
-                  {seat.label}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    aria-pressed={selected}
+                    className={`${seatClassName[seat.status]}${selected ? " seat-selected" : ""}`}
+                    disabled={!isSelectable(seat) || isHolding}
+                    key={seat.id}
+                    onClick={() => toggleSeat(seat)}
+                    style={{
+                      gridColumn: seat.column,
+                      gridRow: seat.row
+                    }}
+                    title={`${seat.label} - ${seatStatusLabel[seat.status]}`}
+                    type="button"
+                  >
+                    {seat.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
 
-      {error ? <p className="seat-map-error">{error}</p> : null}
+      {error ? <p className="seat-map-error" style={{ marginTop: "16px" }}>{error}</p> : null}
+
+      {/* Mockup Sticky Selected Status Footer */}
+      <div className="seat-map-footer">
+        <div>
+          <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+            Đã chọn {selectedSeatIds.length} ghế
+          </span>
+          <strong style={{ fontSize: "16px", color: "var(--text)" }}>
+            {selectedSeatsLabels.join(", ") || "Chưa chọn"}
+          </strong>
+        </div>
+        <div style={{ textAlign: "right", marginRight: "16px" }}>
+          <span style={{ fontSize: "12px", color: "var(--muted)" }}>Tổng tiền</span>
+          <strong style={{ fontSize: "20px", color: "var(--brand-dark)" }}>
+            {(selectedSeatIds.length * price).toLocaleString("vi-VN")}đ
+          </strong>
+        </div>
+        <button
+          className="seat-hold-button primary"
+          disabled={isHolding || selectedSeatIds.length === 0}
+          onClick={handleHoldSeats}
+          type="button"
+          style={{ minWidth: "120px", height: "42px" }}
+        >
+          {isHolding ? "Đang xử lý..." : "Tiếp tục"}
+        </button>
+      </div>
     </section>
   );
 }

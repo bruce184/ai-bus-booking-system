@@ -19,9 +19,15 @@ export default function HomePage() {
     router.push(`/search?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${date}`);
   };
 
+  const handleSwap = () => {
+    const temp = from;
+    setFrom(to);
+    setTo(temp);
+  };
+
   return (
     <>
-      <header className="topbar">
+      <header className="topbar animate-fade-in">
         <div className="logo-container">
           <div className="logo-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'block' }}>
@@ -55,12 +61,13 @@ export default function HomePage() {
         </nav>
       </header>
 
+      {/* Hero Section */}
       <section className="hero animate-fade-in">
         <div className="hero-copy">
-          <span className="eyebrow" style={{ color: "#e07a5f", letterSpacing: "0.1em", fontWeight: "700", fontSize: "13px" }}>
+          <span className="eyebrow">
             HÀNH TRÌNH XANH – TRẢI NGHIỆM NHANH
           </span>
-          <h2 className="brand" style={{ fontSize: "48px", lineHeight: "1.15", fontWeight: "800", color: "var(--text)" }}>
+          <h2 className="brand">
             Đặt vé xe liên tỉnh,<br />
             <span className="serif-highlight">nhanh chóng</span> & an toàn.
           </h2>
@@ -71,7 +78,7 @@ export default function HomePage() {
         <div className="hero-image" />
       </section>
 
-      {/* Floating Search Widget */}
+      {/* Floating Search Widget with Swap Icon */}
       <form className="search-widget animate-fade-in" onSubmit={handleSearch}>
         <div className="field">
           <label htmlFor="from-input">Điểm đi</label>
@@ -90,9 +97,16 @@ export default function HomePage() {
               <option value="Da Lat">Đà Lạt</option>
               <option value="Nha Trang">Nha Trang</option>
               <option value="Can Tho">Cần Thơ</option>
+              <option value="Phan Thiet">Phan Thiết</option>
+              <option value="Vung Tau">Vũng Tàu</option>
             </select>
           </div>
         </div>
+
+        <button className="btn-swap" type="button" onClick={handleSwap} title="Đổi chiều" aria-label="Đổi chiều">
+          ⇄
+        </button>
+
         <div className="field">
           <label htmlFor="to-input">Điểm đến</label>
           <div className="input-with-icon">
@@ -110,9 +124,12 @@ export default function HomePage() {
               <option value="TP.HCM">TP.HCM</option>
               <option value="Nha Trang">Nha Trang</option>
               <option value="Can Tho">Cần Thơ</option>
+              <option value="Phan Thiet">Phan Thiết</option>
+              <option value="Vung Tau">Vũng Tàu</option>
             </select>
           </div>
         </div>
+
         <div className="field">
           <label htmlFor="date-input">Ngày đi</label>
           <div className="input-with-icon">
@@ -131,6 +148,7 @@ export default function HomePage() {
             />
           </div>
         </div>
+
         <button id="search-btn" className="btn-search" type="submit" style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
@@ -148,29 +166,99 @@ export default function HomePage() {
         </div>
       </form>
 
-      <section className="grid">
+      {/* Feature Cards Grid Section */}
+      <section className="homepage-features animate-fade-in">
+        <div className="feature-card">
+          <span className="feature-emoji">🔍</span>
+          <div>
+            <strong style={{ fontSize: "15px", color: "var(--text)" }}>Tìm chuyến & Giữ chỗ</strong>
+            <p className="muted" style={{ fontSize: "13px", marginTop: "2px", fontWeight: "normal" }}>
+              Tìm kiếm tuyến đường phù hợp, chọn vị trí ghế trống trực tuyến và tạm giữ chỗ an toàn.
+            </p>
+          </div>
+        </div>
+        <div className="feature-card">
+          <span className="feature-emoji">💳</span>
+          <div>
+            <strong style={{ fontSize: "15px", color: "var(--text)" }}>Thanh toán dễ dàng</strong>
+            <p className="muted" style={{ fontSize: "13px", marginTop: "2px", fontWeight: "normal" }}>
+              Thanh toán đa dạng, bảo mật và xác nhận giữ vé tức thì qua cổng mô phỏng trực tuyến.
+            </p>
+          </div>
+        </div>
+        <div className="feature-card">
+          <span className="feature-emoji">✉️</span>
+          <div>
+            <strong style={{ fontSize: "15px", color: "var(--text)" }}>Nhận vé điện tử</strong>
+            <p className="muted" style={{ fontSize: "13px", marginTop: "2px", fontWeight: "normal" }}>
+              Vé điện tử thông minh sẽ được gửi qua email khách hàng, dễ dàng xuất trình khi lên xe.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Popular Routes Section */}
+      <section className="popular-routes animate-fade-in">
+        <div className="row between" style={{ alignItems: "center" }}>
+          <h2>Tuyến đường phổ biến</h2>
+          <Link href="/search" className="link-all">Xem tất cả</Link>
+        </div>
+        <div className="routes-grid">
+          <div className="route-card" style={{ background: "linear-gradient(135deg, #105c42 0%, #064e3b 100%)" }} onClick={() => router.push(`/search?from=TP.HCM&to=Da+Lat&date=${date}`)}>
+            <div className="route-card-content">
+              <div className="route-card-title">TP.HCM ⇄ Đà Lạt</div>
+              <div className="route-card-price">Chỉ từ 220.000đ</div>
+              <div className="route-card-trips">126 chuyến/ngày</div>
+            </div>
+          </div>
+          <div className="route-card" style={{ background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)" }} onClick={() => router.push(`/search?from=TP.HCM&to=Nha+Trang&date=${date}`)}>
+            <div className="route-card-content">
+              <div className="route-card-title">TP.HCM ⇄ Nha Trang</div>
+              <div className="route-card-price">Chỉ từ 300.000đ</div>
+              <div className="route-card-trips">96 chuyến/ngày</div>
+            </div>
+          </div>
+          <div className="route-card" style={{ background: "linear-gradient(135deg, #093f2c 0%, #1f2937 100%)" }} onClick={() => router.push(`/search?from=TP.HCM&to=Phan+Thiet&date=${date}`)}>
+            <div className="route-card-content">
+              <div className="route-card-title">TP.HCM ⇄ Phan Thiết</div>
+              <div className="route-card-price">Chỉ từ 180.000đ</div>
+              <div className="route-card-trips">72 chuyến/ngày</div>
+            </div>
+          </div>
+          <div className="route-card" style={{ background: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)" }} onClick={() => router.push(`/search?from=TP.HCM&to=Vung+Tau&date=${date}`)}>
+            <div className="route-card-content">
+              <div className="route-card-title">TP.HCM ⇄ Vũng Tàu</div>
+              <div className="route-card-price">Chỉ từ 120.000đ</div>
+              <div className="route-card-trips">64 chuyến/ngày</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Grid Panels (Illustrations) */}
+      <section className="grid animate-fade-in">
         <div className="panel has-illustration">
-          <h2>Luồng đặt vé tiện lợi</h2>
+          <h2>Quy trình hoạt động</h2>
           <ol className="step-list" style={{ marginTop: "20px" }}>
             <li>
               <span className="step-index">1</span>
               <div>
                 <strong style={{ fontSize: "15px", color: "var(--text)" }}>Tìm chuyến & Giữ chỗ</strong>
-                <p className="muted" style={{ fontSize: "13px", marginTop: "2px", fontWeight: "normal" }}>Tìm kiếm tuyến đường phù hợp, chọn vị trí ghế trống trực tuyến và tạm giữ chỗ an toàn.</p>
+                <p className="muted" style={{ fontSize: "13px", marginTop: "2px", fontWeight: "normal" }}>Chọn điểm hành trình, so sánh thời gian xuất phát của các nhà xe và tạm giữ ghế trong 10 phút.</p>
               </div>
             </li>
             <li>
               <span className="step-index">2</span>
               <div>
                 <strong style={{ fontSize: "15px", color: "var(--text)" }}>Thanh toán nhanh</strong>
-                <p className="muted" style={{ fontSize: "13px", marginTop: "2px", fontWeight: "normal" }}>Thực hiện thanh toán mô phỏng lập tức để xác nhận thông tin vé và phát sinh mã vé chính thức.</p>
+                <p className="muted" style={{ fontSize: "13px", marginTop: "2px", fontWeight: "normal" }}>Chọn phương thức MoMo, ZaloPay, Thẻ ATM hoặc Chuyển khoản và mô phỏng giao dịch thành công.</p>
               </div>
             </li>
             <li>
               <span className="step-index">3</span>
               <div>
                 <strong style={{ fontSize: "15px", color: "var(--text)" }}>Nhận vé điện tử</strong>
-                <p className="muted" style={{ fontSize: "13px", marginTop: "2px", fontWeight: "normal" }}>Vé điện tử thông minh sẽ được gửi qua email khách hàng kèm thông tin chuyến đi đầy đủ.</p>
+                <p className="muted" style={{ fontSize: "13px", marginTop: "2px", fontWeight: "normal" }}>Hệ thống tự động đồng bộ sự kiện để xuất vé kèm QR Code gửi thẳng vào hòm thư điện tử.</p>
               </div>
             </li>
           </ol>
@@ -178,9 +266,9 @@ export default function HomePage() {
         </div>
 
         <div className="panel has-illustration">
-          <h2>Tra cứu vé an toàn</h2>
+          <h2>Bảo mật & Tra cứu vé</h2>
           <p className="muted" style={{ marginBottom: "32px", lineHeight: "1.6", marginTop: "16px", maxWidth: "340px" }}>
-            Chúng tôi luôn bảo vệ quyền riêng tư của bạn. Để tra cứu thông tin đặt vé chi tiết hoặc hoàn hủy, vui lòng cung cấp đầy đủ cả mã đặt vé và địa chỉ email đã đăng ký.
+            Hệ thống áp dụng chính sách riêng tư khắt khe. Để tra cứu chi tiết thông tin vé đã mua, quản lý trạng thái thanh toán hoặc yêu cầu hoàn vé, bạn cần cung cấp đúng cặp thông tin mã đặt vé và email.
           </p>
           <Link className="btn-lookup-portal" href="/lookup" id="lookup-btn">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -193,37 +281,78 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Feature Badges Grid Bar */}
-      <section className="features-bar">
-        <div className="feature-item">
-          <div className="feature-icon-wrapper">🌱</div>
-          <div className="feature-content">
-            <span className="feature-title">Hành trình xanh</span>
-            <span className="feature-desc">Vì môi trường bền vững</span>
-          </div>
+      {/* Newsletter signup block */}
+      <section className="newsletter-banner animate-fade-in">
+        <div className="newsletter-text">
+          <h3>Nhận ưu đãi & thông tin mới nhất</h3>
+          <p>Đăng ký nhận email để cập nhật lịch trình xe chạy và các chương trình khuyến mãi sớm nhất từ EcoBus AI.</p>
         </div>
-        <div className="feature-item">
-          <div className="feature-icon-wrapper">👥</div>
-          <div className="feature-content">
-            <span className="feature-title">Đồng hành tin cậy</span>
-            <span className="feature-desc">Hơn 1 triệu khách hàng</span>
-          </div>
-        </div>
-        <div className="feature-item">
-          <div className="feature-icon-wrapper">🚌</div>
-          <div className="feature-content">
-            <span className="feature-title">Đa dạng tuyến đường</span>
-            <span className="feature-desc">Kết nối khắp Việt Nam</span>
-          </div>
-        </div>
-        <div className="feature-item">
-          <div className="feature-icon-wrapper">🛡️</div>
-          <div className="feature-content">
-            <span className="feature-title">Cam kết an toàn</span>
-            <span className="feature-desc">Tiêu chuẩn bảo mật cao</span>
-          </div>
-        </div>
+        <form className="newsletter-form" onSubmit={(e) => { e.preventDefault(); alert("Đăng ký nhận tin thành công!"); }}>
+          <input type="email" placeholder="Nhập email của bạn..." required style={{ flex: 1 }} />
+          <button className="btn-submit" type="submit">Đăng ký</button>
+        </form>
       </section>
+
+      {/* Full Website Footer */}
+      <footer className="site-footer animate-fade-in">
+        <div className="footer-col">
+          <div className="footer-logo">
+            <div className="logo-icon" style={{ width: "32px", height: "32px", borderRadius: "8px", fontSize: "16px" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'block' }}>
+                <path d="M17,8C8,10 5.9,16.17 3.82,21.34L5.71,22L7.33,18C12,18 16.6,15.25 18.66,13.25C22.66,9.25 22,2 22,2C22,2 14.75,1.34 10.75,5.34C9,7.09 6.25,12 6.25,12C8.75,9 13.5,8 17,8Z" />
+              </svg>
+            </div>
+            <span className="logo-text" style={{ fontSize: "18px" }}>EcoBus AI</span>
+          </div>
+          <p className="footer-desc">
+            Hệ thống đặt vé xe trực tuyến thông minh, ứng dụng công nghệ AI để đem lại hành trình di chuyển xanh, nhanh chóng và an toàn nhất cho mọi hành khách.
+          </p>
+          <div className="footer-socials">
+            <span className="footer-social-icon">f</span>
+            <span className="footer-social-icon">t</span>
+            <span className="footer-social-icon">i</span>
+          </div>
+        </div>
+
+        <div className="footer-col">
+          <h4>Về chúng tôi</h4>
+          <div className="footer-links">
+            <Link href="/">Giới thiệu</Link>
+            <Link href="/">Tin tức</Link>
+            <Link href="/">Tuyển dụng</Link>
+            <Link href="/">Liên hệ</Link>
+          </div>
+        </div>
+
+        <div className="footer-col">
+          <h4>Hỗ trợ</h4>
+          <div className="footer-links">
+            <Link href="/">Câu hỏi thường gặp</Link>
+            <Link href="/">Hướng dẫn đặt vé</Link>
+            <Link href="/">Chính sách bảo mật</Link>
+            <Link href="/">Điều khoản dịch vụ</Link>
+          </div>
+        </div>
+
+        <div className="footer-col">
+          <h4>Tổng đài hỗ trợ</h4>
+          <div className="footer-links">
+            <div className="footer-contact-item">
+              <span>📞</span>
+              <div>
+                <strong>1900 1234</strong>
+                <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "2px" }}>7:00 - 22:00 mỗi ngày</div>
+              </div>
+            </div>
+            <div className="footer-contact-item" style={{ marginTop: "6px" }}>
+              <span>✉️</span>
+              <div>
+                <strong>support@ecobus.ai</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
 
       {/* System Developer Console for Technical Specs */}
       <footer className="dev-console">
