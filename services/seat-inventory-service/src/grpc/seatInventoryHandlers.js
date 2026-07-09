@@ -6,7 +6,8 @@ import {
   getSeatMap,
   holdSeats,
   releaseBookedSeats,
-  releaseHold
+  releaseHold,
+  validateHold
 } from "../services/seatMapService.js";
 
 const handleGetSeatMap = async (call, callback) => {
@@ -45,6 +46,19 @@ const handleReleaseHold = async (call, callback) => {
     }
 
     callback(serviceError(grpc.status.INTERNAL, "Failed to release hold"));
+  }
+};
+
+const handleValidateHold = async (call, callback) => {
+  try {
+    callback(null, await validateHold(call.request));
+  } catch (error) {
+    if (error && "code" in error) {
+      callback(error);
+      return;
+    }
+
+    callback(serviceError(grpc.status.INTERNAL, "Failed to validate hold"));
   }
 };
 
@@ -91,6 +105,7 @@ export const seatInventoryHandlers = {
   getSeatMap: handleGetSeatMap,
   holdSeats: handleHoldSeats,
   releaseHold: handleReleaseHold,
+  validateHold: handleValidateHold,
   confirmSeats: handleConfirmSeats,
   releaseBookedSeats: handleReleaseBookedSeats,
   blockSeats: handleBlockSeats

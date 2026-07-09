@@ -1,7 +1,7 @@
 import { publishKafkaEvent, publishWorkflowEvent } from "@bus/shared/events.js";
 import { fail, toGrpcError } from "@bus/shared/errors.js";
 import { grpc, loadProto } from "@bus/shared/grpc.js";
-import { confirmSeats, releaseBookedSeats, releaseSeatHold } from "./seat-client.js";
+import { confirmSeats, releaseBookedSeats, releaseSeatHold, validateSeatHold } from "./seat-client.js";
 import {
   cancelBooking,
   checkInPassenger,
@@ -78,6 +78,13 @@ async function simulatePayment(request) {
 }
 
 async function createBookingWithEvents(request) {
+  const seatIds = (request.passengers || []).map((passenger) => passenger.seat_id);
+  await validateSeatHold({
+    tripId: request.trip_id,
+    seatIds,
+    holdToken: request.hold_token || ""
+  });
+
   const booking = await createBooking(request);
   await publishKafkaEvent("booking-events", "booking.created", {
     bookingId: booking.id,

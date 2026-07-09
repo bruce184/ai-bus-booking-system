@@ -158,6 +158,56 @@ export async function releaseHold(request) {
   };
 }
 
+export async function validateHold(request) {
+  const tripId = getTripId(request).trim();
+  const seatIds = [...new Set(getSeatIds(request).map((seatId) => seatId.trim()).filter(Boolean))];
+  const holdToken = getHoldToken(request).trim();
+
+  if (!tripId) {
+    throw serviceError(grpc.status.INVALID_ARGUMENT, "trip_id is required");
+  }
+
+  if (seatIds.length === 0) {
+    throw serviceError(grpc.status.INVALID_ARGUMENT, "seat_ids must contain at least one seat");
+  }
+
+  if (!holdToken) {
+    throw serviceError(grpc.status.INVALID_ARGUMENT, "hold_token is required");
+  }
+
+  const heldSeats = await holdTokenCoversSeats(tripId, seatIds, holdToken);
+
+  if (!heldSeats.valid) {
+    throw serviceError(
+      grpc.status.FAILED_PRECONDITION,
+      `HOLD_EXPIRED: Hold token does not cover seat ${heldSeats.missingSeatId ?? "unknown"}`
+    );
+  }
+
+  const currentSeats = await listTripSeatsByIds(tripId, seatIds);
+  const foundSeatIds = new Set(currentSeats.map((seat) => seat.id));
+  const missingSeatId = seatIds.find((seatId) => !foundSeatIds.has(seatId));
+
+  if (missingSeatId) {
+    throw serviceError(grpc.status.NOT_FOUND, `Seat ${missingSeatId} was not found for trip`);
+  }
+
+  const unavailableSeat = currentSeats.find((seat) => seat.status === "BOOKED" || seat.status === "BLOCKED");
+
+  if (unavailableSeat) {
+    throw serviceError(
+      grpc.status.FAILED_PRECONDITION,
+      `SEAT_NOT_AVAILABLE: Seat ${unavailableSeat.id} is ${unavailableSeat.status}`
+    );
+  }
+
+  return {
+    valid: true,
+    tripId,
+    seatIds
+  };
+}
+
 export async function confirmSeats(request) {
   const tripId = getTripId(request).trim();
   const seatIds = [...new Set(getSeatIds(request).map((seatId) => seatId.trim()).filter(Boolean))];

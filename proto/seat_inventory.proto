@@ -5,6 +5,7 @@ package bus.seat.v1;
 service SeatInventoryService {
   rpc GetSeatMap(GetSeatMapRequest) returns (GetSeatMapResponse);
   rpc HoldSeats(HoldSeatsRequest) returns (HoldSeatsResponse);
+  rpc ValidateHold(ValidateHoldRequest) returns (ValidateHoldResponse);
   rpc ReleaseHold(ReleaseHoldRequest) returns (ReleaseHoldResponse);
   rpc ConfirmSeats(ConfirmSeatsRequest) returns (ConfirmSeatsResponse);
   rpc ReleaseBookedSeats(ReleaseBookedSeatsRequest) returns (ReleaseBookedSeatsResponse);
@@ -56,6 +57,18 @@ message ReleaseHoldRequest {
 
 message ReleaseHoldResponse {
   bool released = 1;
+  string trip_id = 2;
+  repeated string seat_ids = 3;
+}
+
+message ValidateHoldRequest {
+  string trip_id = 1;
+  repeated string seat_ids = 2;
+  string hold_token = 3;
+}
+
+message ValidateHoldResponse {
+  bool valid = 1;
   string trip_id = 2;
   repeated string seat_ids = 3;
 }
