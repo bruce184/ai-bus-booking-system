@@ -97,6 +97,7 @@ async function issueTickets(event) {
       }
 
       const ticketId = randomUUID();
+      const code = ticketCode(index);
       const qrPayload = `${booking.booking_code}-${ticketId}`;
       const insert = await client.query(
         `
@@ -110,9 +111,9 @@ async function issueTickets(event) {
           ticketId,
           bookingId,
           passenger.id,
-          ticketCode(index),
+          code,
           qrPayload,
-          ticketHtml({ booking, passenger, trip: booking, qrPayload, ticketCode: ticketCode(index) }),
+          ticketHtml({ booking, passenger, trip: booking, qrPayload, ticketCode: code }),
           CHECKIN_POLICY
         ]
       );
