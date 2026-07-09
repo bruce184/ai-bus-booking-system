@@ -21,8 +21,19 @@ export function query(text, params) {
 }
 
 export async function assertConnection() {
-  const { rows } = await pool.query('select 1 as ok');
-  return rows[0]?.ok === 1;
+  const retries = 20;
+  const delay = 1500;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const { rows } = await pool.query('select 1 as ok');
+      if (rows[0]?.ok === 1) return true;
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      logger.info(`[PostgreSQL] Connection attempt ${i + 1}/${retries} failed: ${err.message}. Retrying in ${delay}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  return false;
 }
 
 export async function closePool() {
