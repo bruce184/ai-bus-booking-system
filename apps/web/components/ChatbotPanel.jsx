@@ -2,14 +2,24 @@
 
 import { useState } from "react";
 
-const DEFAULT_SEARCH = {
-  origin: "TP.HCM",
-  destination: "Da Lat",
-  departureDate: "2026-06-20"
-};
+function createDefaultSearch() {
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const departureDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(tomorrow);
+
+  return {
+    origin: "TP.HCM",
+    destination: "Da Lat",
+    departureDate
+  };
+}
 
 export function ChatbotPanel() {
-  const [search, setSearch] = useState(DEFAULT_SEARCH);
+  const [search, setSearch] = useState(createDefaultSearch);
   const [booking, setBooking] = useState({ bookingCode: "", email: "" });
   const [message, setMessage] = useState("");
   const [answer, setAnswer] = useState("Chon mot tac vu de EcoBus tro ly.");
