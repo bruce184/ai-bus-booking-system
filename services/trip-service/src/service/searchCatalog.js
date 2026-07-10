@@ -4,8 +4,6 @@ import { query } from '../db.js';
 import {
   getCachedSearch,
   setCachedSearch,
-  incrementRouteSearch,
-  getPopularRoutesFromCache,
 } from '../cache.js';
 import { publishSearchPerformed } from '../events.js';
 import { config } from '../config.js';
@@ -84,9 +82,6 @@ export async function searchTrips(call) {
     minAvailableSeats: req.min_available_seats || 0,
     sortBy: req.sort_by || '',
   };
-
-  // Always track popularity + emit analytics, even on a cache hit.
-  await incrementRouteSearch(origin, destination);
 
   const cached = await getCachedSearch(cacheParams);
   if (cached) {
@@ -198,22 +193,22 @@ export async function getTripDetail(call) {
 export async function listPopularRoutes(call) {
   const limit = Math.min(Math.max(call.request.limit || 5, 1), 50);
 
-  const cached = await getPopularRoutesFromCache(limit);
-  if (cached) return { routes: cached };
-
-  // Fallback when Redis has no live search data: rank routes by number of
-  // active trips as a proxy for popularity.
   const { rows } = await query(
-    `select ol.name as origin, dl.name as destination, count(t.id)::int as search_count
-       from routes r
-       join locations ol on ol.id = r.origin_location_id
-       join locations dl on dl.id = r.destination_location_id
-       left join trips t on t.route_id = r.id and t.status = 'ACTIVE'
-      group by ol.name, dl.name
-      having count(t.id) > 0
-      order by count(t.id) desc, ol.name asc
+    `select coalesce(route_label, 'Unknown Route') as route_label,
+            coalesce(sum(search_count), 0)::int as total_searches
+       from analytics_daily
+      where route_label is not null
+      group by route_label
+      having sum(search_count) > 0
+      order by total_searches desc
       limit $1`,
     [limit],
   );
-  return { routes: rows.map((r) => ({ origin: r.origin, destination: r.destination, search_count: r.search_count })) };
+
+  return {
+    routes: rows.map((r) => {
+      const [origin = '', destination = ''] = String(r.route_label).split(' -> ');
+      return { origin: origin.trim(), destination: destination.trim(), search_count: r.total_searches };
+    }),
+  };
 }
