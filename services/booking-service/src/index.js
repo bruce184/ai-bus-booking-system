@@ -186,7 +186,6 @@ async function runExpirationJob() {
       }
 
       await publishWorkflowEvent("booking.expired", eventPayload);
-      await publishKafkaEvent("booking-events", "booking.expired", eventPayload);
     }
   } catch (error) {
     console.error("[booking-service] Expiration job failed", error);
