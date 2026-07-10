@@ -1,6 +1,6 @@
 import { GraphQLScalarType, Kind } from "graphql";
-import { query } from "@bus/shared/db.js";
 
+import { getAnalyticsDashboard, getAnalyticsRevenueSummary } from "../analytics/client.js";
 import { gatewayError } from "../auth/errors.js";
 import { signDemoJwt } from "../auth/jwt.js";
 import { findDemoUserByCredentials } from "../auth/users.js";
@@ -165,127 +165,17 @@ export const resolvers = {
     },
     adminRevenueSummary: async (_parent, args, context) => {
       requireAdmin(context);
-      const { from, to } = args.input;
-      
-      const { rows } = await query(
-        `select coalesce(sum(revenue), 0)::int as total_revenue,
-                coalesce(sum(paid_booking_count), 0)::int as paid_bookings,
-                coalesce(sum(tickets_sold), 0)::int as tickets_sold,
-                case 
-                  when sum(search_count) > 0 then (sum(paid_booking_count)::numeric / sum(search_count)::numeric * 100)::numeric(5,2)
-                  else 0
-                end as successful_booking_rate
-         from analytics_daily
-         where metric_date >= $1 and metric_date <= $2`,
-        [from, to]
-      );
-      
-      const res = rows[0];
-      return {
-        from,
-        to,
-        totalRevenue: res.total_revenue,
-        paidBookings: res.paid_bookings,
-        ticketsSold: res.tickets_sold,
-        successfulBookingRate: Number(res.successful_booking_rate || 0)
-      };
+      return getAnalyticsRevenueSummary({
+        baseUrl: context.config.analytics.baseUrl,
+        range: args.input
+      });
     },
     adminAnalyticsDashboard: async (_parent, args, context) => {
       requireAdmin(context);
-      const { from, to } = args.input;
-      
-      const summaryPromise = query(
-        `select coalesce(sum(revenue), 0)::int as total_revenue,
-                coalesce(sum(paid_booking_count), 0)::int as paid_bookings,
-                coalesce(sum(tickets_sold), 0)::int as tickets_sold,
-                case 
-                  when sum(search_count) > 0 then (sum(paid_booking_count)::numeric / sum(search_count)::numeric * 100)::numeric(5,2)
-                  else 0
-                end as successful_booking_rate
-         from analytics_daily
-         where metric_date >= $1 and metric_date <= $2`,
-        [from, to]
-      );
-
-      const dailyRevenuePromise = query(
-        `select metric_date::text as date,
-                sum(revenue)::int as revenue,
-                sum(paid_booking_count)::int as paid_bookings,
-                sum(tickets_sold)::int as tickets_sold
-         from analytics_daily
-         where metric_date >= $1 and metric_date <= $2
-         group by metric_date
-         order by metric_date asc`,
-        [from, to]
-      );
-
-      const routesPromise = query(
-        `select route_label,
-                sum(tickets_sold)::int as tickets_sold,
-                sum(revenue)::int as revenue
-         from analytics_daily
-         where metric_date >= $1 and metric_date <= $2
-         group by route_label
-         order by tickets_sold desc`,
-        [from, to]
-      );
-
-      const popularPromise = query(
-        `select route_label,
-                sum(search_count)::int as search_count
-         from analytics_daily
-         where metric_date >= $1 and metric_date <= $2
-         group by route_label
-         order by search_count desc`,
-        [from, to]
-      );
-
-      const [summaryRes, dailyRes, routesRes, popularRes] = await Promise.all([
-        summaryPromise,
-        dailyRevenuePromise,
-        routesPromise,
-        popularPromise
-      ]);
-
-      const summary = summaryRes.rows[0];
-      
-      const ticketsByRoute = routesRes.rows.map(r => {
-        const [origin, destination] = (r.route_label || "Unknown -> Unknown").split(" -> ");
-        return {
-          origin: origin || "Unknown",
-          destination: destination || "Unknown",
-          ticketsSold: r.tickets_sold || 0,
-          revenue: r.revenue || 0
-        };
+      return getAnalyticsDashboard({
+        baseUrl: context.config.analytics.baseUrl,
+        range: args.input
       });
-
-      const popularRoutes = popularRes.rows.map(r => {
-        const [origin, destination] = (r.route_label || "Unknown -> Unknown").split(" -> ");
-        return {
-          origin: origin || "Unknown",
-          destination: destination || "Unknown",
-          searchCount: r.search_count || 0
-        };
-      });
-
-      return {
-        revenueSummary: {
-          from,
-          to,
-          totalRevenue: summary.total_revenue || 0,
-          paidBookings: summary.paid_bookings || 0,
-          ticketsSold: summary.tickets_sold || 0,
-          successfulBookingRate: Number(summary.successful_booking_rate || 0)
-        },
-        dailyRevenue: dailyRes.rows.map(r => ({
-          date: r.date,
-          revenue: r.revenue || 0,
-          paidBookings: r.paid_bookings || 0,
-          ticketsSold: r.tickets_sold || 0
-        })),
-        ticketsByRoute,
-        popularRoutes
-      };
     },
     adminLocations: async (_parent, _args, context) => {
       requireAdmin(context);

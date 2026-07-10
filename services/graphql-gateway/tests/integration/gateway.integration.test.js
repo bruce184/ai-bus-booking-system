@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -12,8 +13,10 @@ const seatInventoryTestAddress =
   process.env.SEAT_INVENTORY_GRPC_URL ||
   process.env.SEAT_INVENTORY_URL ||
   "";
-const runDatabaseBackedAnalytics = process.env.RUN_DB_INTEGRATION === "true";
 
+let analyticsServer;
+let analyticsUrl;
+const analyticsRequests = [];
 let gatewayProcess;
 let gatewayOutput = "";
 
@@ -89,12 +92,52 @@ async function login(email, password) {
 }
 
 test.before(async () => {
+  analyticsServer = createServer((req, res) => {
+    const url = new URL(req.url ?? "/", "http://127.0.0.1");
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    const revenueSummary = {
+      from,
+      to,
+      totalRevenue: 1_860_000,
+      paidBookings: 6,
+      ticketsSold: 7,
+      successfulBookingRate: 3.1
+    };
+
+    analyticsRequests.push(url.pathname);
+    res.setHeader("content-type", "application/json; charset=utf-8");
+
+    if (url.pathname === "/admin/revenue-summary") {
+      res.end(JSON.stringify(revenueSummary));
+      return;
+    }
+
+    if (url.pathname === "/admin/dashboard") {
+      res.end(JSON.stringify({
+        revenueSummary,
+        dailyRevenue: [{ date: "2026-06-18", revenue: 280_000, paidBookings: 1, ticketsSold: 1 }],
+        ticketsByRoute: [{ origin: "TP.HCM", destination: "Da Lat", ticketsSold: 3, revenue: 840_000 }],
+        popularRoutes: [{ origin: "TP.HCM", destination: "Da Lat", searchCount: 97 }]
+      }));
+      return;
+    }
+
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: "NOT_FOUND" }));
+  });
+
+  await new Promise((resolve) => analyticsServer.listen(0, "127.0.0.1", resolve));
+  const analyticsAddress = analyticsServer.address();
+  analyticsUrl = `http://127.0.0.1:${analyticsAddress.port}`;
+
   gatewayProcess = spawn(process.execPath, ["src/index.js"], {
     cwd: gatewayRoot,
     env: {
       ...process.env,
       GRAPHQL_GATEWAY_PORT: String(gatewayPort),
       JWT_SECRET: "integration_test_secret_change_me_1234567890",
+      ANALYTICS_SERVICE_URL: analyticsUrl,
       TRIP_SERVICE_GRPC_ADDRESS: "127.0.0.1:59951",
       BOOKING_SERVICE_GRPC_ADDRESS: "127.0.0.1:59953",
       SEAT_INVENTORY_SERVICE_GRPC_ADDRESS:
@@ -116,15 +159,19 @@ test.before(async () => {
 });
 
 test.after(async () => {
-  if (!gatewayProcess || gatewayProcess.killed) {
-    return;
+  if (gatewayProcess && !gatewayProcess.killed) {
+    await new Promise((resolve) => {
+      gatewayProcess.once("exit", resolve);
+      gatewayProcess.kill("SIGTERM");
+      setTimeout(resolve, 2_000);
+    });
   }
 
-  await new Promise((resolve) => {
-    gatewayProcess.once("exit", resolve);
-    gatewayProcess.kill("SIGTERM");
-    setTimeout(resolve, 2_000);
-  });
+  if (analyticsServer?.listening) {
+    await new Promise((resolve, reject) => {
+      analyticsServer.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
 });
 
 test("login and me work through the real GraphQL HTTP gateway", async () => {
@@ -184,10 +231,7 @@ test("admin analytics enforces authentication and admin role over HTTP", async (
 
   assert.equal(forbidden.status, 200);
   assert.equal(forbidden.body.errors[0].extensions.code, "FORBIDDEN");
-
-  if (!runDatabaseBackedAnalytics) {
-    return;
-  }
+  assert.deepEqual(analyticsRequests, []);
 
   const admin = await login("admin@example.com", "admin123");
   const allowed = await graphqlRequest({
@@ -199,7 +243,27 @@ test("admin analytics enforces authentication and admin role over HTTP", async (
   assert.equal(allowed.status, 200);
   assert.equal(allowed.body.errors, undefined);
   assert.equal(allowed.body.data.adminAnalyticsDashboard.revenueSummary.totalRevenue, 1_860_000);
-  assert.ok(allowed.body.data.adminAnalyticsDashboard.dailyRevenue.length >= 1);
+  assert.equal(allowed.body.data.adminAnalyticsDashboard.dailyRevenue.length, 1);
+  assert.deepEqual(analyticsRequests, ["/admin/dashboard"]);
+
+  const summary = await graphqlRequest({
+    query: `
+      query RevenueSummary($input: AdminRevenueSummaryInput!) {
+        adminRevenueSummary(input: $input) {
+          totalRevenue
+          paidBookings
+          ticketsSold
+        }
+      }
+    `,
+    variables,
+    token: admin.token
+  });
+
+  assert.equal(summary.status, 200);
+  assert.equal(summary.body.errors, undefined);
+  assert.equal(summary.body.data.adminRevenueSummary.totalRevenue, 1_860_000);
+  assert.deepEqual(analyticsRequests, ["/admin/dashboard", "/admin/revenue-summary"]);
 });
 
 test("public trip queries are routed through the Trip Service boundary", async () => {

@@ -39,6 +39,9 @@ export function loadGatewayConfig(env = process.env) {
       jwtSecret: env.JWT_SECRET ?? "local_demo_jwt_secret_change_me",
       jwtExpiresInSeconds: readPort(env, "JWT_EXPIRES_IN_SECONDS", 28800)
     },
+    analytics: {
+      baseUrl: env.ANALYTICS_SERVICE_URL ?? "http://localhost:50056"
+    },
     grpc: {
       tripAddress: readGrpcAddress(env, "TRIP_SERVICE_GRPC_ADDRESS", "TRIP_SERVICE_PORT", 50051),
       bookingAddress: readGrpcAddress(env, "BOOKING_SERVICE_GRPC_ADDRESS", "BOOKING_SERVICE_PORT", 50053),
