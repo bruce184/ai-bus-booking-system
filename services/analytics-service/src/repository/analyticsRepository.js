@@ -84,13 +84,22 @@ export async function getRouteLabelForTrip(tripId) {
 }
 
 /**
- * Reads a booking's total_amount and issued seat/ticket count, used to reverse
- * a previously counted paid booking on `booking.cancelled` (see
- * bookingEventsHandler.js for why this lookup is necessary).
+ * Reads the values originally applied by `booking.paid`, including the
+ * transactionally recorded payment time. This lets cancellation reverse the
+ * exact daily aggregate row that received the payment.
  */
-export async function getBookingAmountAndTicketCount(bookingId) {
+export async function getBookingCancellationMetrics(bookingId) {
   const { rows } = await pool.query(
-    `select b.total_amount as total_amount, count(bp.id)::int as ticket_count
+    `select
+       b.total_amount as total_amount,
+       count(bp.id)::int as ticket_count,
+       (
+         select min(el.created_at)
+         from event_logs el
+         where el.event_type = 'booking.paid'
+           and el.entity_type = 'booking'
+           and el.entity_id = b.id
+       ) as paid_at
      from bookings b
      left join booking_passengers bp on bp.booking_id = b.id
      where b.id = $1
@@ -99,12 +108,13 @@ export async function getBookingAmountAndTicketCount(bookingId) {
   );
 
   if (rows.length === 0) {
-    return { totalAmount: 0, ticketCount: 0 };
+    return { totalAmount: 0, ticketCount: 0, paidAt: null };
   }
 
   return {
     totalAmount: Number(rows[0].total_amount) || 0,
-    ticketCount: Number(rows[0].ticket_count) || 0
+    ticketCount: Number(rows[0].ticket_count) || 0,
+    paidAt: rows[0].paid_at ?? null
   };
 }
 

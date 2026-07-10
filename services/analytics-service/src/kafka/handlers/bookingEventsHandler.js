@@ -9,7 +9,7 @@
 // scope; see the completion report's "Out-of-scope issues found" note.
 import {
   applyPaidBookingDelta,
-  getBookingAmountAndTicketCount,
+  getBookingCancellationMetrics,
   getRouteLabelForTrip
 } from "../../repository/analyticsRepository.js";
 import { toMetricDate } from "../../utils/date.js";
@@ -26,7 +26,7 @@ export async function handleBookingEvent({ eventName, payload, occurredAt }) {
     case "booking.paid":
       return handleBookingPaid(payload, occurredAt);
     case "booking.cancelled":
-      return handleBookingCancelled(payload, occurredAt);
+      return handleBookingCancelled(payload);
     default:
       console.warn(`[analytics-service] unexpected booking-events eventName: ${eventName}`);
   }
@@ -62,7 +62,7 @@ async function handleBookingPaid(payload, occurredAt) {
   });
 }
 
-async function handleBookingCancelled(payload, occurredAt) {
+async function handleBookingCancelled(payload) {
   const tripId = payload?.tripId;
   const bookingId = payload?.bookingId;
 
@@ -72,14 +72,16 @@ async function handleBookingCancelled(payload, occurredAt) {
   }
 
   const routeLabel = await resolveRouteLabel(tripId);
-  const { totalAmount, ticketCount } = await getBookingAmountAndTicketCount(bookingId);
-  // NOTE (assumption): the booking state machine only allows PAID -> CANCELLED,
-  // so a cancelled booking was previously counted as paid. The cancellation
-  // is reversed against the CURRENT day's row (day of cancellation), not the
-  // original payment day, because `bookings` has no separate `paid_at` column
-  // (only `updated_at`, which is overwritten by the cancellation itself) to
-  // recover which day originally received the credit. See completion report.
-  const metricDate = toMetricDate(occurredAt);
+  const { totalAmount, ticketCount, paidAt } = await getBookingCancellationMetrics(bookingId);
+
+  if (!paidAt) {
+    console.warn(
+      `[analytics-service] booking.cancelled has no booking.paid event log; skipping reversal for ${bookingId}`
+    );
+    return;
+  }
+
+  const metricDate = toMetricDate(paidAt);
 
   await applyPaidBookingDelta({
     metricDate,
