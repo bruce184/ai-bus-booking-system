@@ -58,7 +58,6 @@ async function main() {
     console.log(`route: ${detail.trip.route.origin.name} -> ${detail.trip.route.destination.name}`);
     console.log(`pickup: ${detail.pickup_points.map((s) => s.name).join(', ') || '(none)'}`);
     console.log(`dropoff: ${detail.dropoff_points.map((s) => s.name).join(', ') || '(none)'}`);
-    console.log(`seats: ${detail.seats.length} (${detail.seats.filter((s) => s.status === 'AVAILABLE').length} available)`);
     console.log(`cancellation_policy: ${detail.cancellation_policy.slice(0, 40)}...`);
   }
 
