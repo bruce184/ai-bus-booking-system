@@ -24,6 +24,7 @@ const SEARCH_TRIPS = `
       }
       suggestedDates
       seoTitle
+      cacheHit
     }
   }
 `;
@@ -61,16 +62,25 @@ export default function SearchPage() {
   const [showSearchForm, setShowSearchForm] = useState(false);
   const initialSearchStarted = useRef(false);
 
-  // Client-side filter states
+  // Filter & sort states (client-side + server-side)
   const [selectedOperators, setSelectedOperators] = useState([]);
-  const [sortBy, setSortBy] = useState("earliest"); // "earliest" | "price-asc" | "price-desc"
+  const [minPrice, setMinPrice] = useState(0);
+  const [maxPrice, setMaxPrice] = useState(0);
+  const [sortBy, setSortBy] = useState("earliest");
 
-  const doSearch = useCallback(async (originVal, destinationVal, dateVal) => {
+  const doSearch = useCallback(async (originVal, destinationVal, dateVal, sortVal = "earliest", minPVal = 0, maxPVal = 0) => {
     setLoading(true);
     setError("");
     try {
       const data = await graphqlRequest(SEARCH_TRIPS, {
-        input: { origin: originVal, destination: destinationVal, departureDate: dateVal }
+        input: {
+          origin: originVal,
+          destination: destinationVal,
+          departureDate: dateVal,
+          sortBy: sortVal,
+          minPrice: minPVal > 0 ? minPVal : 0,
+          maxPrice: maxPVal > 0 ? maxPVal : 0,
+        }
       });
       setResult(data.searchTrips);
     } catch (err) {
@@ -81,12 +91,15 @@ export default function SearchPage() {
     }
   }, []);
 
+  const performSearch = useCallback(async (originVal = origin, destinationVal = destination, dateVal = departureDate, sortVal = sortBy, minPVal = minPrice, maxPVal = maxPrice) => {
+    await doSearch(originVal, destinationVal, dateVal, sortVal, minPVal, maxPVal);
+  }, [doSearch, origin, destination, departureDate, sortBy, minPrice, maxPrice]);
+
   async function submit(event) {
     event.preventDefault();
     setShowSearchForm(false);
-    // Update URL query string
     router.replace(`/search?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}&date=${departureDate}`);
-    await doSearch(origin, destination, departureDate);
+    await performSearch();
   }
 
   const handleSwap = () => {
@@ -110,7 +123,7 @@ export default function SearchPage() {
       setOrigin(nextOrigin);
       setDestination(nextDestination);
       setDepartureDate(nextDate);
-      void doSearch(nextOrigin, nextDestination, nextDate);
+      void doSearch(nextOrigin, nextDestination, nextDate, "earliest", 0, 0);
     }, 0);
 
     return () => clearTimeout(timer);
@@ -123,28 +136,26 @@ export default function SearchPage() {
     return Array.from(set);
   }, [result]);
 
-  // Client-side filtering & sorting logic
-  const filteredAndSortedTrips = useMemo(() => {
+  // Client-side filtering (server handles sorting via sortBy parameter)
+  const filteredTrips = useMemo(() => {
     if (!result?.trips) return [];
 
     let list = [...result.trips];
 
-    // Filter by operators
     if (selectedOperators.length > 0) {
       list = list.filter(t => selectedOperators.includes(t.operatorName));
     }
 
-    // Sort
-    if (sortBy === "earliest") {
-      list.sort((a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime());
-    } else if (sortBy === "price-asc") {
-      list.sort((a, b) => a.price - b.price);
-    } else if (sortBy === "price-desc") {
-      list.sort((a, b) => b.price - a.price);
+    if (minPrice > 0 || maxPrice > 0) {
+      list = list.filter(t => {
+        if (minPrice > 0 && t.price < minPrice) return false;
+        if (maxPrice > 0 && t.price > maxPrice) return false;
+        return true;
+      });
     }
 
     return list;
-  }, [result, selectedOperators, sortBy]);
+  }, [result, selectedOperators, minPrice, maxPrice]);
 
   const toggleOperator = (op) => {
     setSelectedOperators(prev => 
@@ -385,19 +396,37 @@ export default function SearchPage() {
           <div className="panel" style={{ padding: "12px 20px" }}>
             <div className="row between" style={{ alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
               <span style={{ fontSize: "14px", fontWeight: "700", color: "var(--text)" }}>
-                {filteredAndSortedTrips.length} chuyến xe phù hợp
+                {filteredTrips.length} chuyến xe phù hợp
               </span>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", flexWrap: "wrap" }}>
                 <span className="muted">Sắp xếp:</span>
-                <select 
-                  value={sortBy} 
-                  onChange={(e) => setSortBy(e.target.value)}
+                <select
+                  value={sortBy}
+                  onChange={(e) => { setSortBy(e.target.value); doSearch(origin, destination, departureDate, e.target.value, minPrice, maxPrice); }}
                   style={{ minHeight: "30px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
                 >
                   <option value="earliest">Giờ khởi hành sớm nhất</option>
                   <option value="price-asc">Giá vé tăng dần</option>
                   <option value="price-desc">Giá vé giảm dần</option>
                 </select>
+                <span className="muted" style={{ marginLeft: "12px" }}>Giá:</span>
+                <input
+                  type="number"
+                  placeholder="Min"
+                  value={minPrice || ""}
+                  onChange={(e) => setMinPrice(Number(e.target.value) || 0)}
+                  onBlur={() => doSearch(origin, destination, departureDate, sortBy, minPrice, maxPrice)}
+                  style={{ width: "70px", minHeight: "30px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
+                />
+                <span className="muted">-</span>
+                <input
+                  type="number"
+                  placeholder="Max"
+                  value={maxPrice || ""}
+                  onChange={(e) => setMaxPrice(Number(e.target.value) || 0)}
+                  onBlur={() => doSearch(origin, destination, departureDate, sortBy, minPrice, maxPrice)}
+                  style={{ width: "70px", minHeight: "30px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
+                />
               </div>
             </div>
           </div>
@@ -408,7 +437,7 @@ export default function SearchPage() {
           ) : null}
 
           {/* Empty list notice */}
-          {!loading && filteredAndSortedTrips.length === 0 ? (
+          {!loading && filteredTrips.length === 0 ? (
             <div className="panel notice" style={{ padding: "32px" }}>
               Không tìm thấy chuyến xe phù hợp với bộ lọc hiện tại.
               {result?.suggestedDates?.length ? (
@@ -418,7 +447,7 @@ export default function SearchPage() {
                     <button 
                       key={d} 
                       className="button"
-                      onClick={() => { setDepartureDate(d); doSearch(origin, destination, d); }}
+                      onClick={() => { setDepartureDate(d); doSearch(origin, destination, d, sortBy, minPrice, maxPrice); }}
                       style={{ padding: "4px 8px", minHeight: "26px", fontSize: "12px", marginLeft: "6px" }}
                     >
                       {d}
@@ -430,7 +459,7 @@ export default function SearchPage() {
           ) : null}
 
           {/* Trip Cards list */}
-          {!loading && filteredAndSortedTrips.map((trip) => (
+          {!loading && filteredTrips.map((trip) => (
             <article 
               className="panel" 
               key={trip.id} 
