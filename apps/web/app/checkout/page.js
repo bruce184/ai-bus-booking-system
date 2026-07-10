@@ -120,7 +120,7 @@ function CheckoutContent() {
   async function submit(event) {
     event.preventDefault();
     if (holdExpired) {
-      setError("Hold token has expired. Please go back and select seats again.");
+      setError("Mã giữ chỗ đã hết hạn. Vui lòng quay lại chọn ghế.");
       return;
     }
 
@@ -195,10 +195,10 @@ function CheckoutContent() {
               {fromSeatFlow ? (
                 <div className="notice" style={{ marginBottom: "20px" }}>
                   {remainingHoldSeconds !== null ? (
-                    <span>Thá»i gian cĂ²n láº¡i: <strong>{remainingHoldSeconds}s</strong>. </span>
+                    <span>Thời gian còn lại: <strong>{remainingHoldSeconds}s</strong>. </span>
                   ) : null}
                   {holdExpired ? (
-                    <span>MĂ£ giá»¯ chá»— Ä‘Ă£ háº¿t háº¡n, vui lĂ²ng quay láº¡i chá»n gháº¿. </span>
+                    <span>Mã giữ chỗ đã hết hạn, vui lòng quay lại chọn ghế. </span>
                   ) : null}
                   Ghế <strong>{defaultSeats.join(", ")}</strong> đang được giữ cho bạn. Hoàn tất thông tin bên dưới trước khi hết thời gian giữ ghế.
                 </div>
