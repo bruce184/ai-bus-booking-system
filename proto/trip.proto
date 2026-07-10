@@ -91,10 +91,14 @@ message GetTripDetailRequest {
 }
 
 message GetTripDetailResponse {
+  // The seat map belongs to Seat Inventory Service (seatMap(tripId)); it is the
+  // only source that merges Redis holds. Field 4 held a stale copy of it.
+  reserved 4;
+  reserved "seats";
+
   Trip trip = 1;
   repeated Stop pickup_points = 2;
   repeated Stop dropoff_points = 3;
-  repeated Seat seats = 4;
   string cancellation_policy = 5;
   string checkin_policy = 6;
 }
@@ -148,15 +152,6 @@ message Vehicle {
   string vehicle_type = 5;
   int32 seat_count = 6;
   repeated VehicleSeat seats = 7;
-}
-
-message Seat {
-  string id = 1;
-  string label = 2;
-  int32 deck = 3;
-  int32 row = 4;
-  int32 column = 5;
-  string status = 6;
 }
 
 message Trip {

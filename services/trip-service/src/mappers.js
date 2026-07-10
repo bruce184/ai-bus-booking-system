@@ -35,19 +35,6 @@ export function mapVehicleSeat(row) {
   };
 }
 
-// Seat for trip detail: vehicle_seats layout + trip_seats status.
-export function mapSeat(row) {
-  return {
-    // The seat label is the stable public identifier used for holds/booking.
-    id: row.seat_label,
-    label: row.seat_label,
-    deck: row.deck,
-    row: row.seat_row,
-    column: row.seat_column,
-    status: row.status || 'AVAILABLE',
-  };
-}
-
 export function mapRoute(row, stops = []) {
   return {
     id: row.route_id ?? row.id,

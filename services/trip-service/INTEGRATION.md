@@ -116,12 +116,11 @@ export const tripResolvers = {
 ## 4. Field/contract notes
 
 - **`Trip.vehicle` / `Trip.route`** are populated on every result. In search
-  results `vehicle.seats` is empty (layout omitted for performance); full seat
-  layout + live status comes from `GetTripDetail` (`trip(id)`).
-- **`trip(id).seats`** returns the seat **layout** with the persisted
-  `trip_seats` status (AVAILABLE/HELD/BOOKED/BLOCKED). The **live** seat map with
-  Redis holds is owned by **Seat Inventory Service** via `seatMap(tripId)` — do
-  not route `seatMap` here.
+  results `vehicle.seats` is empty (layout omitted for performance).
+- **`GetTripDetail` does not return seats.** The seat map — layout plus live
+  status merged with Redis holds — is owned by **Seat Inventory Service** via
+  `seatMap(tripId)`. The gateway already resolves `TripDetail.seats` there, so
+  nothing changes on the GraphQL side.
 - **DateTime**: `departureTime`/`arrivalTime` are ISO-8601 strings. The gateway's
   `DateTime` scalar should accept/serialize ISO strings.
 - **Errors**: the service returns gRPC `NOT_FOUND` / `INVALID_ARGUMENT` /
