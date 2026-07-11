@@ -19,6 +19,9 @@ const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
 
 const tripId = "33333333-3333-3333-3333-333333333333";
 const seatId = "R01";
+const bookingId = "44444444-4444-4444-8444-444444444444";
+const bookingCode = "BKRACEATOMIC001";
+const missingSeatId = "R99";
 
 function createClient() {
   const packageDefinition = protoLoader.loadSync(protoPath, {
@@ -164,7 +167,70 @@ async function seedRaceTrip() {
                   updated_at = now();
   `);
 
+  await client.query(
+    `
+      insert into bookings (
+        id, booking_code, trip_id, hold_token, contact_email, status, total_amount
+      )
+      values ($1::uuid, $2, $3::uuid, 'race-hold-token', 'race@example.com', 'PENDING_PAYMENT', 280000)
+      on conflict (id) do update
+      set trip_id = excluded.trip_id,
+          hold_token = excluded.hold_token,
+          contact_email = excluded.contact_email,
+          status = 'PENDING_PAYMENT',
+          total_amount = excluded.total_amount,
+          updated_at = now()
+    `,
+    [bookingId, bookingCode, tripId]
+  );
+
   await client.end();
+}
+
+async function persistentSeatStatus() {
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    const result = await client.query(
+      "select status, booking_id from trip_seats where trip_id = $1::uuid and seat_label = $2",
+      [tripId, seatId]
+    );
+    return result.rows[0];
+  } finally {
+    await client.end();
+  }
+}
+
+async function resetPersistentSeat() {
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    await client.query(
+      `
+        update trip_seats
+        set status = 'AVAILABLE', booking_id = null, block_reason = null, updated_at = now()
+        where trip_id = $1::uuid and seat_label = $2
+      `,
+      [tripId, seatId]
+    );
+    await client.query("delete from bookings where id = $1::uuid", [bookingId]);
+  } finally {
+    await client.end();
+  }
+}
+
+async function expectRejected(work, expectedText) {
+  try {
+    await work();
+  } catch (error) {
+    const details = error.details ?? error.message;
+    if (!String(details).includes(expectedText)) {
+      throw new Error(`Expected rejection containing ${expectedText}, received: ${details}`);
+    }
+    return;
+  }
+
+  throw new Error(`Expected request to be rejected with ${expectedText}`);
 }
 
 async function main() {
@@ -218,10 +284,64 @@ async function main() {
       holdToken: successes[0].value.holdToken
     });
 
-    console.log("Race hold test passed");
+    await expectRejected(
+      () => call(client, "blockSeats", {
+        tripId,
+        seatIds: [seatId, missingSeatId],
+        reason: "atomic block test",
+        adminUserId: "55555555-5555-4555-8555-555555555555"
+      }),
+      missingSeatId
+    );
+    let persistentSeat = await persistentSeatStatus();
+    if (persistentSeat.status !== "AVAILABLE" || persistentSeat.booking_id) {
+      throw new Error("BlockSeats partially committed before reporting a missing seat");
+    }
+
+    const confirmationHold = await call(client, "holdSeats", {
+      tripId,
+      seatIds: [seatId],
+      requesterId: "atomic-confirm-user"
+    });
+    await expectRejected(
+      () => call(client, "confirmSeats", {
+        tripId,
+        seatIds: [seatId, missingSeatId],
+        holdToken: confirmationHold.holdToken,
+        bookingId
+      }),
+      missingSeatId
+    );
+    persistentSeat = await persistentSeatStatus();
+    if (persistentSeat.status !== "AVAILABLE" || persistentSeat.booking_id) {
+      throw new Error("ConfirmSeats partially committed before reporting a missing seat");
+    }
+
+    await call(client, "confirmSeats", {
+      tripId,
+      seatIds: [seatId],
+      holdToken: confirmationHold.holdToken,
+      bookingId
+    });
+    persistentSeat = await persistentSeatStatus();
+    if (persistentSeat.status !== "BOOKED" || persistentSeat.booking_id !== bookingId) {
+      throw new Error("ConfirmSeats did not persist the complete booking ownership");
+    }
+
+    // The first confirmation consumes Redis. The same booking must still be
+    // able to retry safely without an active hold or a duplicate transition.
+    await call(client, "confirmSeats", {
+      tripId,
+      seatIds: [seatId],
+      holdToken: confirmationHold.holdToken,
+      bookingId
+    });
+
+    console.log("Race, atomic transition, and idempotent confirmation tests passed");
   } finally {
     client.close();
     await cleanupTripHolds(redis);
+    await resetPersistentSeat();
     redis.disconnect();
   }
 }

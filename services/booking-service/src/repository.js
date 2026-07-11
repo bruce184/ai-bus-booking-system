@@ -9,6 +9,73 @@ function bookingCode() {
   return `BK${ymd}${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
+function normalizedText(value) {
+  return String(value ?? "").trim();
+}
+
+function normalizedEmail(value) {
+  return normalizedText(value).toLowerCase();
+}
+
+function normalizedPassenger(passenger, fallbackEmail = "") {
+  return {
+    fullName: normalizedText(passenger.full_name),
+    phone: normalizedText(passenger.phone),
+    email: normalizedEmail(passenger.email || fallbackEmail),
+    documentNumber: normalizedText(passenger.document_number),
+    seatId: normalizedText(passenger.seat_id)
+  };
+}
+
+function normalizedPassengers(passengers, fallbackEmail = "") {
+  return passengers
+    .map((passenger) => normalizedPassenger(passenger, fallbackEmail))
+    .sort((left, right) => left.seatId.localeCompare(right.seatId));
+}
+
+function validateCreateBookingInput(input) {
+  const passengers = input.passengers || [];
+  if (!input.trip_id || !input.hold_token || !input.contact_email || passengers.length === 0) {
+    fail("VALIDATION_ERROR", "trip_id, hold_token, contact_email and passengers are required");
+  }
+
+  const normalized = normalizedPassengers(passengers, input.contact_email);
+  if (normalized.some((passenger) => !passenger.fullName || !passenger.seatId)) {
+    fail("VALIDATION_ERROR", "Each passenger must have full_name and seat_id");
+  }
+
+  const seatIds = normalized.map((passenger) => passenger.seatId);
+  if (new Set(seatIds).size !== seatIds.length) {
+    fail("VALIDATION_ERROR", "Each passenger must have one unique seat_id");
+  }
+
+  return { passengers, seatIds };
+}
+
+export function bookingRequestMatches(booking, input) {
+  const existingPassengers = normalizedPassengers(booking.passengers || [], booking.contact_email);
+  const requestedPassengers = normalizedPassengers(input.passengers || [], input.contact_email);
+
+  return (
+    normalizedText(booking.trip_id) === normalizedText(input.trip_id) &&
+    normalizedText(booking.hold_token) === normalizedText(input.hold_token) &&
+    normalizedText(booking.customer_user_id) === normalizedText(input.customer_user_id) &&
+    normalizedEmail(booking.contact_email) === normalizedEmail(input.contact_email) &&
+    normalizedText(booking.contact_phone) === normalizedText(input.contact_phone) &&
+    JSON.stringify(existingPassengers) === JSON.stringify(requestedPassengers)
+  );
+}
+
+function assertHoldTokenBindingMatches(booking, input) {
+  if (!bookingRequestMatches(booking, input)) {
+    fail("BOOKING_STATE_INVALID", "Hold token is already bound to another booking request");
+  }
+}
+
+export function isPaymentSettledStatus(status) {
+  return ["PAID", "TICKET_ISSUED", "CHECKED_IN", "COMPLETED"].includes(status);
+}
+
 function ticketRouteColumns() {
   return `
     coalesce(origin.name || ' -> ' || destination.name, '') as route_label,
@@ -102,6 +169,7 @@ export async function fetchBookingById(id, client = { query }) {
     status: booking.status,
     trip_id: booking.trip_id,
     hold_token: booking.hold_token || "",
+    customer_user_id: booking.customer_user_id || "",
     contact_email: booking.contact_email,
     contact_phone: booking.contact_phone || "",
     total_amount: Number(booking.total_amount),
@@ -132,18 +200,47 @@ export async function getBookingStatus({ booking_code, email }) {
   return fetchBookingById(result.rows[0].id);
 }
 
-export async function createBooking(input) {
-  const passengers = input.passengers || [];
-  if (!input.trip_id || !input.hold_token || !input.contact_email || passengers.length === 0) {
-    fail("VALIDATION_ERROR", "trip_id, hold_token, contact_email and passengers are required");
+export async function findBookingByHoldToken(input) {
+  validateCreateBookingInput(input);
+  const result = await query(
+    "select id from bookings where hold_token = $1 order by created_at, id limit 2",
+    [input.hold_token]
+  );
+
+  if (result.rows.length > 1) {
+    fail("INTERNAL_ERROR", "Hold token is bound to multiple bookings");
+  }
+  if (!result.rows[0]) {
+    return null;
   }
 
-  const seatIds = passengers.map((passenger) => passenger.seat_id).filter(Boolean);
-  if (seatIds.length !== passengers.length || new Set(seatIds).size !== seatIds.length) {
-    fail("VALIDATION_ERROR", "Each passenger must have one unique seat_id");
-  }
+  const booking = await fetchBookingById(result.rows[0].id);
+  assertHoldTokenBindingMatches(booking, input);
+  return booking;
+}
 
-  return transaction(async (client) => {
+export async function createBooking(input, { runTransaction = transaction } = {}) {
+  const { passengers, seatIds } = validateCreateBookingInput(input);
+
+  return runTransaction(async (client) => {
+    await client.query(
+      "select pg_advisory_xact_lock(hashtext('booking-hold'), hashtext($1))",
+      [input.hold_token]
+    );
+
+    const existingResult = await client.query(
+      "select id from bookings where hold_token = $1 order by created_at, id for update",
+      [input.hold_token]
+    );
+    if (existingResult.rows.length > 1) {
+      fail("INTERNAL_ERROR", "Hold token is bound to multiple bookings");
+    }
+    if (existingResult.rows[0]) {
+      const existing = await fetchBookingById(existingResult.rows[0].id, client);
+      assertHoldTokenBindingMatches(existing, input);
+      return { booking: existing, created: false };
+    }
+
     const tripResult = await client.query(
       "select price, status from trips where id = $1 for share",
       [input.trip_id]
@@ -159,6 +256,7 @@ export async function createBooking(input) {
     const total = Number(trip.price) * passengers.length;
     let inserted;
     for (let attempt = 0; attempt < 3; attempt += 1) {
+      await client.query("savepoint booking_code_attempt");
       try {
         const result = await client.query(
           `
@@ -179,8 +277,10 @@ export async function createBooking(input) {
           ]
         );
         inserted = result.rows[0];
+        await client.query("release savepoint booking_code_attempt");
         break;
       } catch (error) {
+        await client.query("rollback to savepoint booking_code_attempt");
         if (error.code !== "23505" || attempt === 2) {
           throw error;
         }
@@ -216,12 +316,41 @@ export async function createBooking(input) {
       ]
     );
 
-    return fetchBookingById(inserted.id, client);
+    return {
+      booking: await fetchBookingById(inserted.id, client),
+      created: true
+    };
   });
 }
 
-export async function markBookingPaid({ bookingId }) {
-  return transaction(async (client) => {
+export async function settleBookingPayment(
+  { bookingCode, success, processPayment },
+  { runTransaction = transaction } = {}
+) {
+  return runTransaction(async (client) => {
+    const locked = await client.query(
+      `
+        select id
+        from bookings
+        where booking_code = $1
+        for update
+      `,
+      [bookingCode]
+    );
+    if (!locked.rows[0]) {
+      fail("NOT_FOUND", "Booking not found");
+    }
+
+    const booking = await fetchBookingById(locked.rows[0].id, client);
+    if (success && isPaymentSettledStatus(booking.status)) {
+      return { booking, transitioned: false };
+    }
+    if (booking.status !== "PENDING_PAYMENT") {
+      fail("BOOKING_STATE_INVALID", `Cannot pay booking in ${booking.status} status`);
+    }
+
+    await processPayment(booking);
+
     const update = await client.query(
       `
         update bookings
@@ -229,21 +358,21 @@ export async function markBookingPaid({ bookingId }) {
         where id = $1 and status = 'PENDING_PAYMENT'
         returning id
       `,
-      [bookingId]
+      [booking.id]
     );
     if (!update.rows[0]) {
-      const existing = await fetchBookingById(bookingId, client);
-      if (!existing) {
-        fail("NOT_FOUND", "Booking not found");
-      }
-      return existing;
+      fail("BOOKING_STATE_INVALID", "Booking payment state changed during settlement");
     }
 
     await client.query(
       "insert into event_logs (event_type, entity_type, entity_id, payload) values ($1, $2, $3, $4)",
-      ["booking.paid", "booking", bookingId, JSON.stringify({ bookingId })]
+      ["booking.paid", "booking", booking.id, JSON.stringify({ bookingId: booking.id })]
     );
-    return fetchBookingById(bookingId, client);
+
+    return {
+      booking: await fetchBookingById(booking.id, client),
+      transitioned: true
+    };
   });
 }
 
@@ -285,7 +414,7 @@ export async function cancelBooking({ booking_code, email }) {
   });
 }
 
-export async function expirePendingBookings(ageSeconds = 300) {
+export async function expirePendingBookings(ageSeconds = 300, { bookingIds = null } = {}) {
   return transaction(async (client) => {
     const result = await client.query(
       `
@@ -293,9 +422,10 @@ export async function expirePendingBookings(ageSeconds = 300) {
         from bookings
         where status = 'PENDING_PAYMENT'
           and created_at < now() - $1 * interval '1 second'
-        for update
+          and ($2::uuid[] is null or id = any($2::uuid[]))
+        for update skip locked
       `,
-      [ageSeconds]
+      [ageSeconds, bookingIds]
     );
 
     const expiredBookings = result.rows;

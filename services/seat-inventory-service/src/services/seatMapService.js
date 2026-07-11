@@ -130,10 +130,31 @@ export async function holdSeats(request) {
     );
   }
 
+  // Close the PostgreSQL/Redis race: an admin block or payment confirmation
+  // may commit after the first persistent-state read but before the Lua hold.
+  // Re-check after acquiring Redis and discard the hold if persistence won.
+  const refreshedSeats = await listTripSeatsByIds(tripId, seatIds);
+  const refreshedIds = new Set(refreshedSeats.map((seat) => seat.id));
+  const disappearedSeatId = seatIds.find((seatId) => !refreshedIds.has(seatId));
+  const persistentlyUnavailable = refreshedSeats.find(
+    (seat) => seat.status === "BLOCKED" || seat.status === "BOOKED"
+  );
+
+  if (disappearedSeatId || persistentlyUnavailable) {
+    await releaseHoldByToken(holdToken);
+    if (disappearedSeatId) {
+      throw serviceError(grpc.status.NOT_FOUND, `Seat ${disappearedSeatId} was not found for trip`);
+    }
+    throw serviceError(
+      grpc.status.FAILED_PRECONDITION,
+      `SEAT_NOT_AVAILABLE: Seat ${persistentlyUnavailable.id} is ${persistentlyUnavailable.status}`
+    );
+  }
+
   return {
     holdToken,
     tripId,
-    seats: seats.map((seat) => ({
+    seats: refreshedSeats.map((seat) => ({
       ...toSeatResponse(seat, new Set(seatIds)),
       status: "HELD"
     })),
@@ -230,42 +251,38 @@ export async function confirmSeats(request) {
     throw serviceError(grpc.status.INVALID_ARGUMENT, "booking_id is required");
   }
 
-  const heldSeats = await holdTokenCoversSeats(tripId, seatIds, holdToken);
+  const confirmation = await confirmTripSeats(tripId, seatIds, bookingId, async () => {
+    const heldSeats = await holdTokenCoversSeats(tripId, seatIds, holdToken);
+    if (!heldSeats.valid) {
+      throw serviceError(
+        grpc.status.FAILED_PRECONDITION,
+        `HOLD_EXPIRED: Hold token does not cover seat ${heldSeats.missingSeatId ?? "unknown"}`
+      );
+    }
+  });
 
-  if (!heldSeats.valid) {
+  if (confirmation.outcome === "MISSING") {
+    throw serviceError(grpc.status.NOT_FOUND, `Seat ${confirmation.seatId} was not found for trip`);
+  }
+  if (confirmation.outcome === "UNAVAILABLE") {
     throw serviceError(
       grpc.status.FAILED_PRECONDITION,
-      `HOLD_EXPIRED: Hold token does not cover seat ${heldSeats.missingSeatId ?? "unknown"}`
+      `SEAT_NOT_AVAILABLE: Seat ${confirmation.seatId} is ${confirmation.seatStatus}`
     );
   }
 
-  const currentSeats = await listTripSeatsByIds(tripId, seatIds);
-  const foundSeatIds = new Set(currentSeats.map((seat) => seat.id));
-  const missingSeatId = seatIds.find((seatId) => !foundSeatIds.has(seatId));
-
-  if (missingSeatId) {
-    throw serviceError(grpc.status.NOT_FOUND, `Seat ${missingSeatId} was not found for trip`);
+  if (!confirmation.alreadyConfirmed) {
+    try {
+      await releaseHoldByToken(holdToken);
+    } catch (error) {
+      // PostgreSQL BOOKED is authoritative after the transaction commits.
+      // A stale Redis hold cannot override BOOKED and will expire by TTL.
+      console.warn(`[seat-inventory] Failed to clean confirmed hold ${holdToken}: ${error.message}`);
+    }
   }
-
-  const unavailableSeat = currentSeats.find((seat) => seat.status === "BOOKED" || seat.status === "BLOCKED");
-
-  if (unavailableSeat) {
-    throw serviceError(
-      grpc.status.FAILED_PRECONDITION,
-      `SEAT_NOT_AVAILABLE: Seat ${unavailableSeat.id} is ${unavailableSeat.status}`
-    );
-  }
-
-  const confirmedSeats = await confirmTripSeats(tripId, seatIds, bookingId);
-
-  if (confirmedSeats.length !== seatIds.length) {
-    throw serviceError(grpc.status.INTERNAL, "Failed to confirm all requested seats");
-  }
-
-  await releaseHoldByToken(holdToken);
 
   return {
-    seats: confirmedSeats.map((seat) => ({
+    seats: confirmation.seats.map((seat) => ({
       ...toSeatResponse(seat, new Set()),
       status: "BOOKED"
     }))
@@ -316,33 +333,27 @@ export async function blockSeats(request) {
     throw serviceError(grpc.status.INVALID_ARGUMENT, "admin_user_id is required");
   }
 
-  const currentSeats = await listTripSeatsByIds(tripId, seatIds);
-  const foundSeatIds = new Set(currentSeats.map((seat) => seat.id));
-  const missingSeatId = seatIds.find((seatId) => !foundSeatIds.has(seatId));
-
-  if (missingSeatId) {
-    throw serviceError(grpc.status.NOT_FOUND, `Seat ${missingSeatId} was not found for trip`);
+  const blocking = await blockTripSeats(tripId, seatIds, reason);
+  if (blocking.outcome === "MISSING") {
+    throw serviceError(grpc.status.NOT_FOUND, `Seat ${blocking.seatId} was not found for trip`);
   }
-
-  const bookedSeat = currentSeats.find((seat) => seat.status === "BOOKED");
-
-  if (bookedSeat) {
+  if (blocking.outcome === "UNAVAILABLE") {
     throw serviceError(
       grpc.status.FAILED_PRECONDITION,
-      `SEAT_NOT_AVAILABLE: Seat ${bookedSeat.id} is BOOKED`
+      `SEAT_NOT_AVAILABLE: Seat ${blocking.seatId} is ${blocking.seatStatus}`
     );
   }
 
-  const blockedSeats = await blockTripSeats(tripId, seatIds, reason);
-
-  if (blockedSeats.length !== seatIds.length) {
-    throw serviceError(grpc.status.INTERNAL, "Failed to block all requested seats");
+  try {
+    await releaseSeatHolds(tripId, seatIds);
+  } catch (error) {
+    // PostgreSQL BLOCKED is authoritative; stale hold keys are ignored by
+    // GetSeatMap for BLOCKED seats and expire automatically.
+    console.warn(`[seat-inventory] Failed to clean holds for blocked trip ${tripId}: ${error.message}`);
   }
 
-  await releaseSeatHolds(tripId, seatIds);
-
   return {
-    seats: blockedSeats.map((seat) => ({
+    seats: blocking.seats.map((seat) => ({
       ...toSeatResponse(seat, new Set()),
       status: "BLOCKED"
     }))

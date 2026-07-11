@@ -303,6 +303,18 @@ Analytics Service consumes Kafka events and stores aggregates for daily revenue,
 5. Gateway returns hold token and expiry.
 6. GraphQL Subscription broadcasts seat changes.
 
+Hold and seat transition invariants:
+
+- A hold token may be bound to only one logical booking request. Repeating the
+  same `createBooking` request returns the existing booking; reusing that token
+  with different trip, contact, customer, or passenger data is rejected.
+- `ConfirmSeats` and `BlockSeats` are all-or-none for the requested seat set.
+  Missing or unavailable seats must be detected before any requested seat is
+  changed.
+- Retrying `ConfirmSeats` with the same `booking_id` after all requested seats
+  are already booked by that booking is idempotent and succeeds without an
+  active Redis hold. A different booking may never claim those seats.
+
 ### Checkout and Ticket
 
 1. Web sends passenger/contact details and hold token.
@@ -312,6 +324,11 @@ Analytics Service consumes Kafka events and stores aggregates for daily revenue,
 5. Booking Service publishes `booking.paid`.
 6. Ticket Worker creates tickets and publishes `ticket.issued`.
 7. Email Worker logs simulated email delivery.
+
+Payment and expiry for the same booking must be serialized by Booking Service.
+An expiry sweep must skip a booking whose payment transition is in progress,
+and concurrent successful payment retries must produce only one transition to
+`PAID`.
 
 ## 11. MCP Server Contract
 

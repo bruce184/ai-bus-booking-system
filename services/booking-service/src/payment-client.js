@@ -7,6 +7,7 @@ const STANDARD_ERROR_CODES = new Set([
   "PAYMENT_FAILED",
   "INTERNAL_ERROR"
 ]);
+const PAYMENT_SERVICE_TIMEOUT_MS = 10_000;
 
 export function paymentServiceUrl(env = process.env) {
   const configured =
@@ -52,11 +53,20 @@ export async function simulatePaymentWithService({ booking, success }) {
     };
   }
 
-  const response = await fetch(`${paymentServiceUrl()}/simulate`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(simulatePaymentRequest({ booking, success }))
-  });
+  let response;
+  try {
+    response = await fetch(`${paymentServiceUrl()}/simulate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(simulatePaymentRequest({ booking, success })),
+      signal: AbortSignal.timeout(PAYMENT_SERVICE_TIMEOUT_MS)
+    });
+  } catch (error) {
+    const message = error?.name === "TimeoutError"
+      ? "Payment Service timed out during booking settlement"
+      : "Payment Service is unavailable during booking settlement";
+    fail("INTERNAL_ERROR", message);
+  }
   const payload = await readJson(response);
 
   if (!response.ok) {

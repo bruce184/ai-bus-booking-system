@@ -1,5 +1,5 @@
 import { fail } from "@bus/shared/errors.js";
-import { createInsecureClient, grpc, loadProto, promisifyGrpc } from "@bus/shared/grpc.js";
+import { createInsecureClient, grpc, loadProto } from "@bus/shared/grpc.js";
 
 let seatClient;
 
@@ -10,6 +10,7 @@ const STANDARD_ERROR_CODES = new Set([
   "HOLD_EXPIRED",
   "INTERNAL_ERROR"
 ]);
+const SEAT_INVENTORY_TIMEOUT_MS = 10_000;
 
 export function seatInventoryAddress(env = process.env) {
   return (
@@ -116,7 +117,19 @@ function mapSeatInventoryErrorMessage(error, code) {
 
 async function callSeatInventory(method, request) {
   try {
-    return await promisifyGrpc(client(), method, request);
+    return await new Promise((resolve, reject) => {
+      client()[method](
+        request,
+        { deadline: Date.now() + SEAT_INVENTORY_TIMEOUT_MS },
+        (error, response) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve(response);
+        }
+      );
+    });
   } catch (error) {
     const code = mapSeatInventoryErrorCode(error);
 

@@ -9,13 +9,15 @@ import {
   createBooking,
   deletePassengerProfile,
   fetchBookingByCode,
+  findBookingByHoldToken,
   getBookingStatus,
+  isPaymentSettledStatus,
   listAdminBookings,
   listCustomerBookings,
   listEventLogs,
   listPassengerProfiles,
-  markBookingPaid,
   savePassengerProfile,
+  settleBookingPayment,
   expirePendingBookings
 } from "./repository.js";
 
@@ -33,36 +35,59 @@ async function simulatePayment(request) {
     fail("VALIDATION_ERROR", "booking_code is required");
   }
 
-  const booking = await fetchBookingByCode(request.booking_code);
-  if (!booking) {
-    fail("NOT_FOUND", "Booking not found");
+  let confirmedSeats = null;
+  let transition;
+  try {
+    transition = await settleBookingPayment({
+      bookingCode: request.booking_code,
+      success: request.success,
+      processPayment: async (booking) => {
+        const payment = await simulatePaymentWithService({
+          booking,
+          success: request.success
+        });
+
+        if (!payment.success) {
+          fail("PAYMENT_FAILED", "Simulated payment failed");
+        }
+
+        const seatIds = booking.passengers.map((passenger) => passenger.seat_id);
+        await confirmSeats({
+          tripId: booking.trip_id,
+          seatIds,
+          holdToken:
+            process.env.SKIP_SEAT_CONFIRMATION === "true" ? "skipped" : booking.hold_token || "",
+          bookingId: booking.id
+        });
+        confirmedSeats = {
+          bookingId: booking.id,
+          tripId: booking.trip_id,
+          seatIds
+        };
+      }
+    });
+  } catch (error) {
+    if (confirmedSeats) {
+      try {
+        const current = await fetchBookingByCode(request.booking_code);
+        if (current && !isPaymentSettledStatus(current.status)) {
+          await releaseBookedSeats(confirmedSeats);
+        }
+      } catch (compensationError) {
+        console.error(
+          `[booking-service] Failed to compensate confirmed seats for ${request.booking_code}: ${compensationError.message}`
+        );
+      }
+    }
+    throw error;
   }
 
-  if (request.success && (booking.status === "PAID" || booking.status === "TICKET_ISSUED")) {
-    return booking;
-  }
-  if (booking.status !== "PENDING_PAYMENT") {
-    fail("BOOKING_STATE_INVALID", `Cannot pay booking in ${booking.status} status`);
+  const paidBooking = transition.booking;
+  if (!transition.transitioned) {
+    return paidBooking;
   }
 
-  const payment = await simulatePaymentWithService({
-    booking,
-    success: request.success
-  });
-
-  if (!payment.success) {
-    fail("PAYMENT_FAILED", "Simulated payment failed");
-  }
-
-  const seatIds = booking.passengers.map((passenger) => passenger.seat_id);
-  await confirmSeats({
-    tripId: booking.trip_id,
-    seatIds,
-    holdToken: process.env.SKIP_SEAT_CONFIRMATION === "true" ? "skipped" : booking.hold_token || "",
-    bookingId: booking.id
-  });
-
-  const paidBooking = await markBookingPaid({ bookingId: booking.id });
+  const seatIds = paidBooking.passengers.map((passenger) => passenger.seat_id);
   const eventPayload = {
     bookingId: paidBooking.id,
     bookingCode: paidBooking.booking_code,
@@ -79,6 +104,11 @@ async function simulatePayment(request) {
 }
 
 async function createBookingWithEvents(request) {
+  const existing = await findBookingByHoldToken(request);
+  if (existing) {
+    return existing;
+  }
+
   const seatIds = (request.passengers || []).map((passenger) => passenger.seat_id);
   await validateSeatHold({
     tripId: request.trip_id,
@@ -86,15 +116,17 @@ async function createBookingWithEvents(request) {
     holdToken: request.hold_token || ""
   });
 
-  const booking = await createBooking(request);
-  await publishKafkaEvent("booking-events", "booking.created", {
-    bookingId: booking.id,
-    bookingCode: booking.booking_code,
-    tripId: booking.trip_id,
-    totalAmount: booking.total_amount,
-    passengerCount: booking.passengers.length
-  });
-  return booking;
+  const result = await createBooking(request);
+  if (result.created) {
+    await publishKafkaEvent("booking-events", "booking.created", {
+      bookingId: result.booking.id,
+      bookingCode: result.booking.booking_code,
+      tripId: result.booking.trip_id,
+      totalAmount: result.booking.total_amount,
+      passengerCount: result.booking.passengers.length
+    });
+  }
+  return result.booking;
 }
 
 async function cancelBookingWithEvents(request) {
