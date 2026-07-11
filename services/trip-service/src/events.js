@@ -39,8 +39,14 @@ export async function publishSearchPerformed(payload) {
         {
           key: `${payload.origin}=>${payload.destination}`,
           value: JSON.stringify({
-            event: 'trip.search_performed',
-            ...payload,
+            eventName: 'trip.search_performed',
+            payload: {
+              origin: payload.origin,
+              destination: payload.destination,
+              departureDate: payload.departureDate,
+              resultCount: payload.resultCount,
+              cacheHit: payload.cacheHit,
+            },
             occurredAt: new Date().toISOString(),
           }),
         },

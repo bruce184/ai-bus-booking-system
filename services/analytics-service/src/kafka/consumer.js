@@ -4,6 +4,7 @@ import { handleSearchEvent } from "./handlers/searchEventsHandler.js";
 import { handleBookingEvent } from "./handlers/bookingEventsHandler.js";
 import { handlePaymentEvent } from "./handlers/paymentEventsHandler.js";
 import { handleCheckinEvent } from "./handlers/checkinEventsHandler.js";
+import { parseAnalyticsEvent } from "./eventEnvelope.js";
 
 const TOPIC_HANDLERS = {
   [config.topics.search]: handleSearchEvent,
@@ -13,32 +14,6 @@ const TOPIC_HANDLERS = {
 };
 
 let consumer;
-
-/**
- * Normalizes the two message envelope shapes producers use in this repo:
- *
- * - packages/shared/src/events.js (booking-service, payment-service):
- *     { eventName, payload, occurredAt }
- * - services/trip-service/src/events.js (search-events only):
- *     { event, ...payloadFields, occurredAt }
- *
- * This inconsistency is a pre-existing cross-service issue, not something
- * introduced or fixed here (see completion report "Out-of-scope issues found").
- */
-function parseMessage(topic, rawValue) {
-  const parsed = JSON.parse(rawValue);
-
-  if (topic === config.topics.search) {
-    const { event: eventName, occurredAt, ...payload } = parsed;
-    return { eventName, payload, occurredAt };
-  }
-
-  return {
-    eventName: parsed.eventName,
-    payload: parsed.payload ?? {},
-    occurredAt: parsed.occurredAt
-  };
-}
 
 export async function startAnalyticsConsumer() {
   if (!config.kafkaBrokers.length) {
@@ -67,7 +42,10 @@ export async function startAnalyticsConsumer() {
       }
 
       try {
-        const { eventName, payload, occurredAt } = parseMessage(topic, message.value.toString("utf8"));
+        const { eventName, payload, occurredAt } = parseAnalyticsEvent(
+          message.value.toString("utf8"),
+          { allowLegacyFlat: topic === config.topics.search }
+        );
         const handler = TOPIC_HANDLERS[topic];
 
         if (!handler) {

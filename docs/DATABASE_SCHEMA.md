@@ -156,7 +156,10 @@ No production file storage is required for the MVP unless an assigned task adds 
 - revenue
 - search-to-paid booking rate
 
-Analytics Service owns updating this table from Kafka events.
+Analytics Service is the sole writer of this table and updates it from Kafka
+events. Trip Service may read the `route_label` and `search_count` aggregate as
+a projection for its public `ListPopularRoutes` RPC; it must not mutate
+analytics rows.
 
 ## 11. Index Requirements
 

@@ -34,6 +34,10 @@ Nginx is the local reverse proxy for the web/gateway/MCP demo surface when servi
 | Ticket Worker | E-ticket generation after booking paid | Payment decisions |
 | Email Worker | Simulated email/log after ticket issued | Booking lifecycle decisions |
 
+`ListPopularRoutes` remains a Trip Service catalog RPC. It may read the
+`analytics_daily.search_count` projection to rank routes, but Analytics Service
+is the only service allowed to update that aggregate table.
+
 ## 4. Communication Rules
 
 | Path | Protocol |
@@ -57,6 +61,8 @@ Frontend must not call internal gRPC services directly.
 3. Trip Service reads PostgreSQL and optional Redis cache.
 4. Trip Service publishes search analytics to Kafka topic `search-events`.
 5. Gateway returns trips, available filters, nearby-date suggestions when empty, and SEO metadata for route pages.
+6. Analytics Service updates `analytics_daily`; Trip Service reads that
+   aggregate projection when serving `ListPopularRoutes`.
 
 ### Trip Detail
 

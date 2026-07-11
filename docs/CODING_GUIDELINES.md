@@ -203,9 +203,16 @@ Baseline:
 ```bash
 npm run check:docs
 docker compose config
+npm run test:trip
+npm run test:analytics
 ```
 
-When services are implemented, add service-specific checks to this file and `docs/DEV_WORKFLOW.md`.
+Trip integration additionally uses
+`npm --prefix services/trip-service run test:client` with seeded PostgreSQL and
+the Trip Service running. Search-event integration uses
+`npm run test:analytics:integration` with PostgreSQL, Kafka, and Analytics
+Service running. Keep service-specific checks synchronized with
+`docs/DEV_WORKFLOW.md`.
 
 ## 12. Documentation Workflow
 

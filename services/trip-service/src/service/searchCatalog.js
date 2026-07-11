@@ -4,8 +4,6 @@ import { query } from '../db.js';
 import {
   getCachedSearch,
   setCachedSearch,
-  incrementRouteSearch,
-  getPopularRoutesFromCache,
 } from '../cache.js';
 import { publishSearchPerformed } from '../events.js';
 import { config } from '../config.js';
@@ -15,12 +13,12 @@ import { TRIP_SELECT, rowToTrip } from '../tripQuery.js';
 import {
   mapLocation,
   mapStop,
-  mapSeat,
   mapRoute,
   mapVehicle,
   mapTrip,
   buildSeoTitle,
 } from '../mappers.js';
+import { mapPopularRoute, resolveSortBy } from '../searchRules.js';
 
 export async function autocompleteLocations(call) {
   const keyword = (call.request.keyword || '').trim();
@@ -59,9 +57,6 @@ export async function searchTrips(call) {
     sortBy: req.sort_by || '',
   };
 
-  // Always track popularity + emit analytics, even on a cache hit.
-  await incrementRouteSearch(origin, destination);
-
   const cached = await getCachedSearch(cacheParams);
   if (cached) {
     await publishSearchPerformed({
@@ -93,17 +88,10 @@ export async function searchTrips(call) {
   if (req.operator_name) where.push(`v.operator_name ilike ${addParam(`%${req.operator_name}%`)}`);
   if (req.vehicle_type) where.push(`v.vehicle_type = ${addParam(req.vehicle_type)}`);
 
-  const orderBy =
-    {
-      price: 't.price asc',
-      lowest_price: 't.price asc',
-      duration: '(t.arrival_time - t.departure_time) asc',
-      shortest_duration: '(t.arrival_time - t.departure_time) asc',
-      departure: 't.departure_time asc',
-      earliest_departure: 't.departure_time asc',
-    }[req.sort_by] || 't.departure_time asc';
-
-  const { rows } = await query(`${TRIP_SELECT} where ${where.join(' and ')} order by ${orderBy}`, params);
+  const { rows } = await query(
+    `${TRIP_SELECT} where ${where.join(' and ')} order by ${resolveSortBy(req.sort_by)}`,
+    params,
+  );
 
   let trips = rows.map(rowToTrip);
   if (req.min_available_seats) {
@@ -151,26 +139,15 @@ export async function getTripDetail(call) {
   if (rows.length === 0) throw notFound('Trip not found');
   const row = rows[0];
 
-  const [stopsRes, seatsRes] = await Promise.all([
-    query(
-      `select rs.id, rs.stop_type, rs.stop_order,
-              l.name as location_name, l.address as location_address
-         from route_stops rs
-         join locations l on l.id = rs.location_id
-        where rs.route_id = $1
-        order by rs.stop_order asc`,
-      [row.route_id],
-    ),
-    query(
-      `select vs.id, vs.seat_label, vs.deck, vs.seat_row, vs.seat_column,
-              coalesce(ts.status, 'AVAILABLE') as status
-         from vehicle_seats vs
-         left join trip_seats ts on ts.trip_id = $1 and ts.seat_label = vs.seat_label
-        where vs.vehicle_id = $2
-        order by vs.deck, vs.seat_row, vs.seat_column`,
-      [tripId, row.vehicle_id],
-    ),
-  ]);
+  const stopsRes = await query(
+    `select rs.id, rs.stop_type, rs.stop_order,
+            l.name as location_name, l.address as location_address
+       from route_stops rs
+       join locations l on l.id = rs.location_id
+      where rs.route_id = $1
+      order by rs.stop_order asc`,
+    [row.route_id],
+  );
 
   const stops = stopsRes.rows.map(mapStop);
   const route = mapRoute(row, stops);
@@ -182,7 +159,6 @@ export async function getTripDetail(call) {
     trip,
     pickup_points: stops.filter((s) => s.stop_type === 'PICKUP'),
     dropoff_points: stops.filter((s) => s.stop_type === 'DROPOFF'),
-    seats: seatsRes.rows.map(mapSeat),
     cancellation_policy: CANCELLATION_POLICY,
     checkin_policy: CHECKIN_POLICY,
   };
@@ -191,22 +167,21 @@ export async function getTripDetail(call) {
 export async function listPopularRoutes(call) {
   const limit = Math.min(Math.max(call.request.limit || 5, 1), 50);
 
-  const cached = await getPopularRoutesFromCache(limit);
-  if (cached) return { routes: cached };
-
-  // Fallback when Redis has no live search data: rank routes by number of
-  // active trips as a proxy for popularity.
+  // Analytics Service is the sole writer of analytics_daily. Trip Service owns
+  // the public ListPopularRoutes RPC and reads this aggregate projection only.
   const { rows } = await query(
-    `select ol.name as origin, dl.name as destination, count(t.id)::int as search_count
-       from routes r
-       join locations ol on ol.id = r.origin_location_id
-       join locations dl on dl.id = r.destination_location_id
-       left join trips t on t.route_id = r.id and t.status = 'ACTIVE'
-      group by ol.name, dl.name
-      having count(t.id) > 0
-      order by count(t.id) desc, ol.name asc
+    `select coalesce(route_label, 'Unknown Route') as route_label,
+            coalesce(sum(search_count), 0)::int as total_searches
+       from analytics_daily
+      where route_label is not null
+      group by route_label
+      having sum(search_count) > 0
+      order by total_searches desc
       limit $1`,
     [limit],
   );
-  return { routes: rows.map((r) => ({ origin: r.origin, destination: r.destination, search_count: r.search_count })) };
+
+  return {
+    routes: rows.map(mapPopularRoute).filter(Boolean),
+  };
 }

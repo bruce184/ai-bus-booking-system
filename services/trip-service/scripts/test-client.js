@@ -44,11 +44,16 @@ async function main() {
   console.log(ac.locations.map((l) => `${l.name} [${l.type}]`).join(', ') || '(none)');
 
   console.log(`\n== SearchTrips(${origin} -> ${destination} @ ${date}) ==`);
-  const search = await call('SearchTrips', { origin, destination, departure_date: date, sort_by: 'price' });
+  const search = await call('SearchTrips', { origin, destination, departure_date: date, sort_by: 'price-desc' });
   console.log(`seo_title: ${search.seo_title}`);
   console.log(`cache_hit: ${search.cache_hit}, trips: ${search.trips.length}, suggested_dates: ${JSON.stringify(search.suggested_dates)}`);
   for (const t of search.trips) {
     console.log(`  - ${t.id} | ${t.operator_name} ${t.vehicle_type} | ${t.departure_time} -> ${t.arrival_time} | ${t.price}d | seats:${t.available_seats} | ${t.status}`);
+  }
+  for (let index = 1; index < search.trips.length; index += 1) {
+    if (search.trips[index - 1].price < search.trips[index].price) {
+      throw new Error('SearchTrips price-desc ordering invariant failed');
+    }
   }
 
   if (search.trips.length > 0) {
@@ -58,13 +63,21 @@ async function main() {
     console.log(`route: ${detail.trip.route.origin.name} -> ${detail.trip.route.destination.name}`);
     console.log(`pickup: ${detail.pickup_points.map((s) => s.name).join(', ') || '(none)'}`);
     console.log(`dropoff: ${detail.dropoff_points.map((s) => s.name).join(', ') || '(none)'}`);
-    console.log(`seats: ${detail.seats.length} (${detail.seats.filter((s) => s.status === 'AVAILABLE').length} available)`);
     console.log(`cancellation_policy: ${detail.cancellation_policy.slice(0, 40)}...`);
+    if (Object.hasOwn(detail, 'seats')) {
+      throw new Error('GetTripDetail must not return seat state owned by Seat Inventory Service');
+    }
   }
 
   console.log(`\n== ListPopularRoutes(limit=5) ==`);
   const popular = await call('ListPopularRoutes', { limit: 5 });
+  if (!popular.routes.length) {
+    throw new Error('ListPopularRoutes returned no analytics search-count projections');
+  }
   for (const r of popular.routes) {
+    if (!r.origin || !r.destination || r.search_count <= 0) {
+      throw new Error(`Invalid popular-route projection: ${JSON.stringify(r)}`);
+    }
     console.log(`  - ${r.origin} -> ${r.destination} (${r.search_count})`);
   }
 

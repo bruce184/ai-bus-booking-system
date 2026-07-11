@@ -61,7 +61,12 @@ CANCELLED
 ## Baseline Contract Notes
 
 - `searchTrips` returns `TripSearchResult` so empty-date suggestions and SEO metadata can travel with results.
+- Trip Service `GetTripDetail` returns trip/stops/policies; GraphQL
+  `TripDetail.seats` comes only from Seat Inventory Service `GetSeatMap`.
 - Admin route/stop/vehicle/trip CRUD belongs to Trip Service.
 - Seat holding and blocking belong to Seat Inventory Service.
 - Booking lookup, saved passengers, cancellation, and check-in belong to Booking Service.
-- Analytics dashboard data comes from Kafka-derived aggregates.
+- Analytics events use `{ eventName, payload, occurredAt }` and Analytics
+  Service is the sole writer of Kafka-derived aggregates.
+- Trip Service owns `ListPopularRoutes` and may read the analytics search-count
+  projection without writing analytics rows.

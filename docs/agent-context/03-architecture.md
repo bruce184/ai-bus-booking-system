@@ -22,6 +22,9 @@ Next.js Web
 - Analytics Service consumes Kafka events.
 - MCP Server exposes approved tools/resources to external AI clients.
 
+Trip Service may read the analytics search-count projection for its public
+popular-route catalog, but Analytics Service remains the sole aggregate writer.
+
 ## Do Not Bypass
 
 - Frontend must not call internal gRPC services directly.
