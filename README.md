@@ -164,6 +164,9 @@ Members should add implementation files only inside their assigned module and ke
 | `docs/CODING_GUIDELINES.md` | Branch, commit, PR, code, docs, and security rules |
 | `docs/DEV_WORKFLOW.md` | Team assignment and AI Agent workflow |
 | `docs/implementation/02_task_template.md` | Copy/paste task template for members and Agents |
+| `demo/HUONG_DAN_DEMO.md` | Step-by-step lecturer demo script and troubleshooting |
+| `demo/DEMO_DATA.md` | Demo accounts, bookings, catalog, and fixture reference |
+| `docs/TEAM_OVERVIEW.md` | Full-project overview for the team, with diagrams |
 
 ## AI Agent Workflow
 
