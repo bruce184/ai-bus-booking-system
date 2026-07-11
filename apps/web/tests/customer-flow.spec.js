@@ -1,0 +1,78 @@
+import { test, expect } from '@playwright/test';
+
+import { cleanupCustomerE2EBookings, closeAdminE2EDatabase } from './demoDatabase.js';
+
+const SEARCH = { from: 'TP.HCM', to: 'Da Lat', date: '2026-07-16' };
+
+test.describe('Customer Booking Flow E2E (Sec 3.1-3.3)', () => {
+  test.afterEach(async () => {
+    await cleanupCustomerE2EBookings();
+  });
+
+  test.afterAll(async () => {
+    await closeAdminE2EDatabase();
+  });
+
+  test('guest searches, holds a seat, checks out, and pays (simulated)', async ({ page }) => {
+    const contactEmail = `e2e-${Date.now()}@example.com`;
+
+    // Module 1: search results for a seeded future trip.
+    await page.goto(`/search?from=${SEARCH.from}&to=${encodeURIComponent(SEARCH.to)}&date=${SEARCH.date}`);
+    const chooseSeats = page.getByRole('link', { name: 'Chọn ghế' }).first();
+    await expect(chooseSeats).toBeVisible({ timeout: 15000 });
+    await chooseSeats.click();
+
+    // Module 2: seat map, pick the first available seat and hold it (Redis TTL).
+    const seat = page.locator('button.seat-available').first();
+    await expect(seat).toBeVisible({ timeout: 15000 });
+    await seat.click();
+    await expect(seat).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('button.seat-hold-button').click();
+
+    // Hold succeeded -> checkout page with countdown.
+    await expect(page).toHaveURL(/\/checkout\?tripId=/, { timeout: 15000 });
+
+    // Module 3: guest checkout with passenger info.
+    await page.locator('input[type="email"]').first().fill(contactEmail);
+    await page.locator('input[placeholder="Nguyễn Văn A"]').first().fill('E2E Passenger');
+    await page.locator('input[placeholder="0900000000"]').first().fill('0900000001');
+    await page.locator('button[type="submit"]').click();
+
+    // Simulated payment.
+    await expect(page).toHaveURL(/\/payment\?bookingCode=/, { timeout: 15000 });
+    await page.getByRole('button', { name: 'Thanh toán thành công' }).click();
+
+    // Confirmation page shows the booking code and a paid-or-later status.
+    await expect(page).toHaveURL(/\/booking\//, { timeout: 15000 });
+    await expect(page.getByText(/^BK\d+/).first()).toBeVisible();
+    await expect(page.getByText(/PAID|TICKET_ISSUED/).first()).toBeVisible();
+  });
+
+  test('two clients racing for the same seat: only one hold succeeds', async ({ browser }) => {
+    const contextA = await browser.newContext();
+    const contextB = await browser.newContext();
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+
+    for (const p of [pageA, pageB]) {
+      await p.goto(`/search?from=${SEARCH.from}&to=${encodeURIComponent(SEARCH.to)}&date=${SEARCH.date}`);
+      await p.getByRole('link', { name: 'Chọn ghế' }).first().click();
+      await expect(p.locator('button.seat-available').first()).toBeVisible({ timeout: 15000 });
+    }
+
+    // Both pick the same first available seat label.
+    const seatLabel = await pageA.locator('button.seat-available').first().innerText();
+    await pageA.getByRole('button', { name: seatLabel, exact: true }).click();
+    await pageB.getByRole('button', { name: seatLabel, exact: true }).click();
+
+    await pageA.locator('button.seat-hold-button').click();
+    await expect(pageA).toHaveURL(/\/checkout\?tripId=/, { timeout: 15000 });
+
+    await pageB.locator('button.seat-hold-button').click();
+    await expect(pageB.locator('.seat-map-error')).toBeVisible({ timeout: 15000 });
+    await expect(pageB).not.toHaveURL(/\/checkout/);
+
+    await contextA.close();
+    await contextB.close();
+  });
+});
