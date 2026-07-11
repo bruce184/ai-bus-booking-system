@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { graphqlRequest } from "../../../lib/graphql";
+import PrintTicketButton from "./_PrintTicketButton.jsx";
 
 const BOOKING_STATUS = `
   query BookingStatus($bookingCode: String!, $email: String!) {
@@ -224,9 +225,7 @@ export default async function BookingConfirmationPage({ params, searchParams }) 
             <Link className="button" href="/my-bookings" style={{ minWidth: "120px" }}>
               Vé của tôi
             </Link>
-            <button className="primary" onClick={() => window.print()} style={{ minWidth: "120px" }}>
-              Tải vé PDF
-            </button>
+            <PrintTicketButton />
           </div>
         </div>
       )}
