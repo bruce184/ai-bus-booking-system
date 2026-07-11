@@ -18,33 +18,7 @@ import {
   mapTrip,
   buildSeoTitle,
 } from '../mappers.js';
-
-const DEPARTURE_ASC = 't.departure_time asc';
-const DURATION = '(t.arrival_time - t.departure_time)';
-
-// Accepts both the snake_case names in the proto and the hyphenated names the
-// web client uses ("price-asc"). Unknown values fall back to earliest departure.
-const SORT_OPTIONS = {
-  price: 't.price asc',
-  price_asc: 't.price asc',
-  lowest_price: 't.price asc',
-  price_desc: 't.price desc',
-  highest_price: 't.price desc',
-  duration: `${DURATION} asc`,
-  shortest_duration: `${DURATION} asc`,
-  longest_duration: `${DURATION} desc`,
-  departure: DEPARTURE_ASC,
-  earliest: DEPARTURE_ASC,
-  earliest_departure: DEPARTURE_ASC,
-  latest_departure: 't.departure_time desc',
-};
-
-function resolveSortBy(sortBy) {
-  const key = String(sortBy || '').trim().toLowerCase().replace(/-/g, '_');
-  // t.id breaks ties so equal-priced trips keep a stable order across requests
-  // (otherwise a cached page and a fresh one can disagree).
-  return `${SORT_OPTIONS[key] || DEPARTURE_ASC}, t.id asc`;
-}
+import { mapPopularRoute, resolveSortBy } from '../searchRules.js';
 
 export async function autocompleteLocations(call) {
   const keyword = (call.request.keyword || '').trim();
@@ -193,6 +167,8 @@ export async function getTripDetail(call) {
 export async function listPopularRoutes(call) {
   const limit = Math.min(Math.max(call.request.limit || 5, 1), 50);
 
+  // Analytics Service is the sole writer of analytics_daily. Trip Service owns
+  // the public ListPopularRoutes RPC and reads this aggregate projection only.
   const { rows } = await query(
     `select coalesce(route_label, 'Unknown Route') as route_label,
             coalesce(sum(search_count), 0)::int as total_searches
@@ -206,9 +182,6 @@ export async function listPopularRoutes(call) {
   );
 
   return {
-    routes: rows.map((r) => {
-      const [origin = '', destination = ''] = String(r.route_label).split(' -> ');
-      return { origin: origin.trim(), destination: destination.trim(), search_count: r.total_searches };
-    }),
+    routes: rows.map(mapPopularRoute).filter(Boolean),
   };
 }

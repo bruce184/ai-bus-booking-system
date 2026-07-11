@@ -103,6 +103,16 @@ Admin login is required for admin screens in the MVP. Local demo auth may use se
 
 The GraphQL response is `TripSearchResult`, not a bare trip array, so it can carry `suggestedDates`, `seoTitle`, and `cacheHit`.
 
+Trip detail ownership is split deliberately: Trip Service `GetTripDetail`
+returns trip metadata, pickup/dropoff points, and policy text, while
+`TripDetail.seats` is resolved by the GraphQL Gateway through Seat Inventory
+Service `GetSeatMap`. Trip Service must not return a second, stale seat-state
+copy.
+
+`ListPopularRoutes` is owned by Trip Service and ranks the read-only
+`analytics_daily.search_count` projection. Analytics Service remains the sole
+writer of that aggregate table.
+
 ## 6. Core Data Objects
 
 ### Trip Search Result
@@ -291,6 +301,26 @@ Owns booking state machine, passenger-per-seat data, booking lookup privacy, can
 | `checkin-events` | `ticket.checked_in` |
 
 Analytics Service consumes Kafka events and stores aggregates for daily revenue, tickets sold by route, popular routes, and booking success rate versus search count.
+
+All producers use the canonical JSON envelope:
+
+```json
+{
+  "eventName": "trip.search_performed",
+  "payload": {
+    "origin": "TP.HCM",
+    "destination": "Da Lat",
+    "departureDate": "2026-07-12",
+    "resultCount": 3,
+    "cacheHit": false
+  },
+  "occurredAt": "2026-07-11T01:00:00.000Z"
+}
+```
+
+During the search-event migration, Analytics Service may consume the previous
+flat `{ "event": "trip.search_performed", ... }` shape for queued-message
+compatibility. New events must use the canonical envelope.
 
 ## 10. Booking and Seat Workflows
 

@@ -22,6 +22,12 @@ Expected responsibilities:
 
 Web must call GraphQL Gateway, not internal gRPC services directly.
 
+Browser GraphQL calls use `NEXT_PUBLIC_GRAPHQL_URL`. Server-rendered trip
+detail and metadata prefer `GRAPHQL_GATEWAY_URL`, fall back to
+`NEXT_PUBLIC_GRAPHQL_URL`, and finally use `http://localhost:4000/graphql` for
+the documented local setup. Live seat-state requests are never cached by the
+server page.
+
 Run admin E2E tests from the repository root with:
 
 ```bash

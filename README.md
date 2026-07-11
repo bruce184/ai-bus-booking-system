@@ -108,6 +108,9 @@ npm run check:docs
 npm run test:gateway
 npm run test:gateway:integration
 npm run test:booking
+npm run test:trip
+npm run test:analytics
+npm run test:analytics:integration
 npm --prefix apps/web run lint
 ```
 

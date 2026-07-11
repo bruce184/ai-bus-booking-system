@@ -185,6 +185,9 @@ Implemented test targets:
 | Gateway unit / whitebox | `npm run test:gateway` | Auth, JWT, role helpers, and context factory |
 | Gateway integration | `npm run test:gateway:integration` | Starts a real gateway on port `4100` and calls GraphQL over HTTP |
 | Booking service unit | `npm run test:booking` | Booking state machine and service client request contracts |
+| Trip service unit | `npm run test:trip` | Sort aliases and popular-route aggregate mapping |
+| Analytics service unit | `npm run test:analytics` | Canonical and legacy search-event envelope compatibility |
+| Search analytics integration | `npm run test:analytics:integration` | Requires PostgreSQL, Kafka, and Analytics Service; bounded to 15 seconds and cleans test data |
 | Gateway API / contract smoke | `npm run test:gateway:api` | Requires a gateway already running on `http://localhost:4000/graphql` |
 | Gateway performance | `npm run test:gateway:perf` | Requires Apache JMeter on `PATH` |
 | Web lint | `npm --prefix apps/web run lint` | Next.js/React lint |

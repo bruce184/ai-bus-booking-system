@@ -13,7 +13,7 @@ let enabled = false;
 
 export function initCache() {
   if (!config.redisUrl) {
-    logger.warn('REDIS_URL not set; trip search cache and popularity are disabled');
+    logger.warn('REDIS_URL not set; trip search cache is disabled');
     return;
   }
   client = new Redis(config.redisUrl, {

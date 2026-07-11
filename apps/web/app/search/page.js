@@ -61,6 +61,7 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [showSearchForm, setShowSearchForm] = useState(false);
   const initialSearchStarted = useRef(false);
+  const latestSearchRequest = useRef(0);
 
   // Filter & sort states (client-side + server-side)
   const [selectedOperators, setSelectedOperators] = useState([]);
@@ -69,6 +70,18 @@ export default function SearchPage() {
   const [sortBy, setSortBy] = useState("earliest");
 
   const doSearch = useCallback(async (originVal, destinationVal, dateVal, sortVal = "earliest", minPVal = 0, maxPVal = 0) => {
+    const requestId = latestSearchRequest.current + 1;
+    latestSearchRequest.current = requestId;
+    const normalizedMinPrice = Math.max(0, Math.trunc(Number(minPVal) || 0));
+    const normalizedMaxPrice = Math.max(0, Math.trunc(Number(maxPVal) || 0));
+
+    if (normalizedMinPrice > 0 && normalizedMaxPrice > 0 && normalizedMinPrice > normalizedMaxPrice) {
+      setError("Giá tối thiểu không được lớn hơn giá tối đa.");
+      setResult(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
@@ -78,16 +91,22 @@ export default function SearchPage() {
           destination: destinationVal,
           departureDate: dateVal,
           sortBy: sortVal,
-          minPrice: minPVal > 0 ? minPVal : 0,
-          maxPrice: maxPVal > 0 ? maxPVal : 0,
+          minPrice: normalizedMinPrice,
+          maxPrice: normalizedMaxPrice,
         }
       });
-      setResult(data.searchTrips);
+      if (requestId === latestSearchRequest.current) {
+        setResult(data.searchTrips);
+      }
     } catch (err) {
-      setError(err.message);
-      setResult(null);
+      if (requestId === latestSearchRequest.current) {
+        setError(err.message);
+        setResult(null);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === latestSearchRequest.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -165,6 +184,9 @@ export default function SearchPage() {
 
   const clearFilters = () => {
     setSelectedOperators([]);
+    setMinPrice(0);
+    setMaxPrice(0);
+    void doSearch(origin, destination, departureDate, sortBy, 0, 0);
   };
 
   return (
@@ -414,7 +436,9 @@ export default function SearchPage() {
                   type="number"
                   placeholder="Min"
                   value={minPrice || ""}
-                  onChange={(e) => setMinPrice(Number(e.target.value) || 0)}
+                  min="0"
+                  step="1000"
+                  onChange={(e) => setMinPrice(Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
                   onBlur={() => doSearch(origin, destination, departureDate, sortBy, minPrice, maxPrice)}
                   style={{ width: "70px", minHeight: "30px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
                 />
@@ -423,7 +447,9 @@ export default function SearchPage() {
                   type="number"
                   placeholder="Max"
                   value={maxPrice || ""}
-                  onChange={(e) => setMaxPrice(Number(e.target.value) || 0)}
+                  min="0"
+                  step="1000"
+                  onChange={(e) => setMaxPrice(Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
                   onBlur={() => doSearch(origin, destination, departureDate, sortBy, minPrice, maxPrice)}
                   style={{ width: "70px", minHeight: "30px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
                 />
