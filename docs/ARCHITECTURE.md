@@ -1,4 +1,4 @@
-# ARCHITECTURE - Intercity Bus Booking AI
+# ARCHITECTURE - AI Bus Booking System
 
 ## 1. Purpose
 

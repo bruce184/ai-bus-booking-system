@@ -1,4 +1,4 @@
-# DEV WORKFLOW - Intercity Bus Booking AI
+# DEV WORKFLOW - AI Bus Booking System
 
 ## 1. Purpose
 
@@ -18,7 +18,7 @@ It explains how to:
 
 | Item | Value |
 |---|---|
-| Project name | Intercity Bus Booking AI |
+| Project name | AI Bus Booking System |
 | Product type | Microservices web app |
 | Main users | Guest customer, registered customer, admin, check-in staff |
 | Main goal | Book intercity bus tickets with AI and MCP support |

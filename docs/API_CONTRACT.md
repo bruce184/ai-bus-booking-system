@@ -1,4 +1,4 @@
-# API CONTRACT - Intercity Bus Booking AI
+# API CONTRACT - AI Bus Booking System
 
 ## 1. Purpose
 

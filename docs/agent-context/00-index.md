@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This directory gives AI Agents and team members a compact, task-oriented view of Intercity Bus Booking AI. It prevents agents from guessing architecture, scope, service boundaries, contracts, or file placement.
+This directory gives AI Agents and team members a compact, task-oriented view of AI Bus Booking System. It prevents agents from guessing architecture, scope, service boundaries, contracts, or file placement.
 
 ## Start Here
 

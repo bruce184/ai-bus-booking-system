@@ -1,4 +1,4 @@
-# DATABASE SCHEMA - Intercity Bus Booking AI
+# DATABASE SCHEMA - AI Bus Booking System
 
 ## 1. Purpose
 

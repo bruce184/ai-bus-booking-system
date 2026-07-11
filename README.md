@@ -1,6 +1,6 @@
-# Intercity Bus Booking AI
+# AI Bus Booking System
 
-Intercity Bus Booking AI is a student microservices project for searching intercity bus trips, selecting seats, holding seats with Redis TTL, simulating checkout, issuing e-tickets, supporting admin operations, providing analytics, and exposing AI/MCP tools.
+AI Bus Booking System is a student microservices project for searching intercity bus trips, selecting seats, holding seats with Redis TTL, simulating checkout, issuing e-tickets, supporting admin operations, providing analytics, and exposing AI/MCP tools.
 
 The repository is set up with a local-demo-first strategy. The current state includes source-of-truth docs, GraphQL schema, gRPC proto files, database schema and seed data, Docker infrastructure, the GraphQL Gateway, Next.js web flows, core trip/seat/booking/payment services, ticket/email workers, demo auth, admin screens, and test harnesses. Remaining modules should still add implementation files only inside their assigned areas.
 
@@ -50,7 +50,7 @@ Out-of-scope unless approved:
 ## Repository Structure
 
 ```text
-intercity-bus-booking-ai/
+ai-bus-booking-system/
 +-- apps/web/                    # Next.js frontend
 +-- services/graphql-gateway/    # Public GraphQL API and subscriptions
 +-- services/trip-service/       # Routes, stops, vehicles, trips, search
@@ -105,12 +105,12 @@ Run implemented verification targets:
 
 ```bash
 npm run check:docs
-npm run test:gateway
+npm run test:unit                  # gateway, booking, trip, analytics, seat, mcp, ticket-worker
 npm run test:gateway:integration
-npm run test:booking
-npm run test:trip
-npm run test:analytics
 npm run test:analytics:integration
+npm run test:seat:integration
+npm run test:seat:race
+npm run test:web:e2e               # Playwright admin + customer flows (needs infra + services)
 npm --prefix apps/web run lint
 ```
 
@@ -144,12 +144,10 @@ Implemented now:
 - Booking Service runtime for booking lifecycle, payment simulation coordination, cancellation, lookup, check-in, and saved passengers
 - Payment Service simulation runtime
 - Ticket Worker and Email Worker runtimes for e-ticket creation and simulated delivery
-
-Not implemented yet:
-
-- AI SDK chatbot runtime
-- Analytics Service runtime
-- MCP Server runtime
+- Analytics Service runtime with Kafka consumers, `eventId` deduplication, and reporting aggregates
+- AI SDK chatbot route with tool calling (`searchTrips`, `getBookingStatus`, policy resources)
+- MCP Server runtime with the 5 lecturer-required tools and 4 policy/health resources
+- Playwright E2E suites for the admin/staff portal and the customer booking flow
 
 Members should add implementation files only inside their assigned module and keep the matching docs/contracts updated.
 

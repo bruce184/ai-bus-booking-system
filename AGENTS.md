@@ -1,4 +1,4 @@
-# Agent Instructions - Intercity Bus Booking AI
+# Agent Instructions - AI Bus Booking System
 
 This repository is a student microservices project for an intercity bus booking system with AI chatbot and MCP Server support.
 

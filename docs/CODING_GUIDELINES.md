@@ -1,4 +1,4 @@
-# CODING GUIDELINES - Intercity Bus Booking AI
+# CODING GUIDELINES - AI Bus Booking System
 
 ## 1. Purpose
 

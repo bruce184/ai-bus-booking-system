@@ -1,4 +1,4 @@
-# README SETUP - Intercity Bus Booking AI
+# README SETUP - AI Bus Booking System
 
 ## 1. Purpose
 
@@ -13,7 +13,7 @@ Use this file when:
 
 ## 2. Project Summary
 
-Intercity Bus Booking AI lets customers search trips, select seats, hold seats, checkout, receive e-tickets, and ask an AI chatbot for trip/policy/booking help. Admin users manage routes, stops, vehicles, seat layouts, trips, bookings, check-in, seat blocks, logs, and reports. External AI clients can use the MCP Server tools.
+AI Bus Booking System lets customers search trips, select seats, hold seats, checkout, receive e-tickets, and ask an AI chatbot for trip/policy/booking help. Admin users manage routes, stops, vehicles, seat layouts, trips, bookings, check-in, seat blocks, logs, and reports. External AI clients can use the MCP Server tools.
 
 Current repository status:
 
