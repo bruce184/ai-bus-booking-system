@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { TopBar } from "../../src/components/TopBar.jsx";
 
 export default function LookupPage() {
   const router = useRouter();
@@ -16,17 +17,7 @@ export default function LookupPage() {
 
   return (
     <>
-      <header className="topbar">
-        <div className="logo-container">
-          <div className="logo-icon">🟢</div>
-          <span className="logo-text">EcoBus AI</span>
-        </div>
-        <nav className="nav">
-          <Link href="/">Trang chính</Link>
-          <Link href="/search">Tìm chuyến</Link>
-          <Link href="/my-bookings">Vé của tôi</Link>
-        </nav>
-      </header>
+      <TopBar links={[{ href: "/", label: "Trang chính" }, { href: "/search", label: "Tìm chuyến" }, { href: "/my-bookings", label: "Vé của tôi" }]} />
 
       <section className="grid">
         <form className="panel form" onSubmit={submit}>

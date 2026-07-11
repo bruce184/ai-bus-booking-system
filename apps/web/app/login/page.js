@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { graphqlRequest } from "../../lib/graphql";
+import { TopBar } from "../../src/components/TopBar.jsx";
 
 const LOGIN = `
   mutation Login($input: LoginInput!) {
@@ -47,17 +48,7 @@ function LoginContent() {
 
   return (
     <>
-      <header className="topbar">
-        <div className="logo-container">
-          <div className="logo-icon">🟢</div>
-          <span className="logo-text">EcoBus AI</span>
-        </div>
-        <nav className="nav">
-          <Link href="/">Trang chính</Link>
-          <Link href="/search">Tìm chuyến</Link>
-          <Link href="/lookup">Tra cứu vé</Link>
-        </nav>
-      </header>
+      <TopBar links={[{ href: "/", label: "Trang chính" }, { href: "/search", label: "Tìm chuyến" }, { href: "/lookup", label: "Tra cứu vé" }]} />
 
       <section className="grid">
         <form className="panel form" onSubmit={submit}>

@@ -3,6 +3,15 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import {
+  Bus,
+  CalendarDays,
+  LayoutDashboard,
+  MapPin,
+  Route as RouteIcon,
+  ScrollText,
+  Ticket
+} from 'lucide-react';
 import { queryGraphQL } from '../graphql.js';
 
 export default function AdminLayout({ children }) {
@@ -93,13 +102,13 @@ export default function AdminLayout({ children }) {
   }
 
   const adminMenuItems = [
-    { name: 'Dashboard', href: '/admin/dashboard', icon: '📊' },
-    { name: 'Trips', href: '/admin/trips', icon: '🗓️' },
-    { name: 'Routes', href: '/admin/routes', icon: '🛣️' },
-    { name: 'Stops', href: '/admin/stops', icon: '📍' },
-    { name: 'Vehicles', href: '/admin/vehicles', icon: '🚌' },
-    { name: 'Bookings', href: '/admin/bookings', icon: '🎟️' },
-    { name: 'Event Logs', href: '/admin/event-logs', icon: '📜' }
+    { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+    { name: 'Trips', href: '/admin/trips', icon: CalendarDays },
+    { name: 'Routes', href: '/admin/routes', icon: RouteIcon },
+    { name: 'Stops', href: '/admin/stops', icon: MapPin },
+    { name: 'Vehicles', href: '/admin/vehicles', icon: Bus },
+    { name: 'Bookings', href: '/admin/bookings', icon: Ticket },
+    { name: 'Event Logs', href: '/admin/event-logs', icon: ScrollText }
   ];
   const menuItems = user?.role === 'STAFF'
     ? adminMenuItems.filter((item) => item.href === '/admin/bookings')
@@ -119,8 +128,8 @@ export default function AdminLayout({ children }) {
         flexShrink: 0
       }}>
         <div>
-          <h2 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--primary)' }}>
-            🚌 BusBooking AI
+          <h2 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Bus size={22} aria-hidden="true" /> EcoBus AI
           </h2>
           <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>ADMIN MANAGEMENT</span>
         </div>
@@ -140,7 +149,7 @@ export default function AdminLayout({ children }) {
                 fontWeight: isActive ? '600' : '500',
                 transition: 'all 0.2s ease'
               }}>
-                <span>{item.icon}</span>
+                <item.icon size={17} strokeWidth={2} aria-hidden="true" />
                 <span>{item.name}</span>
               </Link>
             );

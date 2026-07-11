@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { clearCustomerSession, getCustomerToken, getCustomerUser, graphqlRequest } from "../../lib/graphql";
+import { TopBar } from "../../src/components/TopBar.jsx";
 
 const MY_BOOKINGS = `
   query MyBookings {
@@ -60,25 +61,18 @@ export default function MyBookingsPage() {
 
   return (
     <>
-      <header className="topbar">
-        <div className="logo-container">
-          <div className="logo-icon">🟢</div>
-          <div>
-            <span className="logo-text">EcoBus AI</span>
-            <p className="lead" style={{ fontSize: "14px", marginTop: "2px" }}>
-              {state.user ? `Đang đăng nhập: ${state.user.email}` : "Đăng nhập để xem các booking gắn với tài khoản của bạn."}
-            </p>
-          </div>
-        </div>
-        <nav className="nav">
-          <Link href="/">Trang chính</Link>
-          <Link href="/search">Tìm chuyến</Link>
-          <Link href="/lookup">Tra cứu vé</Link>
-          {state.phase === "ready" ? (
-            <button onClick={logout} type="button">Đăng xuất</button>
-          ) : null}
-        </nav>
-      </header>
+      <TopBar
+        links={[{ href: "/", label: "Trang chính" }, { href: "/search", label: "Tìm chuyến" }, { href: "/lookup", label: "Tra cứu vé" }]}
+        subtitle={(
+          <p className="lead" style={{ fontSize: "14px", marginTop: "2px" }}>
+            {state.user ? `Đang đăng nhập: ${state.user.email}` : "Đăng nhập để xem các booking gắn với tài khoản của bạn."}
+          </p>
+        )}
+      >
+        {state.phase === "ready" ? (
+          <button onClick={logout} type="button">Đăng xuất</button>
+        ) : null}
+      </TopBar>
 
       {state.phase === "loading" ? <section className="panel">Đang tải lịch sử đặt vé...</section> : null}
 

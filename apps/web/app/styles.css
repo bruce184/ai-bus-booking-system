@@ -45,6 +45,19 @@ body {
   margin-bottom: 22px;
 }
 
+.topbar-user-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background-color: var(--surface-soft);
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  margin-left: var(--sp-2);
+}
+
 .brand-block {
   display: grid;
   gap: 5px;
