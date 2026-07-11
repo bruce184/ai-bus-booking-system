@@ -1,6 +1,23 @@
 import { pool } from "../db/postgres.js";
 
 /**
+ * Consumer idempotency (Tuan04): records the eventId before the handler runs.
+ * Returns false when the event was already processed, so Kafka redeliveries
+ * (rebalance, offset replay) cannot double-count aggregates.
+ * ponytail: mark-then-process; a crash between mark and handler drops that one
+ * event. Move the mark into a shared handler transaction if that ever matters.
+ */
+export async function markEventProcessed(eventId, topic) {
+  const { rowCount } = await pool.query(
+    `insert into processed_events (event_id, topic)
+     values ($1, $2)
+     on conflict (event_id) do nothing`,
+    [eventId, topic]
+  );
+  return rowCount > 0;
+}
+
+/**
  * Increments `search_count` for (metric_date, route_label) by 1 and
  * recomputes `search_to_paid_rate` from the (possibly stale) existing
  * `paid_booking_count`. Atomic single-statement upsert; safe under concurrent

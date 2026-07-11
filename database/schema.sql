@@ -157,6 +157,13 @@ create table if not exists analytics_daily (
   unique (metric_date, route_label)
 );
 
+-- Consumer idempotency for at-least-once Kafka delivery (analytics service).
+create table if not exists processed_events (
+  event_id uuid primary key,
+  topic text not null,
+  processed_at timestamptz not null default now()
+);
+
 create index if not exists idx_locations_name on locations(name);
 create index if not exists idx_routes_origin_destination on routes(origin_location_id, destination_location_id);
 create index if not exists idx_trips_route_departure on trips(route_id, departure_time);

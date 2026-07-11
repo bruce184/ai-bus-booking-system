@@ -307,6 +307,7 @@ All producers use the canonical JSON envelope:
 
 ```json
 {
+  "eventId": "8c8f4f5e-9f2a-4c1e-9a3d-2f4f7b1a6c11",
   "eventName": "trip.search_performed",
   "payload": {
     "origin": "TP.HCM",
@@ -318,6 +319,11 @@ All producers use the canonical JSON envelope:
   "occurredAt": "2026-07-11T01:00:00.000Z"
 }
 ```
+
+`eventId` is a producer-generated UUID. Analytics Service records it in
+`processed_events` before applying aggregates, so redelivered Kafka messages
+(at-least-once) are skipped instead of double-counted. Events without an
+`eventId` (legacy) are processed without deduplication.
 
 During the search-event migration, Analytics Service may consume the previous
 flat `{ "event": "trip.search_performed", ... }` shape for queued-message

@@ -20,6 +20,7 @@ export function parseAnalyticsEvent(rawValue, { allowLegacyFlat = false } = {}) 
     }
 
     return {
+      eventId: typeof parsed.eventId === "string" && parsed.eventId.trim() ? parsed.eventId : null,
       eventName: parsed.eventName,
       payload: parsed.payload,
       occurredAt: parsed.occurredAt
@@ -28,7 +29,7 @@ export function parseAnalyticsEvent(rawValue, { allowLegacyFlat = false } = {}) 
 
   if (allowLegacyFlat && typeof parsed.event === "string" && parsed.event.trim()) {
     const { event: eventName, occurredAt, ...payload } = parsed;
-    return { eventName, payload, occurredAt };
+    return { eventId: null, eventName, payload, occurredAt };
   }
 
   throw new Error("Unsupported analytics event envelope");

@@ -47,6 +47,7 @@ create extension if not exists pgcrypto;
 | `tickets` | Issued e-tickets, QR payload, check-in policy snapshot, optional HTML/PDF output |
 | `event_logs` | Main operational logs |
 | `analytics_daily` | Demo aggregate reporting |
+| `processed_events` | Kafka consumer idempotency (dedup by `eventId`) |
 
 ## 4. Roles
 

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import amqp from "amqplib";
 import { Kafka } from "kafkajs";
 
@@ -75,7 +76,7 @@ export async function publishWorkflowEvent(eventName, payload) {
   channel.publish(
     workflowExchange,
     eventName,
-    Buffer.from(JSON.stringify({ eventName, payload, occurredAt: new Date().toISOString() })),
+    Buffer.from(JSON.stringify({ eventId: randomUUID(), eventName, payload, occurredAt: new Date().toISOString() })),
     { contentType: "application/json", persistent: true }
   );
 }
@@ -92,7 +93,7 @@ export async function publishKafkaEvent(topic, eventName, payload) {
     messages: [
       {
         key: payload.bookingCode || payload.bookingId || eventName,
-        value: JSON.stringify({ eventName, payload, occurredAt: new Date().toISOString() })
+        value: JSON.stringify({ eventId: randomUUID(), eventName, payload, occurredAt: new Date().toISOString() })
       }
     ]
   });

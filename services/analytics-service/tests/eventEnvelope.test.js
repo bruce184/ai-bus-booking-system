@@ -5,6 +5,7 @@ import { parseAnalyticsEvent } from "../src/kafka/eventEnvelope.js";
 
 test("parses the canonical analytics event envelope", () => {
   const result = parseAnalyticsEvent(JSON.stringify({
+    eventId: "8c8f4f5e-9f2a-4c1e-9a3d-2f4f7b1a6c11",
     eventName: "trip.search_performed",
     payload: {
       origin: "TP.HCM",
@@ -15,6 +16,7 @@ test("parses the canonical analytics event envelope", () => {
     occurredAt: "2026-07-11T01:00:00.000Z"
   }));
 
+  assert.equal(result.eventId, "8c8f4f5e-9f2a-4c1e-9a3d-2f4f7b1a6c11");
   assert.equal(result.eventName, "trip.search_performed");
   assert.deepEqual(result.payload, {
     origin: "TP.HCM",
@@ -37,6 +39,7 @@ test("accepts the legacy flat search envelope only when compatibility is enabled
 
   assert.throws(() => parseAnalyticsEvent(legacy), /Unsupported analytics event envelope/);
   assert.deepEqual(parseAnalyticsEvent(legacy, { allowLegacyFlat: true }), {
+    eventId: null,
     eventName: "trip.search_performed",
     payload: {
       origin: "TP.HCM",

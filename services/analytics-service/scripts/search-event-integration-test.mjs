@@ -65,8 +65,24 @@ async function waitForProjection() {
   );
 }
 
+async function verifyEventDeduplication() {
+  const { randomUUID } = await import("node:crypto");
+  const { markEventProcessed } = await import("../src/repository/analyticsRepository.js");
+  const eventId = randomUUID();
+
+  const first = await markEventProcessed(eventId, "search-events");
+  const second = await markEventProcessed(eventId, "search-events");
+
+  if (first !== true || second !== false) {
+    throw new Error(`Expected first=true second=false, got first=${first} second=${second}`);
+  }
+
+  await pool.query("delete from processed_events where event_id = $1", [eventId]);
+}
+
 try {
   await removeTestProjection();
+  await verifyEventDeduplication();
   await initEvents();
   await publishSearchPerformed({
     origin,
@@ -76,7 +92,7 @@ try {
     cacheHit: false
   });
   await waitForProjection();
-  console.log("Trip producer -> Analytics consumer integration test passed");
+  console.log("Trip producer -> Analytics consumer integration test passed (incl. eventId dedup)");
 } finally {
   await closeEvents();
   await removeTestProjection().catch(() => {});

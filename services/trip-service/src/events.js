@@ -1,6 +1,7 @@
 // Kafka producer for analytics search events.
 // Optional dependency: search must never fail because Kafka is down, so all
 // publish errors are swallowed with a warning.
+import { randomUUID } from 'node:crypto';
 import { Kafka } from 'kafkajs';
 import { config } from './config.js';
 import { logger } from './logger.js';
@@ -39,6 +40,7 @@ export async function publishSearchPerformed(payload) {
         {
           key: `${payload.origin}=>${payload.destination}`,
           value: JSON.stringify({
+            eventId: randomUUID(),
             eventName: 'trip.search_performed',
             payload: {
               origin: payload.origin,

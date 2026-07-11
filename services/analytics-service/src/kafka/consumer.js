@@ -5,6 +5,7 @@ import { handleBookingEvent } from "./handlers/bookingEventsHandler.js";
 import { handlePaymentEvent } from "./handlers/paymentEventsHandler.js";
 import { handleCheckinEvent } from "./handlers/checkinEventsHandler.js";
 import { parseAnalyticsEvent } from "./eventEnvelope.js";
+import { markEventProcessed } from "../repository/analyticsRepository.js";
 
 const TOPIC_HANDLERS = {
   [config.topics.search]: handleSearchEvent,
@@ -42,7 +43,7 @@ export async function startAnalyticsConsumer() {
       }
 
       try {
-        const { eventName, payload, occurredAt } = parseAnalyticsEvent(
+        const { eventId, eventName, payload, occurredAt } = parseAnalyticsEvent(
           message.value.toString("utf8"),
           { allowLegacyFlat: topic === config.topics.search }
         );
@@ -50,6 +51,11 @@ export async function startAnalyticsConsumer() {
 
         if (!handler) {
           console.warn(`[analytics-service] no handler registered for topic ${topic}`);
+          return;
+        }
+
+        if (eventId && !(await markEventProcessed(eventId, topic))) {
+          console.log(`[analytics-service] skipping duplicate event ${eventId} on ${topic}`);
           return;
         }
 
