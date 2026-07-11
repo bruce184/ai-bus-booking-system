@@ -328,12 +328,16 @@ export async function settleBookingPayment(
   { runTransaction = transaction } = {}
 ) {
   return runTransaction(async (client) => {
+    // FOR NO KEY UPDATE (not FOR UPDATE): Seat Inventory sets
+    // trip_seats.booking_id while this transaction is still open, and that
+    // FK check takes FOR KEY SHARE on this row. FOR UPDATE would block it
+    // until the gRPC deadline; NO KEY UPDATE still serializes settlements.
     const locked = await client.query(
       `
         select id
         from bookings
         where booking_code = $1
-        for update
+        for no key update
       `,
       [bookingCode]
     );

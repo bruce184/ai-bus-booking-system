@@ -167,7 +167,7 @@ test("pending payment is processed once while the booking row is locked", async 
   assert.equal(result.transitioned, true);
   assert.equal(result.booking.status, "PAID");
   assert.equal(calls, 1);
-  assert.equal(statements[0].includes("for update"), true);
+  assert.equal(statements[0].includes("for no key update"), true);
 });
 
 test("failed payment processing does not mark the locked booking paid", async () => {
