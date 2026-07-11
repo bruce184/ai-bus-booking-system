@@ -20,7 +20,7 @@ function grpcError({ code, details, metadataCode }) {
 
 function clientThatFails(error) {
   return {
-    run(_request, callback) {
+    run(_request, _options, callback) {
       callback(error);
     }
   };
@@ -63,6 +63,37 @@ test("callGrpc maps standard code prefixes from services without metadata", asyn
       {}
     ),
     "SEAT_NOT_AVAILABLE"
+  );
+});
+
+test("callGrpc passes a deadline so calls cannot hang forever", async () => {
+  let seenOptions = null;
+  const client = {
+    run(_request, options, callback) {
+      seenOptions = options;
+      callback(null, { ok: true });
+    }
+  };
+
+  const before = Date.now();
+  await callGrpc(client, "run", {}, { timeoutMs: 2000 });
+
+  assert.ok(seenOptions.deadline instanceof Date);
+  assert.ok(seenOptions.deadline.getTime() >= before + 2000);
+  assert.ok(seenOptions.deadline.getTime() <= Date.now() + 2000);
+});
+
+test("callGrpc maps DEADLINE_EXCEEDED to SERVICE_TIMEOUT", async () => {
+  await expectGraphqlCode(
+    () => callGrpc(
+      clientThatFails(grpcError({
+        code: grpcStatus.DEADLINE_EXCEEDED,
+        details: "Deadline exceeded"
+      })),
+      "run",
+      {}
+    ),
+    "SERVICE_TIMEOUT"
   );
 });
 

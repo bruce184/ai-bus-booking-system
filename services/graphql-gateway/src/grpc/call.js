@@ -10,8 +10,11 @@ const STANDARD_ERROR_CODES = new Set([
   "HOLD_EXPIRED",
   "BOOKING_STATE_INVALID",
   "PAYMENT_FAILED",
+  "SERVICE_TIMEOUT",
   "INTERNAL_ERROR"
 ]);
+
+const DEFAULT_CALL_TIMEOUT_MS = Number(process.env.GRPC_CALL_TIMEOUT_MS || 5000);
 
 function normalizeErrorCode(value) {
   if (typeof value === "string" && STANDARD_ERROR_CODES.has(value)) {
@@ -58,20 +61,25 @@ function mapGrpcErrorCode(error) {
       return "FORBIDDEN";
     case grpcStatus.NOT_FOUND:
       return "NOT_FOUND";
+    case grpcStatus.DEADLINE_EXCEEDED:
+      return "SERVICE_TIMEOUT";
     default:
       return "INTERNAL_ERROR";
   }
 }
 
-export function callGrpc(client, methodName, request) {
+export function callGrpc(client, methodName, request, { timeoutMs = DEFAULT_CALL_TIMEOUT_MS } = {}) {
   const method = client[methodName];
 
   if (typeof method !== "function") {
     throw gatewayError(`gRPC method ${methodName} is not available.`, "INTERNAL_ERROR");
   }
 
+  // Deadline so a hung downstream service fails fast instead of blocking the gateway.
+  const options = { deadline: new Date(Date.now() + timeoutMs) };
+
   return new Promise((resolve, reject) => {
-    method.call(client, request, (error, response) => {
+    method.call(client, request, options, (error, response) => {
       if (error) {
         reject(gatewayError(error.details || error.message, mapGrpcErrorCode(error)));
         return;
