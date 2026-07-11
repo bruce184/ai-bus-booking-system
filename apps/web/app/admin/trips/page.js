@@ -461,7 +461,7 @@ export default function TripsCrud() {
                     </td>
                     <td style={{ padding: '16px 8px', textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '8px' }}>
-                        <button onClick={() => handleOpenBlockSeats(t)} className="btn btn-success" style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.3)' }} disabled={loading}>
+                        <button data-testid={`block-seats-${t.id}`} onClick={() => handleOpenBlockSeats(t)} className="btn btn-success" style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.3)' }} disabled={loading}>
                           Block Seats
                         </button>
                         <button onClick={() => startEdit(t)} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} disabled={loading}>

@@ -30,6 +30,7 @@ export default function BookingsCrud() {
   const [checkInCode, setCheckInCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const [canViewAdminData, setCanViewAdminData] = useState(false);
 
   const showToast = (text, type = 'success') => {
     setMessage({ text, type });
@@ -129,8 +130,19 @@ export default function BookingsCrud() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      void loadTrips();
-      void queryBookings();
+      let role = null;
+      try {
+        role = JSON.parse(localStorage.getItem('admin_user') || 'null')?.role || null;
+      } catch {
+        role = null;
+      }
+
+      const isAdmin = role === 'ADMIN';
+      setCanViewAdminData(isAdmin);
+      if (isAdmin) {
+        void loadTrips();
+        void queryBookings();
+      }
     }, 0);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,8 +226,9 @@ export default function BookingsCrud() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '30px', alignItems: 'start' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: canViewAdminData ? '1fr 380px' : 'minmax(0, 520px)', gap: '30px', alignItems: 'start' }}>
+        {canViewAdminData && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
           <div className="glass-card" style={{ padding: '20px', display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
             <div style={{ flex: 1, minWidth: '150px' }}>
               <label style={{ fontSize: '11px' }}>Booking Code</label>
@@ -328,7 +341,8 @@ export default function BookingsCrud() {
               </table>
             )}
           </div>
-        </div>
+          </div>
+        )}
 
         <div className="glass-card" style={{ padding: '30px' }}>
           <h3 style={{ fontSize: '18px', marginBottom: '8px', fontWeight: '600' }}>Boarding Desk</h3>

@@ -68,6 +68,12 @@ export default function AdminLayout({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, router]);
 
+  useEffect(() => {
+    if (user?.role === 'STAFF' && pathname !== '/admin/login' && pathname !== '/admin/bookings') {
+      router.replace('/admin/bookings');
+    }
+  }, [pathname, router, user]);
+
   if (loading) {
     return (
       <div style={{
@@ -86,7 +92,7 @@ export default function AdminLayout({ children }) {
     return <>{children}</>;
   }
 
-  const menuItems = [
+  const adminMenuItems = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: '📊' },
     { name: 'Trips', href: '/admin/trips', icon: '🗓️' },
     { name: 'Routes', href: '/admin/routes', icon: '🛣️' },
@@ -95,6 +101,9 @@ export default function AdminLayout({ children }) {
     { name: 'Bookings', href: '/admin/bookings', icon: '🎟️' },
     { name: 'Event Logs', href: '/admin/event-logs', icon: '📜' }
   ];
+  const menuItems = user?.role === 'STAFF'
+    ? adminMenuItems.filter((item) => item.href === '/admin/bookings')
+    : adminMenuItems;
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-main)' }}>

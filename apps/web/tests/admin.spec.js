@@ -1,36 +1,46 @@
 import { test, expect } from '@playwright/test';
 
+import {
+  closeAdminE2EDatabase,
+  demoFixtures,
+  resetAdminE2EFixtures
+} from './demoDatabase.js';
+
 test.describe('Admin & Staff Portal Business Logic E2E Tests', () => {
+  test.beforeEach(async () => {
+    await resetAdminE2EFixtures();
+  });
+
+  test.afterEach(async () => {
+    await resetAdminE2EFixtures();
+  });
+
+  test.afterAll(async () => {
+    await closeAdminE2EDatabase();
+  });
 
   test('Access Control & Authorization (Sec 7.3)', async ({ page }) => {
-    // 1. Customer Role Rejection
     await page.goto('/admin/login');
     await page.locator('#email').fill('customer@example.com');
     await page.locator('#password').fill('customer123');
     await page.locator('button[type="submit"]').click();
-    
-    // Check that we are rejected (either still on login or showing error toast)
-    // The security context prevents CUSTOMER from accessing the layout
+    // Assert the actual rejection message so a transient network failure
+    // cannot masquerade as a role rejection.
+    await expect(page.getByText('Access denied. Admin or Staff role required.')).toBeVisible();
     await expect(page).toHaveURL(/\/admin\/login/);
-    
-    // 2. Staff Role Login & Navigation
+
     await page.locator('#email').fill('staff@example.com');
     await page.locator('#password').fill('staff123');
     await page.locator('button[type="submit"]').click();
-    
-    // Staff should be redirected to the Dashboard
-    await expect(page).toHaveURL(/\/admin\/dashboard/);
-    
-    // Staff should be able to view Bookings boarding desk
-    await page.click('text=Bookings');
+
     await expect(page).toHaveURL(/\/admin\/bookings/);
     await expect(page.locator('h1')).toContainText('Bookings & Check-in');
-    
-    // Log out to prepare for Admin tests
-    await page.click('text=Logout');
+    await expect(page.getByRole('link', { name: /Bookings/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Dashboard/ })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Logout' }).click();
     await expect(page).toHaveURL(/\/admin\/login/);
-    
-    // 3. Admin Role Login
+
     await page.locator('#email').fill('admin@example.com');
     await page.locator('#password').fill('admin123');
     await page.locator('button[type="submit"]').click();
@@ -38,76 +48,55 @@ test.describe('Admin & Staff Portal Business Logic E2E Tests', () => {
   });
 
   test('Trip Seat Map States & Admin Blocking (Sec 8.2)', async ({ page }) => {
-    // Login as Admin
     await page.goto('/admin/login');
     await page.locator('#email').fill('admin@example.com');
     await page.locator('#password').fill('admin123');
     await page.locator('button[type="submit"]').click();
-    
-    // Navigate to Trips
-    await page.click('text=Trips');
+
+    await page.getByRole('link', { name: /Trips/ }).click();
     await expect(page).toHaveURL(/\/admin\/trips/);
-    
-    // Click "Block Seats" on the first scheduled trip (trip-1)
-    await page.locator('button:has-text("Block Seats")').first().click();
-    
-    // Verify blocking modal is visible
-    const modal = page.locator('text=Inventory Operations');
+    await page.getByTestId(`block-seats-${demoFixtures.tripId}`).click();
+
+    const modal = page.getByText('Inventory Operations');
     await expect(modal).toBeVisible();
-    
-    // Select an Available seat (e.g., A04)
-    const seatBtn = page.getByRole('button', { name: 'A04', exact: true });
-    await expect(seatBtn).toBeVisible();
-    
-    // Click A04 to toggle selection
-    await seatBtn.click();
-    
-    // Verify it is listed in the selected list
-    await expect(page.locator('text=A04').first()).toBeVisible();
-    
-    // Enter block reason
+
+    const seatButton = page.getByRole('button', {
+      name: demoFixtures.seatLabel,
+      exact: true
+    });
+    await expect(seatButton).toBeVisible();
+    await seatButton.click();
+
     await page.locator('#reason').fill('VIP delegation reserve');
-    
-    // Submit blocking request
-    await page.click('button:has-text("Confirm Block")');
-    
-    // Success toast should appear
-    await expect(page.locator('.toast')).toBeVisible();
-    
-    // The seat status should visually reflect BLOCKED (disabled)
-    await expect(seatBtn).toBeDisabled();
-    
-    // Close modal
-    await page.click('button:has-text("Close")');
+    await page.getByRole('button', { name: 'Confirm Block' }).click();
+
+    await expect(page.locator('.toast')).toContainText('Successfully blocked');
+    await expect(seatButton).toBeDisabled();
+
+    await page.getByRole('button', { name: 'Close' }).click();
     await expect(modal).not.toBeVisible();
   });
 
   test('Check-in Boarding State Changes (Sec 6)', async ({ page }) => {
-    // Login as Staff
     await page.goto('/admin/login');
     await page.locator('#email').fill('staff@example.com');
     await page.locator('#password').fill('staff123');
     await page.locator('button[type="submit"]').click();
-    
-    // Navigate to Bookings
-    await page.click('text=Bookings');
-    await expect(page).toHaveURL(/\/admin\/bookings/);
-    
-    // Verify booking BK202606240001 is currently TICKET_ISSUED (ticket issued, ready to board)
-    // Business rule: only TICKET_ISSUED bookings can be checked in.
-    // State machine: PAID → TICKET_ISSUED → CHECKED_IN
-    const bookingRow = page.locator('tr:has-text("BK202606240001")');
-    await expect(bookingRow.locator('text=TICKET_ISSUED')).toBeVisible();
-    
-    // Input booking code manually at Boarding Desk
-    await page.locator('#code').fill('BK202606240001');
-    await page.click('button:has-text("Confirm Boarding")');
-    
-    // Toast notification showing success
-    await expect(page.locator('.toast')).toBeVisible();
-    
-    // The state in the table must change from TICKET_ISSUED to CHECKED_IN
-    await expect(bookingRow.locator('text=CHECKED_IN')).toBeVisible();
-  });
 
+    await expect(page).toHaveURL(/\/admin\/bookings/);
+    await expect(page.getByRole('heading', { name: 'Bookings List' })).toHaveCount(0);
+
+    await page.locator('#code').fill(demoFixtures.bookingCode);
+    await page.getByRole('button', { name: 'Confirm Boarding' }).click();
+    await expect(page.locator('.toast')).toContainText('successfully');
+
+    await page.getByRole('button', { name: 'Logout' }).click();
+    await page.locator('#email').fill('admin@example.com');
+    await page.locator('#password').fill('admin123');
+    await page.locator('button[type="submit"]').click();
+    await page.getByRole('link', { name: /Bookings/ }).click();
+
+    const bookingRow = page.locator('tr').filter({ hasText: demoFixtures.bookingCode });
+    await expect(bookingRow.getByText('CHECKED_IN', { exact: true })).toBeVisible();
+  });
 });
