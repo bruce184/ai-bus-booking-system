@@ -2,7 +2,7 @@
 import { pool, query } from '../db.js';
 import { notFound, invalidArgument } from '../errors.js';
 import { mapStop, mapVehicleSeat, mapRoute, mapVehicle, mapLocation } from '../mappers.js';
-import { TRIP_SELECT, rowToTrip } from '../tripQuery.js';
+import { TRIP_SELECT, rowToTrip, rowsToTrips } from '../tripQuery.js';
 import { logger } from '../logger.js';
 
 // ---- helpers ----------------------------------------------------------------
@@ -359,5 +359,5 @@ export async function listVehicles(call) {
 
 export async function listTrips(call) {
   const { rows } = await query(`${TRIP_SELECT} order by t.departure_time desc`);
-  return { trips: rows.map(rowToTrip) };
+  return { trips: rowsToTrips(rows) };
 }

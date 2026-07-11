@@ -23,3 +23,9 @@ export function rowToTrip(row, stops = []) {
   const seoTitle = buildSeoTitle(row.origin_name, row.destination_name, row.departure_time, config.timezone);
   return mapTrip(row, { route, vehicle, availableSeats: row.available_seats, seoTitle });
 }
+
+export function rowsToTrips(rows) {
+  // Array.map passes the numeric index as its second callback argument, while
+  // rowToTrip expects an optional route-stops array in that position.
+  return rows.map((row) => rowToTrip(row));
+}
