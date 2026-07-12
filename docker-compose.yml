@@ -40,6 +40,9 @@ services:
     container_name: bus-kafka
     depends_on:
       - zookeeper
+    # depends_on only waits for the container to start, not for Zookeeper to
+    # be ready; retry instead of staying dead when Kafka loses that race.
+    restart: on-failure:5
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181

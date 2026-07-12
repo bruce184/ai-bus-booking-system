@@ -12,7 +12,8 @@ export default function LookupPage() {
 
   function submit(event) {
     event.preventDefault();
-    router.push(`/booking/${bookingCode}?email=${encodeURIComponent(email)}`);
+    const code = bookingCode.trim().toUpperCase();
+    router.push(`/booking/${encodeURIComponent(code)}?email=${encodeURIComponent(email.trim())}`);
   }
 
   return (

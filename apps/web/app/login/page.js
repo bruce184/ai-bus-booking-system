@@ -24,7 +24,9 @@ const LOGIN = `
 function LoginContent() {
   const router = useRouter();
   const params = useSearchParams();
-  const nextPath = params.get("next") || "/my-bookings";
+  // Chỉ nhận đường dẫn nội bộ để tránh open redirect qua ?next=
+  const rawNext = params.get("next") || "/my-bookings";
+  const nextPath = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/my-bookings";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");

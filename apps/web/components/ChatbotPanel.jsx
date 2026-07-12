@@ -22,7 +22,7 @@ export function ChatbotPanel() {
   const [search, setSearch] = useState(createDefaultSearch);
   const [booking, setBooking] = useState({ bookingCode: "", email: "" });
   const [message, setMessage] = useState("");
-  const [answer, setAnswer] = useState("Chon mot tac vu de EcoBus tro ly.");
+  const [answer, setAnswer] = useState("Chọn một tác vụ để EcoBus trợ giúp.");
   const [loading, setLoading] = useState(false);
 
   async function ask(payload) {
@@ -34,9 +34,9 @@ export function ChatbotPanel() {
         body: JSON.stringify(payload)
       });
       const body = await response.json();
-      setAnswer(body.answer ?? "Khong co phan hoi.");
+      setAnswer(body.answer ?? "Không có phản hồi.");
     } catch (error) {
-      setAnswer(`Khong goi duoc tro ly: ${error.message}`);
+      setAnswer(`Không gọi được trợ lý: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -46,22 +46,22 @@ export function ChatbotPanel() {
     <section className="chatbot-panel animate-fade-in" aria-label="EcoBus AI assistant">
       <div className="chatbot-panel-header">
         <span className="eyebrow">AI ASSISTANT</span>
-        <h2>Tro ly EcoBus</h2>
+        <h2>Trợ lý EcoBus</h2>
       </div>
 
       <div className="chatbot-fields">
         <input
-          aria-label="Diem di"
+          aria-label="Điểm đi"
           value={search.origin}
           onChange={(event) => setSearch({ ...search, origin: event.target.value })}
         />
         <input
-          aria-label="Diem den"
+          aria-label="Điểm đến"
           value={search.destination}
           onChange={(event) => setSearch({ ...search, destination: event.target.value })}
         />
         <input
-          aria-label="Ngay di"
+          aria-label="Ngày đi"
           type="date"
           value={search.departureDate}
           onChange={(event) => setSearch({ ...search, departureDate: event.target.value })}
@@ -70,10 +70,10 @@ export function ChatbotPanel() {
 
       <div className="chatbot-actions">
         <button type="button" onClick={() => ask({ intent: "searchTrips", input: search })} disabled={loading}>
-          Tim chuyen
+          Tìm chuyến
         </button>
         <button type="button" onClick={() => ask({ intent: "policy", policy: "cancellation" })} disabled={loading}>
-          Huy ve
+          Hủy vé
         </button>
         <button type="button" onClick={() => ask({ intent: "policy", policy: "checkin" })} disabled={loading}>
           Check-in
@@ -82,13 +82,13 @@ export function ChatbotPanel() {
 
       <div className="chatbot-fields two">
         <input
-          aria-label="Ma dat cho"
+          aria-label="Mã đặt chỗ"
           placeholder="BK202606200001"
           value={booking.bookingCode}
           onChange={(event) => setBooking({ ...booking, bookingCode: event.target.value })}
         />
         <input
-          aria-label="Email dat cho"
+          aria-label="Email đặt chỗ"
           placeholder="guest@example.com"
           value={booking.email}
           onChange={(event) => setBooking({ ...booking, email: event.target.value })}
@@ -101,13 +101,13 @@ export function ChatbotPanel() {
         onClick={() => ask({ intent: "getBookingStatus", input: booking })}
         disabled={loading}
       >
-        Tra cuu booking
+        Tra cứu booking
       </button>
 
       <div className="chatbot-ai-prompt">
         <textarea
-          aria-label="Cau hoi cho AI"
-          placeholder="Hoi ve chuyen xe, chinh sach, hoac booking..."
+          aria-label="Câu hỏi cho AI"
+          placeholder="Hỏi về chuyến xe, chính sách, hoặc booking..."
           value={message}
           onChange={(event) => setMessage(event.target.value)}
         />
@@ -116,11 +116,11 @@ export function ChatbotPanel() {
           onClick={() => ask({ message })}
           disabled={loading || !message.trim()}
         >
-          Hoi AI
+          Hỏi AI
         </button>
       </div>
 
-      <pre className="chatbot-answer">{loading ? "Dang goi tool..." : answer}</pre>
+      <pre className="chatbot-answer">{loading ? "Đang gọi tool..." : answer}</pre>
     </section>
   );
 }
