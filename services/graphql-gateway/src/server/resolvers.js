@@ -399,7 +399,15 @@ export const resolvers = {
       subscribe: (_parent, args) => subscribeSeatStateChanged(args.tripId)
     },
     bookingUpdated: {
-      subscribe: (_parent, args) => subscribeBookingUpdated(args.bookingCode)
+      // Same bookingCode+email pairing as the bookingStatus query: proves the
+      // subscriber actually knows the booking before it can stream its PII.
+      subscribe: async (_parent, args, context) => {
+        await callGrpc(context.grpc.booking, "getBookingStatus", {
+          bookingCode: args.bookingCode,
+          email: args.email
+        });
+        return subscribeBookingUpdated(args.bookingCode);
+      }
     }
   }
 };

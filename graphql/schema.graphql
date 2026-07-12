@@ -416,5 +416,5 @@ type Mutation {
 
 type Subscription {
   seatStateChanged(tripId: ID!): Seat!
-  bookingUpdated(bookingCode: String!): Booking!
+  bookingUpdated(bookingCode: String!, email: String!): Booking!
 }

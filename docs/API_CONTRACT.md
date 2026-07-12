@@ -86,7 +86,7 @@ Admin login is required for admin screens in the MVP. Local demo auth may use se
 | Operation | Purpose |
 |---|---|
 | `seatStateChanged(tripId)` | Real-time seat state updates after hold, release, confirm, block, or expiry |
-| `bookingUpdated(bookingCode)` | Booking status updates |
+| `bookingUpdated(bookingCode, email)` | Booking status updates; email must match the booking's contact email (same check as `bookingStatus`) or the subscription is rejected |
 
 ## 5. Search and Trip Rules
 
