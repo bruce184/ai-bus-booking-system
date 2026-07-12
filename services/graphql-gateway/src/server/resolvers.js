@@ -372,16 +372,14 @@ export const resolvers = {
     }
   },
   Booking: {
+    // Batched through tripLoader (see server/loaders.js): myBookings/
+    // adminBookings resolve N bookings' trips in one GetTripsByIds call
+    // instead of N GetTripDetail calls.
     trip: async (parent, _args, context) => {
       if (!parent.tripId) {
         return null;
       }
-      const response = await callGrpc(
-        context.grpc.trip,
-        "getTripDetail",
-        { tripId: parent.tripId }
-      );
-      return response.trip;
+      return context.loaders.tripLoader.load(parent.tripId);
     }
   },
   TripDetail: {

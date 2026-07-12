@@ -165,6 +165,19 @@ export async function getTripDetail(call) {
   };
 }
 
+// Batched counterpart to getTripDetail (proto/trip.proto GetTripsByIds):
+// lets gateway resolvers load N trips in one round-trip via a DataLoader
+// instead of N (Week 1 slide 24/25 - see resolvers.js Booking.trip).
+export async function getTripsByIds(call) {
+  const tripIds = [...new Set((call.request.trip_ids || []).filter(Boolean))];
+  if (tripIds.length === 0) {
+    return { trips: [] };
+  }
+
+  const { rows } = await query(`${TRIP_SELECT} where t.id = any($1::uuid[])`, [tripIds]);
+  return { trips: await rowsToTrips(rows) };
+}
+
 export async function listPopularRoutes(call) {
   const limit = Math.min(Math.max(call.request.limit || 5, 1), 50);
 

@@ -244,7 +244,7 @@ Owns locations, routes, stops, vehicles, vehicle seats, trips, popular routes, t
 
 | RPC Group | RPCs |
 |---|---|
-| Search/catalog | `AutocompleteLocations`, `SearchTrips`, `GetTripDetail`, `ListPopularRoutes` |
+| Search/catalog | `AutocompleteLocations`, `SearchTrips`, `GetTripDetail`, `GetTripsByIds`, `ListPopularRoutes` |
 | Admin catalog reads | `ListLocations`, `ListRoutes`, `ListVehicles`, `ListTrips` |
 | Route admin | `CreateRoute`, `UpdateRoute`, `DeleteRoute` |
 | Stop admin | `CreateStop`, `UpdateStop`, `DeleteStop` |

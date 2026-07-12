@@ -6,6 +6,9 @@ service TripService {
   rpc AutocompleteLocations(AutocompleteLocationsRequest) returns (AutocompleteLocationsResponse);
   rpc SearchTrips(SearchTripsRequest) returns (SearchTripsResponse);
   rpc GetTripDetail(GetTripDetailRequest) returns (GetTripDetailResponse);
+  // Batched trip lookup so gateway resolvers (e.g. Booking.trip across a
+  // booking list) can load N trips in one round-trip instead of N.
+  rpc GetTripsByIds(GetTripsByIdsRequest) returns (GetTripsByIdsResponse);
   rpc ListPopularRoutes(ListPopularRoutesRequest) returns (ListPopularRoutesResponse);
   rpc CreateRoute(RouteMutationRequest) returns (RouteResponse);
   rpc UpdateRoute(RouteMutationRequest) returns (RouteResponse);
@@ -101,6 +104,14 @@ message GetTripDetailResponse {
   repeated Stop dropoff_points = 3;
   string cancellation_policy = 5;
   string checkin_policy = 6;
+}
+
+message GetTripsByIdsRequest {
+  repeated string trip_ids = 1;
+}
+
+message GetTripsByIdsResponse {
+  repeated Trip trips = 1;
 }
 
 message ListPopularRoutesRequest {

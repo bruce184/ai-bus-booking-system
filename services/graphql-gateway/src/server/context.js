@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { verifyDemoJwt } from "../auth/jwt.js";
+import { createLoaders } from "./loaders.js";
 
 function readBearerToken(headerValue) {
   if (!headerValue?.startsWith("Bearer ")) {
@@ -18,7 +19,8 @@ export function createContextFactory(config, grpc) {
       authToken,
       user: authToken ? verifyDemoJwt(authToken, config) : null,
       config,
-      grpc
+      grpc,
+      loaders: createLoaders(grpc)
     };
   };
 }

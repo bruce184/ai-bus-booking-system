@@ -13,6 +13,7 @@ import { loadGatewayConfig } from "./config/env.js";
 import { closeGrpcClients, createGrpcClients } from "./grpc/clients.js";
 import { loadTypeDefs } from "./graphql/schema.js";
 import { createContextFactory } from "./server/context.js";
+import { createLoaders } from "./server/loaders.js";
 import { resolvers } from "./server/resolvers.js";
 
 async function main() {
@@ -36,7 +37,8 @@ async function main() {
       context: () => {
         return {
           config,
-          grpc: grpcClients
+          grpc: grpcClients,
+          loaders: createLoaders(grpcClients)
         };
       }
     },
