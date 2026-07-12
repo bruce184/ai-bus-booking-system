@@ -88,7 +88,7 @@ create table if not exists bookings (
   booking_code text not null unique,
   customer_user_id uuid,
   trip_id uuid not null,
-  hold_token text,
+  hold_token text unique,
   contact_email text not null,
   contact_phone text,
   status text not null check (status in ('DRAFT', 'PENDING_PAYMENT', 'PAID', 'TICKET_ISSUED', 'CHECKED_IN', 'COMPLETED', 'EXPIRED', 'CANCELLED')),

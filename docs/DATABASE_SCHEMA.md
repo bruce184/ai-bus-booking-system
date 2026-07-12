@@ -125,7 +125,7 @@ PAID -> CANCELLED
 
 1. Registered customer bookings link to `users.id`.
 2. Guest bookings use contact email and phone.
-3. `bookings.hold_token` stores the internal Seat Inventory hold token captured at checkout so payment confirmation can call `ConfirmSeats`; it is not exposed through public GraphQL or gRPC responses.
+3. `bookings.hold_token` stores the internal Seat Inventory hold token captured at checkout so payment confirmation can call `ConfirmSeats`; it is not exposed through public GraphQL or gRPC responses. It carries a `unique` constraint (NULLs excepted) so two bookings can never bind to the same hold.
 4. Public booking lookup requires `booking_code` and `contact_email`.
 5. Admin/staff check-in may use booking code, ticket code, or simulated QR payload.
 6. Saved passenger profiles belong to a registered customer.
