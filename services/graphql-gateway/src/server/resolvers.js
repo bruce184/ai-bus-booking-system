@@ -317,7 +317,8 @@ export const resolvers = {
     simulatePayment: async (_parent, args, context) => {
       const booking = await callGrpc(context.grpc.booking, "simulatePayment", {
         bookingCode: args.input.bookingCode,
-        success: args.input.success
+        success: args.input.success,
+        email: args.input.email
       });
 
       if (args.input.success && booking) {

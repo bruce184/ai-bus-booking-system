@@ -324,7 +324,7 @@ export async function createBooking(input, { runTransaction = transaction } = {}
 }
 
 export async function settleBookingPayment(
-  { bookingCode, success, processPayment },
+  { bookingCode, email, success, processPayment },
   { runTransaction = transaction } = {}
 ) {
   return runTransaction(async (client) => {
@@ -346,6 +346,11 @@ export async function settleBookingPayment(
     }
 
     const booking = await fetchBookingById(locked.rows[0].id, client);
+    // Same bookingCode+email pairing GetBookingStatus/CancelBooking require:
+    // whoever is on the payment page must know both, not just the code.
+    if (normalizedEmail(booking.contact_email) !== normalizedEmail(email)) {
+      fail("NOT_FOUND", "Booking not found");
+    }
     if (success && isPaymentSettledStatus(booking.status)) {
       return { booking, transitioned: false };
     }

@@ -28,7 +28,7 @@ function PaymentContent() {
     setLoading(true);
     setError("");
     try {
-      await graphqlRequest(SIMULATE_PAYMENT, { input: { bookingCode, success } });
+      await graphqlRequest(SIMULATE_PAYMENT, { input: { bookingCode, success, email } });
       router.push(`/booking/${bookingCode}?email=${encodeURIComponent(email)}`);
     } catch (err) {
       setError(err.message);
@@ -46,10 +46,10 @@ function PaymentContent() {
           <h2>Chọn kết quả giao dịch</h2>
           <p className="muted">Hệ thống sẽ mô phỏng kết quả giao dịch thanh toán trực tuyến để hoàn tất đặt vé.</p>
           <div className="row">
-            <button className="primary" disabled={!bookingCode || loading} onClick={() => pay(true)}>
+            <button className="primary" disabled={!bookingCode || !email || loading} onClick={() => pay(true)}>
               Thanh toán thành công
             </button>
-            <button className="danger" disabled={!bookingCode || loading} onClick={() => pay(false)}>
+            <button className="danger" disabled={!bookingCode || !email || loading} onClick={() => pay(false)}>
               Thanh toán thất bại
             </button>
           </div>

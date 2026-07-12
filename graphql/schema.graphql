@@ -285,6 +285,7 @@ input CreateBookingInput {
 input SimulatePaymentInput {
   bookingCode: String!
   success: Boolean!
+  email: String!
 }
 
 input CancelBookingInput {

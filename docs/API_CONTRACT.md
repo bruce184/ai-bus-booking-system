@@ -70,7 +70,7 @@ Admin login is required for admin screens in the MVP. Local demo auth may use se
 | `holdSeats(input)` | Temporarily hold seats through Seat Inventory Service and Redis TTL |
 | `releaseSeatHold(input)` | Release a hold before TTL expiry |
 | `createBooking(input)` | Create a `PENDING_PAYMENT` booking from a valid hold token |
-| `simulatePayment(input)` | Simulate payment success/failure |
+| `simulatePayment(input)` | Simulate payment success/failure; requires booking code and email (same pairing as `cancelBooking`) |
 | `cancelBooking(input)` | Cancel an eligible booking by booking code and email |
 | `adminCreateRoute(input)` / `adminUpdateRoute` / `adminDeleteRoute` | Admin route CRUD |
 | `adminCreateStop(input)` / `adminUpdateStop` / `adminDeleteStop` | Admin pickup/dropoff stop CRUD |

@@ -31,8 +31,8 @@ async function handle(call, callback, work) {
 }
 
 async function simulatePayment(request) {
-  if (!request.booking_code) {
-    fail("VALIDATION_ERROR", "booking_code is required");
+  if (!request.booking_code || !request.email) {
+    fail("VALIDATION_ERROR", "booking_code and email are required");
   }
 
   let confirmedSeats = null;
@@ -40,6 +40,7 @@ async function simulatePayment(request) {
   try {
     transition = await settleBookingPayment({
       bookingCode: request.booking_code,
+      email: request.email,
       success: request.success,
       processPayment: async (booking) => {
         const payment = await simulatePaymentWithService({

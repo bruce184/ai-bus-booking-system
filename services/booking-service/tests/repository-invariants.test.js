@@ -137,6 +137,7 @@ test("settled payment retry is idempotent and does not process payment again", a
   const result = await settleBookingPayment(
     {
       bookingCode: storedBooking().booking_code,
+      email: storedBooking().contact_email,
       success: true,
       processPayment: async () => {
         calls += 1;
@@ -156,6 +157,7 @@ test("pending payment is processed once while the booking row is locked", async 
   const result = await settleBookingPayment(
     {
       bookingCode: storedBooking().booking_code,
+      email: storedBooking().contact_email,
       success: true,
       processPayment: async () => {
         calls += 1;
@@ -177,6 +179,7 @@ test("failed payment processing does not mark the locked booking paid", async ()
     settleBookingPayment(
       {
         bookingCode: storedBooking().booking_code,
+        email: storedBooking().contact_email,
         success: true,
         processPayment: async () => {
           throw new Error("seat confirmation failed");
@@ -190,6 +193,23 @@ test("failed payment processing does not mark the locked booking paid", async ()
   assert.equal(
     statements.some((sql) => sql.startsWith("update bookings") && sql.includes("set status = 'paid'")),
     false
+  );
+});
+
+test("settlement rejects a booking code and email that don't match", async () => {
+  const { client } = repositoryClient();
+
+  await assert.rejects(
+    settleBookingPayment(
+      {
+        bookingCode: storedBooking().booking_code,
+        email: "someone-else@example.com",
+        success: true,
+        processPayment: async () => {}
+      },
+      { runTransaction: (work) => work(client) }
+    ),
+    (error) => error.code === "NOT_FOUND"
   );
 });
 
