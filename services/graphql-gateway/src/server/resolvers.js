@@ -6,7 +6,7 @@ import { signDemoJwt } from "../auth/jwt.js";
 import { findDemoUserByCredentials } from "../auth/users.js";
 import { adminMutationResolvers } from "./adminResolvers.js";
 import { callGrpc } from "../grpc/call.js";
-import { requireAdmin } from "../auth/authorization.js";
+import { requireAdmin, requireUser } from "../auth/authorization.js";
 import { publishSeatStateChanged, subscribeSeatStateChanged } from "./seatStatePubSub.js";
 import { publishBookingUpdated, subscribeBookingUpdated } from "./bookingUpdatedPubSub.js";
 
@@ -102,7 +102,7 @@ export const resolvers = {
       );
     },
     myBookings: async (_parent, _args, context) => {
-      const customerId = context.user?.id ?? "";
+      const customerId = requireUser(context).id;
       const response = await callGrpc(
         context.grpc.booking,
         "listCustomerBookings",
@@ -111,7 +111,7 @@ export const resolvers = {
       return response.bookings || [];
     },
     mySavedPassengers: async (_parent, _args, context) => {
-      const customerId = context.user?.id ?? "";
+      const customerId = requireUser(context).id;
       const response = await callGrpc(
         context.grpc.booking,
         "listPassengerProfiles",
@@ -353,7 +353,7 @@ export const resolvers = {
     savePassengerProfile: async (_parent, args, context) => {
       const input = args.input;
       const response = await callGrpc(context.grpc.booking, "savePassengerProfile", {
-        customerUserId: context.user?.id ?? "",
+        customerUserId: requireUser(context).id,
         fullName: input.fullName,
         phone: input.phone ?? "",
         email: input.email ?? "",
@@ -364,7 +364,7 @@ export const resolvers = {
 
     deleteSavedPassenger: async (_parent, args, context) => {
       const response = await callGrpc(context.grpc.booking, "deletePassengerProfile", {
-        customerUserId: context.user?.id ?? "",
+        customerUserId: requireUser(context).id,
         id: args.id
       });
       return response.deleted;

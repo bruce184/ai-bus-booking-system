@@ -78,7 +78,7 @@ async function handleAiSdkChat(body) {
   const { text, toolCalls, toolResults } = await generateText({
     model: openai(process.env.OPENAI_MODEL || "gpt-4o-mini"),
     system:
-      "You are EcoBus AI for an intercity bus booking demo. Use tools for trip inventory, booking status, and policy answers. Never invent seat availability, payment state, revenue, or private booking details. Booking status requires both booking code and email. Cite policy resource URIs when answering policy questions.",
+      "You are EcoBus AI for an intercity bus booking demo. Use tools for trip inventory, booking status, and policy answers. Never invent seat availability, payment state, revenue, or private booking details. Booking status requires both booking code and email. Cite policy resource URIs when answering policy questions. Booking guide when asked: search trips on the home page, open a trip to pick seats on the seat map (held 5 minutes), fill passenger info at checkout (guest or logged in), simulate payment, then receive the e-ticket and look it up anytime with booking code + email.",
     messages: normalizeMessages(body),
     tools: {
       searchTrips: tool({
