@@ -2,7 +2,18 @@ import { test, expect } from '@playwright/test';
 
 import { cleanupCustomerE2EBookings, closeAdminE2EDatabase } from './demoDatabase.js';
 
-const SEARCH = { from: 'TP.HCM', to: 'Da Lat', date: '2026-07-16' };
+// database/seed.sql schedules its demo trips relative to current_date (so the
+// search demo always has upcoming departures); a hardcoded absolute date here
+// only matches the seed on the one calendar day it happened to be written.
+// "Tomorrow" matches both the seed's nearest relative trip and the search
+// page's own defaultSearchDate(), so this stays correct on any run date.
+function tomorrowDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+const SEARCH = { from: 'TP.HCM', to: 'Da Lat', date: tomorrowDate() };
 
 test.describe('Customer Booking Flow E2E (Sec 3.1-3.3)', () => {
   test.afterEach(async () => {

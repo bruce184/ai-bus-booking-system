@@ -309,31 +309,36 @@ where not exists (
 );
 
 -- Trips (dates are relative to current_date so demo trips are always upcoming).
--- Times are wall-clock in Asia/Ho_Chi_Minh.
-insert into trips (route_id, vehicle_id, departure_time, arrival_time, price, status)
-select r.id, v.id,
+-- Times are wall-clock in Asia/Ho_Chi_Minh. Fixed ids + on conflict update,
+-- same repeatability pattern as the B-3 block above: rerunning this file on
+-- a different day reschedules these 8 trips in place instead of appending a
+-- fresh, never-cleaned-up batch next to yesterday's.
+insert into trips (id, route_id, vehicle_id, departure_time, arrival_time, price, status)
+select x.id::uuid, r.id, v.id,
        timezone('Asia/Ho_Chi_Minh', current_date + (x.dep_day::text || ' day')::interval + x.dep_time::time),
        timezone('Asia/Ho_Chi_Minh', current_date + (x.arr_day::text || ' day')::interval + x.arr_time::time),
        x.price, 'ACTIVE'
 from (values
-  ('TP.HCM', 'Da Lat', 'PT-SLEEPER-34-01', 1, '21:00', 2, '00:30', 280000),
-  ('TP.HCM', 'Da Lat', 'TB-LIMO-22-01',    2, '20:00', 2, '23:30', 320000),
-  ('TP.HCM', 'Da Lat', 'KH-SEAT-29-01',    3, '07:00', 3, '13:00', 250000),
-  ('TP.HCM', 'Da Lat', 'PT-SLEEPER-34-01', 5, '22:00', 6, '04:30', 270000),
-  ('TP.HCM', 'Nha Trang', 'TB-LIMO-22-01', 2, '06:00', 2, '14:00', 350000),
-  ('TP.HCM', 'Nha Trang', 'KH-SEAT-29-01', 4, '08:00', 4, '16:00', 300000),
-  ('TP.HCM', 'Can Tho', 'KH-SEAT-29-01',   2, '09:00', 2, '13:00', 180000),
-  ('Da Lat', 'TP.HCM', 'PT-SLEEPER-34-01', 3, '13:00', 3, '19:30', 280000)
-) as x(origin, destination, vcode, dep_day, dep_time, arr_day, arr_time, price)
+  ('00000000-0000-4000-8004-000000000101', 'TP.HCM', 'Da Lat', 'PT-SLEEPER-34-01', 1, '21:00', 2, '00:30', 280000),
+  ('00000000-0000-4000-8004-000000000102', 'TP.HCM', 'Da Lat', 'TB-LIMO-22-01',    2, '20:00', 2, '23:30', 320000),
+  ('00000000-0000-4000-8004-000000000103', 'TP.HCM', 'Da Lat', 'KH-SEAT-29-01',    3, '07:00', 3, '13:00', 250000),
+  ('00000000-0000-4000-8004-000000000104', 'TP.HCM', 'Da Lat', 'PT-SLEEPER-34-01', 5, '22:00', 6, '04:30', 270000),
+  ('00000000-0000-4000-8004-000000000105', 'TP.HCM', 'Nha Trang', 'TB-LIMO-22-01', 2, '06:00', 2, '14:00', 350000),
+  ('00000000-0000-4000-8004-000000000106', 'TP.HCM', 'Nha Trang', 'KH-SEAT-29-01', 4, '08:00', 4, '16:00', 300000),
+  ('00000000-0000-4000-8004-000000000107', 'TP.HCM', 'Can Tho', 'KH-SEAT-29-01',   2, '09:00', 2, '13:00', 180000),
+  ('00000000-0000-4000-8004-000000000108', 'Da Lat', 'TP.HCM', 'PT-SLEEPER-34-01', 3, '13:00', 3, '19:30', 280000)
+) as x(id, origin, destination, vcode, dep_day, dep_time, arr_day, arr_time, price)
 join locations o on o.name = x.origin
 join locations d on d.name = x.destination
 join routes r on r.origin_location_id = o.id and r.destination_location_id = d.id
 join vehicles v on v.vehicle_code = x.vcode
-where not exists (
-  select 1 from trips t2
-  where t2.route_id = r.id and t2.vehicle_id = v.id
-    and t2.departure_time = timezone('Asia/Ho_Chi_Minh', current_date + (x.dep_day::text || ' day')::interval + x.dep_time::time)
-);
+on conflict (id) do update set
+  route_id = excluded.route_id,
+  vehicle_id = excluded.vehicle_id,
+  departure_time = excluded.departure_time,
+  arrival_time = excluded.arrival_time,
+  price = excluded.price,
+  status = excluded.status;
 
 -- Materialize trip seats from each trip's vehicle layout.
 insert into trip_seats (trip_id, seat_label, status)
