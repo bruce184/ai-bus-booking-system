@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChatbotPanel } from "../components/ChatbotPanel";
+import { LocationInput } from "../src/components/LocationInput.jsx";
 
 function getDefaultDate() {
   const tomorrow = new Date();
@@ -91,19 +92,7 @@ export default function HomePage() {
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
               <circle cx="12" cy="10" r="3"></circle>
             </svg>
-            <select 
-              id="from-input"
-              value={from} 
-              onChange={(e) => setFrom(e.target.value)} 
-              required
-            >
-              <option value="TP.HCM">TP.HCM</option>
-              <option value="Da Lat">Đà Lạt</option>
-              <option value="Nha Trang">Nha Trang</option>
-              <option value="Can Tho">Cần Thơ</option>
-              <option value="Phan Thiet">Phan Thiết</option>
-              <option value="Vung Tau">Vũng Tàu</option>
-            </select>
+            <LocationInput id="from-input" value={from} onChange={setFrom} required />
           </div>
         </div>
 
@@ -118,19 +107,7 @@ export default function HomePage() {
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
               <circle cx="12" cy="10" r="3"></circle>
             </svg>
-            <select 
-              id="to-input"
-              value={to} 
-              onChange={(e) => setTo(e.target.value)} 
-              required
-            >
-              <option value="Da Lat">Đà Lạt</option>
-              <option value="TP.HCM">TP.HCM</option>
-              <option value="Nha Trang">Nha Trang</option>
-              <option value="Can Tho">Cần Thơ</option>
-              <option value="Phan Thiet">Phan Thiết</option>
-              <option value="Vung Tau">Vũng Tàu</option>
-            </select>
+            <LocationInput id="to-input" value={to} onChange={setTo} required />
           </div>
         </div>
 

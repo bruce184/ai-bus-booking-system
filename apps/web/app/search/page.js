@@ -5,6 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { graphqlRequest } from "../../lib/graphql";
 import { TopBar } from "../../src/components/TopBar.jsx";
+import { LocationInput } from "../../src/components/LocationInput.jsx";
+
+const TIME_SLOTS = {
+  early: { label: "Sáng sớm (0h-6h)", from: 0, to: 6 },
+  morning: { label: "Buổi sáng (6h-12h)", from: 6, to: 12 },
+  afternoon: { label: "Buổi chiều (12h-18h)", from: 12, to: 18 },
+  evening: { label: "Buổi tối (18h-24h)", from: 18, to: 24 }
+};
 
 const SEARCH_TRIPS = `
   query SearchTrips($input: SearchTripsInput!) {
@@ -66,6 +74,9 @@ export default function SearchPage() {
 
   // Filter & sort states (client-side + server-side)
   const [selectedOperators, setSelectedOperators] = useState([]);
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState([]);
+  const [selectedVehicleTypes, setSelectedVehicleTypes] = useState([]);
+  const [minSeats, setMinSeats] = useState(0);
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(0);
   const [sortBy, setSortBy] = useState("earliest");
@@ -156,6 +167,11 @@ export default function SearchPage() {
     return Array.from(set);
   }, [result]);
 
+  const vehicleTypes = useMemo(() => {
+    if (!result?.trips) return [];
+    return Array.from(new Set(result.trips.map(t => t.vehicleType)));
+  }, [result]);
+
   // Client-side filtering (server handles sorting via sortBy parameter)
   const filteredTrips = useMemo(() => {
     if (!result?.trips) return [];
@@ -174,8 +190,23 @@ export default function SearchPage() {
       });
     }
 
+    if (selectedTimeSlots.length > 0) {
+      list = list.filter(t => {
+        const hour = new Date(t.departureTime).getHours();
+        return selectedTimeSlots.some(slot => hour >= TIME_SLOTS[slot].from && hour < TIME_SLOTS[slot].to);
+      });
+    }
+
+    if (selectedVehicleTypes.length > 0) {
+      list = list.filter(t => selectedVehicleTypes.includes(t.vehicleType));
+    }
+
+    if (minSeats > 0) {
+      list = list.filter(t => t.availableSeats >= minSeats);
+    }
+
     return list;
-  }, [result, selectedOperators, minPrice, maxPrice]);
+  }, [result, selectedOperators, minPrice, maxPrice, selectedTimeSlots, selectedVehicleTypes, minSeats]);
 
   const toggleOperator = (op) => {
     setSelectedOperators(prev => 
@@ -187,6 +218,9 @@ export default function SearchPage() {
     setSelectedOperators([]);
     setMinPrice(0);
     setMaxPrice(0);
+    setSelectedTimeSlots([]);
+    setSelectedVehicleTypes([]);
+    setMinSeats(0);
     void doSearch(origin, destination, departureDate, sortBy, 0, 0);
   };
 
@@ -205,19 +239,7 @@ export default function SearchPage() {
                   <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                   <circle cx="12" cy="10" r="3"></circle>
                 </svg>
-                <select 
-                  id="from-input"
-                  value={origin} 
-                  onChange={(e) => setOrigin(e.target.value)} 
-                  required
-                >
-                  <option value="TP.HCM">TP.HCM</option>
-                  <option value="Da Lat">Đà Lạt</option>
-                  <option value="Nha Trang">Nha Trang</option>
-                  <option value="Can Tho">Cần Thơ</option>
-                  <option value="Phan Thiet">Phan Thiết</option>
-                  <option value="Vung Tau">Vũng Tàu</option>
-                </select>
+                <LocationInput id="from-input" value={origin} onChange={setOrigin} required />
               </div>
             </div>
 
@@ -232,19 +254,7 @@ export default function SearchPage() {
                   <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                   <circle cx="12" cy="10" r="3"></circle>
                 </svg>
-                <select 
-                  id="to-input"
-                  value={destination} 
-                  onChange={(e) => setDestination(e.target.value)} 
-                  required
-                >
-                  <option value="Da Lat">Đà Lạt</option>
-                  <option value="TP.HCM">TP.HCM</option>
-                  <option value="Nha Trang">Nha Trang</option>
-                  <option value="Can Tho">Cần Thơ</option>
-                  <option value="Phan Thiet">Phan Thiết</option>
-                  <option value="Vung Tau">Vũng Tàu</option>
-                </select>
+                <LocationInput id="to-input" value={destination} onChange={setDestination} required />
               </div>
             </div>
 
@@ -347,37 +357,53 @@ export default function SearchPage() {
             </div>
           </div>
 
-          {/* Price Range Filter Mock */}
+          {/* Khung giờ đi */}
           <div style={{ marginBottom: "24px" }}>
-            <h4 style={{ fontSize: "14px", fontWeight: "700", marginBottom: "12px", color: "var(--text)" }}>Khoảng giá</h4>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "8px", fontWeight: "600" }}>
-              <span>0đ</span>
-              <span>500.000đ</span>
-            </div>
-            <div style={{ height: "4px", background: "var(--line)", borderRadius: "2px" }}>
-              <div style={{ width: "70%", height: "100%", background: "var(--brand)", position: "relative" }}>
-                <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: "white", border: "2px solid var(--brand)", position: "absolute", right: 0, top: "-4px" }} />
-              </div>
+            <h4 style={{ fontSize: "14px", fontWeight: "700", marginBottom: "12px", color: "var(--text)" }}>Khung giờ đi</h4>
+            <div style={{ display: "grid", gap: "10px", fontSize: "14px" }}>
+              {Object.entries(TIME_SLOTS).map(([key, slot]) => (
+                <label key={key} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedTimeSlots.includes(key)}
+                    onChange={() => setSelectedTimeSlots(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])}
+                    style={{ accentColor: "var(--brand)" }}
+                  />
+                  {slot.label}
+                </label>
+              ))}
             </div>
           </div>
 
-          {/* Utilities Filter Mock */}
-          <div>
-            <h4 style={{ fontSize: "14px", fontWeight: "700", marginBottom: "12px", color: "var(--text)" }}>Tiện ích</h4>
+          {/* Loại xe */}
+          <div style={{ marginBottom: "24px" }}>
+            <h4 style={{ fontSize: "14px", fontWeight: "700", marginBottom: "12px", color: "var(--text)" }}>Loại xe</h4>
             <div style={{ display: "grid", gap: "10px", fontSize: "14px" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <input type="checkbox" defaultChecked style={{ accentColor: "var(--brand)" }} /> Wifi
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <input type="checkbox" defaultChecked style={{ accentColor: "var(--brand)" }} /> Nước uống
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <input type="checkbox" style={{ accentColor: "var(--brand)" }} /> Ổ cắm điện
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <input type="checkbox" style={{ accentColor: "var(--brand)" }} /> Điều hòa
-              </label>
+              {vehicleTypes.map((type) => (
+                <label key={type} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedVehicleTypes.includes(type)}
+                    onChange={() => setSelectedVehicleTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])}
+                    style={{ accentColor: "var(--brand)" }}
+                  />
+                  {type}
+                </label>
+              ))}
             </div>
+          </div>
+
+          {/* Số ghế trống tối thiểu */}
+          <div>
+            <h4 style={{ fontSize: "14px", fontWeight: "700", marginBottom: "12px", color: "var(--text)" }}>Ghế trống tối thiểu</h4>
+            <input
+              type="number"
+              min="0"
+              value={minSeats || ""}
+              placeholder="Ví dụ: 2"
+              onChange={(e) => setMinSeats(Number(e.target.value) || 0)}
+              style={{ width: "100%" }}
+            />
           </div>
         </aside>
 
@@ -400,6 +426,7 @@ export default function SearchPage() {
                   <option value="earliest">Giờ khởi hành sớm nhất</option>
                   <option value="price-asc">Giá vé tăng dần</option>
                   <option value="price-desc">Giá vé giảm dần</option>
+                  <option value="duration">Thời gian di chuyển ngắn nhất</option>
                 </select>
                 <span className="muted" style={{ marginLeft: "12px" }}>Giá:</span>
                 <input

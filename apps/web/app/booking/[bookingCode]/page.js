@@ -1,4 +1,5 @@
 import Link from "next/link";
+import QRCode from "qrcode";
 import { graphqlRequest } from "../../../lib/graphql";
 import PrintTicketButton from "./_PrintTicketButton.jsx";
 import { TopBar } from "../../../src/components/TopBar.jsx";
@@ -62,6 +63,16 @@ export default async function BookingConfirmationPage({ params, searchParams }) 
     booking = data.bookingStatus;
   } catch (err) {
     error = err.message;
+  }
+
+  // QR mô phỏng theo spec (`bookingCode-ticketId`) render thành ảnh thật.
+  const qrByTicketId = {};
+  if (booking?.tickets?.length) {
+    await Promise.all(
+      booking.tickets.map(async (ticket) => {
+        qrByTicketId[ticket.id] = await QRCode.toDataURL(ticket.qrPayload, { margin: 1, width: 120 });
+      })
+    );
   }
 
   return (
@@ -146,6 +157,20 @@ export default async function BookingConfirmationPage({ params, searchParams }) 
                       <div>
                         <span className="muted" style={{ fontSize: "11px", display: "block" }}>Xe</span>
                         <strong style={{ fontSize: "13px" }}>Mã số {ticket.vehicleCode}</strong>
+                      </div>
+                      <div>
+                        <span className="muted" style={{ fontSize: "11px", display: "block" }}>Mã booking</span>
+                        <strong style={{ fontSize: "13px", color: "var(--brand-dark)" }}>{booking.bookingCode}</strong>
+                      </div>
+                      <div>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={qrByTicketId[ticket.id]}
+                          alt={`QR check-in ${ticket.qrPayload}`}
+                          width={96}
+                          height={96}
+                          style={{ borderRadius: "6px", border: "1px solid var(--line)", background: "white" }}
+                        />
                       </div>
                     </div>
                   </article>

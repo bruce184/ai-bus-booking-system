@@ -3,8 +3,21 @@
 import { Suspense, useMemo, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { graphqlRequest } from "../../lib/graphql";
+import { graphqlRequest, getCustomerToken } from "../../lib/graphql";
 import { TopBar } from "../../src/components/TopBar.jsx";
+import { CountdownRing } from "../../src/components/ui/CountdownRing.jsx";
+
+const MY_SAVED_PASSENGERS = `
+  query MySavedPassengers {
+    mySavedPassengers {
+      id
+      fullName
+      phone
+      email
+      documentNumber
+    }
+  }
+`;
 
 const TRIP_MINI = `
   query TripMini($id: ID!) {
@@ -68,12 +81,43 @@ function CheckoutContent() {
     defaultSeats.map((seatId) => ({ fullName: "", phone: "", email: "", documentNumber: "", seatId }))
   );
   const [paymentMethod, setPaymentMethod] = useState("momo");
+  const [savedPassengers, setSavedPassengers] = useState([]);
   const [tripDetail, setTripDetail] = useState(null);
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [remainingHoldSeconds, setRemainingHoldSeconds] = useState(null);
   const holdExpired = fromSeatFlow && remainingHoldSeconds === 0;
+
+  // Khách đã đăng nhập: nạp hồ sơ hành khách đã lưu để điền nhanh.
+  useEffect(() => {
+    if (!getCustomerToken()) {
+      return;
+    }
+    graphqlRequest(MY_SAVED_PASSENGERS)
+      .then((data) => setSavedPassengers(data.mySavedPassengers ?? []))
+      .catch(() => setSavedPassengers([]));
+  }, []);
+
+  function applySavedPassenger(index, profileId) {
+    const profile = savedPassengers.find((p) => p.id === profileId);
+    if (!profile) {
+      return;
+    }
+    setPassengers((current) =>
+      current.map((passenger, i) =>
+        i === index
+          ? {
+              ...passenger,
+              fullName: profile.fullName,
+              phone: profile.phone ?? "",
+              email: profile.email ?? "",
+              documentNumber: profile.documentNumber ?? ""
+            }
+          : passenger
+      )
+    );
+  }
 
   // Fetch trip details to show summary
   useEffect(() => {
@@ -163,14 +207,16 @@ function CheckoutContent() {
               </div>
 
               {fromSeatFlow ? (
-                <div className="notice" style={{ marginBottom: "20px" }}>
-                  {remainingHoldSeconds !== null ? (
-                    <span>Thời gian còn lại: <strong>{remainingHoldSeconds}s</strong>. </span>
+                <div className="notice" style={{ marginBottom: "20px", display: "flex", alignItems: "center", gap: "12px" }}>
+                  {remainingHoldSeconds !== null && !holdExpired ? (
+                    <CountdownRing remainingSeconds={remainingHoldSeconds} />
                   ) : null}
-                  {holdExpired ? (
-                    <span>Mã giữ chỗ đã hết hạn, vui lòng quay lại chọn ghế. </span>
-                  ) : null}
-                  Ghế <strong>{defaultSeats.join(", ")}</strong> đang được giữ cho bạn. Hoàn tất thông tin bên dưới trước khi hết thời gian giữ ghế.
+                  <span>
+                    {holdExpired ? (
+                      <span>Mã giữ chỗ đã hết hạn, vui lòng quay lại chọn ghế. </span>
+                    ) : null}
+                    Ghế <strong>{defaultSeats.join(", ")}</strong> đang được giữ cho bạn. Hoàn tất thông tin bên dưới trước khi hết thời gian giữ ghế.
+                  </span>
                 </div>
               ) : null}
 
@@ -207,6 +253,17 @@ function CheckoutContent() {
                       <strong style={{ fontSize: "15px", color: "var(--brand)" }}>Ghế {passenger.seatId}</strong>
                       <span className="status" style={{ fontSize: "12px" }}>Hành khách {index + 1}</span>
                     </div>
+                    {savedPassengers.length > 0 ? (
+                      <div className="field" style={{ marginBottom: "12px" }}>
+                        <label>Điền nhanh từ hành khách đã lưu</label>
+                        <select defaultValue="" onChange={(event) => applySavedPassenger(index, event.target.value)}>
+                          <option value="">-- Chọn hồ sơ --</option>
+                          {savedPassengers.map((profile) => (
+                            <option key={profile.id} value={profile.id}>{profile.fullName}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
                     <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                       <div className="field">
                         <label>Họ tên</label>

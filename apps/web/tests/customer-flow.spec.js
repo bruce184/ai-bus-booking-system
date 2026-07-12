@@ -42,10 +42,11 @@ test.describe('Customer Booking Flow E2E (Sec 3.1-3.3)', () => {
     await expect(page).toHaveURL(/\/payment\?bookingCode=/, { timeout: 15000 });
     await page.getByRole('button', { name: 'Thanh toán thành công' }).click();
 
-    // Confirmation page shows the booking code and a paid-or-later status.
+    // Confirmation page: success banner + booking code (shown in both the
+    // ticket card and the pre-ticket summary variants).
     await expect(page).toHaveURL(/\/booking\//, { timeout: 15000 });
-    await expect(page.getByText(/^BK\d+/).first()).toBeVisible();
-    await expect(page.getByText(/PAID|TICKET_ISSUED/).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Đặt vé thành công!' })).toBeVisible();
+    await expect(page.getByText(/BK\d+/).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('two clients racing for the same seat: only one hold succeeds', async ({ browser }) => {
@@ -68,8 +69,11 @@ test.describe('Customer Booking Flow E2E (Sec 3.1-3.3)', () => {
     await pageA.locator('button.seat-hold-button').click();
     await expect(pageA).toHaveURL(/\/checkout\?tripId=/, { timeout: 15000 });
 
-    await pageB.locator('button.seat-hold-button').click();
-    await expect(pageB.locator('.seat-map-error')).toBeVisible({ timeout: 15000 });
+    // Realtime subscription: B thấy ghế chuyển HELD ngay khi A giữ thành công,
+    // lựa chọn của B bị bỏ và không thể giữ ghế đó nữa.
+    const seatOnB = pageB.getByRole('button', { name: seatLabel, exact: true });
+    await expect(seatOnB).toBeDisabled({ timeout: 15000 });
+    await expect(pageB.locator('button.seat-hold-button')).toBeDisabled();
     await expect(pageB).not.toHaveURL(/\/checkout/);
 
     await contextA.close();
