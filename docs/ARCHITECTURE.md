@@ -34,9 +34,32 @@ Nginx is the local reverse proxy for the web/gateway/MCP demo surface when servi
 | Ticket Worker | E-ticket generation after booking paid | Payment decisions |
 | Email Worker | Simulated email/log after ticket issued | Booking lifecycle decisions |
 
-`ListPopularRoutes` remains a Trip Service catalog RPC. It may read the
-`analytics_daily.search_count` projection to rank routes, but Analytics Service
-is the only service allowed to update that aggregate table.
+`ListPopularRoutes` remains a Trip Service catalog RPC. It reads the
+`analytics_daily.search_count` projection to rank routes through Analytics
+Service's `GET /popular-routes` endpoint rather than querying that table
+directly; Analytics Service is the only service allowed to read or write
+`analytics_daily` in SQL.
+
+### Database per service
+
+All tables share one PostgreSQL instance in this local deployment, but no
+service holds a physical foreign key into a table it does not own, and no
+service runs a direct SQL join into another service's tables (see
+`docs/DATABASE_SCHEMA.md` section 8 for the full list). Where one service
+needs data another owns, it calls that service's API:
+
+- Booking Service calls Trip Service's `GetTripDetail` RPC to verify a
+  `trip_id` and read its current price/status before creating a booking
+  (`services/booking-service/src/trip-client.js`), instead of joining into
+  `trips`.
+- Analytics Service calls Trip Service's `GetTripDetail` RPC for route
+  labels and Booking Service's internal `GetBookingMetrics` RPC for
+  cancellation reversal, instead of joining into either service's tables
+  (`services/analytics-service/src/trip-client.js`,
+  `services/analytics-service/src/booking-client.js`).
+- `customer_user_id` values are trusted from the GraphQL Gateway's
+  already-authenticated caller wherever they appear (`bookings`,
+  `saved_passengers`); no service re-validates them against a `users` table.
 
 ## 4. Communication Rules
 

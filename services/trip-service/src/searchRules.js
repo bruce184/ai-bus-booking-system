@@ -20,24 +20,3 @@ export function resolveSortBy(sortBy) {
   const key = String(sortBy || '').trim().toLowerCase().replace(/-/g, '_');
   return `${SORT_OPTIONS[key] || DEPARTURE_ASC}, t.id asc`;
 }
-
-export function mapPopularRoute(row) {
-  const routeLabel = String(row.route_label || '').trim();
-  const separatorIndex = routeLabel.indexOf(' -> ');
-
-  if (separatorIndex <= 0) {
-    return null;
-  }
-
-  const origin = routeLabel.slice(0, separatorIndex).trim();
-  const destination = routeLabel.slice(separatorIndex + 4).trim();
-  if (!origin || !destination) {
-    return null;
-  }
-
-  return {
-    origin,
-    destination,
-    search_count: Number(row.total_searches) || 0,
-  };
-}

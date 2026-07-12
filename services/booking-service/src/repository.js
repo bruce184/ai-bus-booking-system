@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { query, transaction } from "@bus/shared/db.js";
 import { fail } from "@bus/shared/errors.js";
 import { writeOutboxEvent } from "@bus/shared/outbox.js";
+import { fetchTripSnapshot } from "./trip-client.js";
 import { canCancel, canCancelBeforeDeparture, canCheckIn, canCheckInTripState } from "./status.js";
 
 function bookingCode() {
@@ -220,8 +221,20 @@ export async function findBookingByHoldToken(input) {
   return booking;
 }
 
-export async function createBooking(input, { runTransaction = transaction } = {}) {
+export async function createBooking(
+  input,
+  { runTransaction = transaction, getTripSnapshot = fetchTripSnapshot } = {}
+) {
   const { passengers, seatIds } = validateCreateBookingInput(input);
+
+  // trip_id is unauthenticated client input and Trip Service owns that data
+  // (no physical FK across service boundaries - see docs/ARCHITECTURE.md
+  // section 11), so existence/price/status come from its API, fetched
+  // before opening a DB transaction rather than mid-transaction.
+  const trip = await getTripSnapshot(input.trip_id);
+  if (trip.status !== "ACTIVE") {
+    fail("BOOKING_STATE_INVALID", "Trip is not active");
+  }
 
   return runTransaction(async (client) => {
     await client.query(
@@ -240,18 +253,6 @@ export async function createBooking(input, { runTransaction = transaction } = {}
       const existing = await fetchBookingById(existingResult.rows[0].id, client);
       assertHoldTokenBindingMatches(existing, input);
       return { booking: existing, created: false };
-    }
-
-    const tripResult = await client.query(
-      "select price, status from trips where id = $1 for share",
-      [input.trip_id]
-    );
-    const trip = tripResult.rows[0];
-    if (!trip) {
-      fail("NOT_FOUND", "Trip not found");
-    }
-    if (trip.status !== "ACTIVE") {
-      fail("BOOKING_STATE_INVALID", "Trip is not active");
     }
 
     const total = Number(trip.price) * passengers.length;
@@ -777,4 +778,44 @@ export async function listPassengerProfiles({ customer_user_id }) {
     [customer_user_id]
   );
   return { passengers: result.rows };
+}
+
+// Internal RPC for Analytics Service (see proto/booking.proto): the metrics
+// it needs to reverse a booking.cancelled aggregate, without a direct SQL
+// join into these tables from another service.
+export async function getBookingMetrics({ booking_id }) {
+  if (!booking_id) {
+    fail("VALIDATION_ERROR", "booking_id is required");
+  }
+
+  const result = await query(
+    `
+      select
+        b.total_amount as total_amount,
+        count(bp.id)::int as ticket_count,
+        (
+          select min(el.created_at)
+          from event_logs el
+          where el.event_type = 'booking.paid'
+            and el.entity_type = 'booking'
+            and el.entity_id = b.id
+        ) as paid_at
+      from bookings b
+      left join booking_passengers bp on bp.booking_id = b.id
+      where b.id = $1
+      group by b.total_amount
+    `,
+    [booking_id]
+  );
+
+  const row = result.rows[0];
+  if (!row) {
+    return { total_amount: 0, ticket_count: 0, paid_at: "" };
+  }
+
+  return {
+    total_amount: Number(row.total_amount) || 0,
+    ticket_count: Number(row.ticket_count) || 0,
+    paid_at: row.paid_at ? new Date(row.paid_at).toISOString() : ""
+  };
 }

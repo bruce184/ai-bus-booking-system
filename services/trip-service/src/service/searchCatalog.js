@@ -18,7 +18,8 @@ import {
   mapTrip,
   buildSeoTitle,
 } from '../mappers.js';
-import { mapPopularRoute, resolveSortBy } from '../searchRules.js';
+import { resolveSortBy } from '../searchRules.js';
+import { fetchPopularRoutes } from '../analytics-client.js';
 
 export async function autocompleteLocations(call) {
   const keyword = (call.request.keyword || '').trim();
@@ -168,20 +169,17 @@ export async function listPopularRoutes(call) {
   const limit = Math.min(Math.max(call.request.limit || 5, 1), 50);
 
   // Analytics Service is the sole writer of analytics_daily. Trip Service owns
-  // the public ListPopularRoutes RPC and reads this aggregate projection only.
-  const { rows } = await query(
-    `select coalesce(route_label, 'Unknown Route') as route_label,
-            coalesce(sum(search_count), 0)::int as total_searches
-       from analytics_daily
-      where route_label is not null
-      group by route_label
-      having sum(search_count) > 0
-      order by total_searches desc
-      limit $1`,
-    [limit],
-  );
+  // the public ListPopularRoutes RPC but reads this aggregate through
+  // Analytics Service's own API instead of querying its table directly.
+  const routes = await fetchPopularRoutes(limit);
 
   return {
-    routes: rows.map(mapPopularRoute).filter(Boolean),
+    routes: routes
+      .filter((r) => r.origin && r.destination)
+      .map((r) => ({
+        origin: r.origin,
+        destination: r.destination,
+        search_count: Number(r.searchCount) || 0,
+      })),
   };
 }

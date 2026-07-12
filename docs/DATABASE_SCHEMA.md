@@ -131,6 +131,34 @@ PAID -> CANCELLED
 6. Saved passenger profiles belong to a registered customer.
 7. Do not store real personal data in seed files.
 
+### Database per service
+
+`bookings.customer_user_id`, `bookings.trip_id`, `trip_seats.booking_id`, and
+`saved_passengers.customer_user_id` are references, not physical foreign
+keys. All tables still live in one PostgreSQL instance for this local
+deployment, but a service only ever reads/writes the tables it owns per
+`docs/ARCHITECTURE.md` section 3 - it does not join into another service's
+tables or rely on a shared-schema constraint to enforce a cross-service
+reference. Instead:
+
+- `bookings.trip_id` is unauthenticated client input, so Booking Service
+  verifies existence/price/status through Trip Service's `GetTripDetail` RPC
+  (`services/booking-service/src/trip-client.js`) before creating a booking.
+- `bookings.customer_user_id` / `saved_passengers.customer_user_id` are
+  trusted from the GraphQL Gateway's already-authenticated caller (the
+  gateway issues the id after verifying the demo JWT), not re-checked
+  against a `users` table by the service that receives them.
+- `trip_seats.booking_id` is trusted from Booking Service's own
+  `ConfirmSeats`/`ReleaseBookedSeats` calls to Seat Inventory Service.
+- Analytics Service resolves a trip's route label via Trip Service's
+  `GetTripDetail` RPC and a booking's cancellation metrics via Booking
+  Service's internal `GetBookingMetrics` RPC, instead of joining into
+  `trips`/`routes`/`locations` or `bookings`/`booking_passengers`/`event_logs`
+  directly. Trip Service's `ListPopularRoutes` reads Analytics Service's
+  `GET /popular-routes` HTTP endpoint instead of querying `analytics_daily`
+  directly (see `docs/ARCHITECTURE.md` section 3 for the existing read-only
+  `analytics_daily` projection precedent this replaces).
+
 ## 9. Ticket Data
 
 Ticket Worker creates ticket records after `booking.paid`.

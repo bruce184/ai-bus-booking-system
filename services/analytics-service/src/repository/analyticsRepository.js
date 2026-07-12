@@ -1,4 +1,6 @@
 import { pool } from "../db/postgres.js";
+import { getTripRouteLabel } from "../trip-client.js";
+import { getBookingMetrics as fetchBookingMetrics } from "../booking-client.js";
 
 /**
  * Consumer idempotency (Tuan04): records the eventId in the same transaction
@@ -76,64 +78,38 @@ export async function applyPaidBookingDelta(client, {
 }
 
 /**
- * Reads-only join to build a human-readable route label ("Origin -> Destination")
- * from a trip id, matching the label format the search-events handler builds
- * from raw origin/destination search strings. Trip Service owns trips/routes/
- * locations; this is a read-only cross-service lookup for analytics enrichment,
- * not a write.
+ * Human-readable route label ("Origin -> Destination") for a trip id,
+ * matching the label format the search-events handler builds from raw
+ * origin/destination search strings. Trip Service owns trips/routes/
+ * locations (database-per-service - docs/ARCHITECTURE.md section 11), so
+ * this calls its GetTripDetail RPC instead of joining those tables directly.
  */
 export async function getRouteLabelForTrip(tripId) {
-  const { rows } = await pool.query(
-    `select ol.name as origin_name, dl.name as destination_name
-     from trips t
-     join routes r on r.id = t.route_id
-     join locations ol on ol.id = r.origin_location_id
-     join locations dl on dl.id = r.destination_location_id
-     where t.id = $1`,
-    [tripId]
-  );
-
-  if (rows.length === 0) {
+  try {
+    return await getTripRouteLabel(tripId);
+  } catch (error) {
+    console.warn(`[analytics-service] Trip Service lookup failed for ${tripId}: ${error.message}`);
     return null;
   }
-
-  const { origin_name: originName, destination_name: destinationName } = rows[0];
-  return `${originName} -> ${destinationName}`;
 }
 
 /**
  * Reads the values originally applied by `booking.paid`, including the
  * transactionally recorded payment time. This lets cancellation reverse the
- * exact daily aggregate row that received the payment.
+ * exact daily aggregate row that received the payment. Booking Service owns
+ * bookings/booking_passengers/event_logs, so this calls its internal
+ * GetBookingMetrics RPC instead of joining those tables directly.
  */
 export async function getBookingCancellationMetrics(bookingId) {
-  const { rows } = await pool.query(
-    `select
-       b.total_amount as total_amount,
-       count(bp.id)::int as ticket_count,
-       (
-         select min(el.created_at)
-         from event_logs el
-         where el.event_type = 'booking.paid'
-           and el.entity_type = 'booking'
-           and el.entity_id = b.id
-       ) as paid_at
-     from bookings b
-     left join booking_passengers bp on bp.booking_id = b.id
-     where b.id = $1
-     group by b.total_amount`,
-    [bookingId]
-  );
-
-  if (rows.length === 0) {
+  try {
+    return await fetchBookingMetrics(bookingId);
+  } catch (error) {
+    console.warn(`[analytics-service] Booking Service lookup failed for ${bookingId}: ${error.message}`);
+    // Matches the "no booking.paid event log" shape handleBookingCancelled
+    // already treats as skip-the-reversal, rather than losing the whole
+    // Kafka message to an unrelated network blip.
     return { totalAmount: 0, ticketCount: 0, paidAt: null };
   }
-
-  return {
-    totalAmount: Number(rows[0].total_amount) || 0,
-    ticketCount: Number(rows[0].ticket_count) || 0,
-    paidAt: rows[0].paid_at ?? null
-  };
 }
 
 export async function getRevenueSummary({ from, to }) {

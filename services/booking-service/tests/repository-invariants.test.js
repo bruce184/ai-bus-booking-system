@@ -110,10 +110,13 @@ test("booking request matching is order-insensitive but binds every passenger fi
   );
 });
 
+const activeTripSnapshot = async () => ({ price: 280000, status: "ACTIVE" });
+
 test("same hold token returns the existing booking without inserting another row", async () => {
   const { client, statements } = repositoryClient();
   const result = await createBooking(input, {
-    runTransaction: (work) => work(client)
+    runTransaction: (work) => work(client),
+    getTripSnapshot: activeTripSnapshot
   });
 
   assert.equal(result.created, false);
@@ -128,10 +131,39 @@ test("same hold token rejects a different logical booking request", async () => 
   await assert.rejects(
     createBooking(
       { ...input, contact_email: "other@example.com" },
-      { runTransaction: (work) => work(client) }
+      { runTransaction: (work) => work(client), getTripSnapshot: activeTripSnapshot }
     ),
     (error) => error.code === "BOOKING_STATE_INVALID"
   );
+});
+
+test("createBooking rejects when Trip Service reports the trip is not ACTIVE", async () => {
+  const { client } = repositoryClient();
+
+  await assert.rejects(
+    createBooking(input, {
+      runTransaction: (work) => work(client),
+      getTripSnapshot: async () => ({ price: 280000, status: "LOCKED" })
+    }),
+    (error) => error.code === "BOOKING_STATE_INVALID"
+  );
+});
+
+test("createBooking propagates a trip lookup failure without touching the database", async () => {
+  const { client, statements } = repositoryClient();
+
+  await assert.rejects(
+    createBooking(input, {
+      runTransaction: (work) => work(client),
+      getTripSnapshot: async () => {
+        const notFound = new Error("Trip not found");
+        notFound.code = "NOT_FOUND";
+        throw notFound;
+      }
+    }),
+    (error) => error.code === "NOT_FOUND"
+  );
+  assert.equal(statements.length, 0);
 });
 
 test("settled payment retry is idempotent and does not process payment again", async () => {

@@ -10,6 +10,8 @@
     "test:integration": "node scripts/search-event-integration-test.mjs"
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.13.4",
+    "@grpc/proto-loader": "^0.7.15",
     "dotenv": "^16.4.7",
     "kafkajs": "^2.2.4",
     "pg": "^8.13.1"

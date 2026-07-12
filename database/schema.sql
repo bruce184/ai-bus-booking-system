@@ -75,11 +75,19 @@ create table if not exists trip_seats (
   unique (trip_id, seat_label)
 );
 
+-- customer_user_id and trip_id are references into users/trips (owned by the
+-- demo-auth identity issued through the GraphQL Gateway and by Trip Service),
+-- not physical foreign keys: database-per-service (docs/ARCHITECTURE.md
+-- section 11) means Booking Service does not share a constraint-enforced
+-- schema boundary with those owners. trip_id existence/status is verified
+-- through Trip Service's GetTripDetail RPC at booking-creation time instead
+-- (services/booking-service/src/trip-client.js); customer_user_id is trusted
+-- from the gateway's already-authenticated caller.
 create table if not exists bookings (
   id uuid primary key default gen_random_uuid(),
   booking_code text not null unique,
-  customer_user_id uuid references users(id),
-  trip_id uuid not null references trips(id),
+  customer_user_id uuid,
+  trip_id uuid not null,
   hold_token text,
   contact_email text not null,
   contact_phone text,
@@ -89,19 +97,9 @@ create table if not exists bookings (
   updated_at timestamptz not null default now()
 );
 
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_constraint
-    where conname = 'fk_trip_seats_booking'
-      and conrelid = 'trip_seats'::regclass
-  ) then
-    alter table trip_seats
-      add constraint fk_trip_seats_booking
-      foreign key (booking_id) references bookings(id);
-  end if;
-end $$;
+-- trip_seats.booking_id is likewise a cross-service reference (Seat
+-- Inventory Service -> Booking Service), set only by Booking Service's own
+-- ConfirmSeats/ReleaseBookedSeats calls, not a physical foreign key.
 
 create table if not exists booking_passengers (
   id uuid primary key default gen_random_uuid(),
@@ -113,9 +111,11 @@ create table if not exists booking_passengers (
   seat_label text not null
 );
 
+-- customer_user_id: see the note on bookings above - trusted from the
+-- gateway's already-authenticated caller, not a physical foreign key.
 create table if not exists saved_passengers (
   id uuid primary key default gen_random_uuid(),
-  customer_user_id uuid not null references users(id) on delete cascade,
+  customer_user_id uuid not null,
   full_name text not null,
   phone text,
   email text,

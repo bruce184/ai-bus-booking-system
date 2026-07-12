@@ -19,6 +19,7 @@ export const config = {
     process.env.DATABASE_URL ||
     'postgresql://bus_app:change_me_local_only@localhost:5432/bus_booking',
   redisUrl: process.env.REDIS_URL || '',
+  analyticsBaseUrl: process.env.ANALYTICS_SERVICE_URL || 'http://localhost:50056',
   searchCacheTtlSeconds: Number(process.env.TRIP_SEARCH_CACHE_TTL_SECONDS || 60),
   kafkaBrokers: (process.env.KAFKA_BROKERS || '')
     .split(',')

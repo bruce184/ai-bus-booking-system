@@ -275,11 +275,12 @@ Owns booking state machine, passenger-per-seat data, booking lookup privacy, can
 | `GetBookingStatus` | Lookup with booking code and email |
 | `ListCustomerBookings` | Registered customer booking history |
 | `ListAdminBookings` | Admin booking list |
-| `SimulatePayment` | Simulate payment result |
+| `SimulatePayment` | Simulate payment result; requires booking code and email (same pairing as `CancelBooking`) |
 | `CancelBooking` | Cancel eligible booking |
 | `CheckInPassenger` | Admin/staff check-in |
 | `SavePassengerProfile` / `DeletePassengerProfile` / `ListPassengerProfiles` | Registered customer saved passenger profiles |
 | `ListEventLogs` | Query operational event logs for admin |
+| `GetBookingMetrics` | Internal only (Analytics Service caller, not exposed through the Gateway): total amount, ticket count, and paid-at timestamp for a booking id |
 
 ## 9. Events
 
