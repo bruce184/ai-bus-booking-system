@@ -17,6 +17,17 @@ export function canCancel(status) {
   return status === "PAID";
 }
 
+// Matches the cancellation policy text Trip Service serves with trip detail
+// (services/trip-service/src/policies.js CANCELLATION_POLICY): refund tiers
+// only make sense before this cutoff, so self-service cancellation closes at
+// the same line the policy already promises "no refund" past.
+export const CANCELLATION_CUTOFF_HOURS = 24;
+
+export function canCancelBeforeDeparture(departureTime, now = new Date()) {
+  const hoursUntilDeparture = (new Date(departureTime).getTime() - now.getTime()) / 3_600_000;
+  return hoursUntilDeparture >= CANCELLATION_CUTOFF_HOURS;
+}
+
 export function canCheckIn(status) {
   return status === "TICKET_ISSUED";
 }
