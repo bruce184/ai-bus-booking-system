@@ -164,6 +164,24 @@ create table if not exists processed_events (
   processed_at timestamptz not null default now()
 );
 
+-- Transactional outbox: producers insert a row in the same DB transaction as
+-- their business write, so an event can never be lost to a broker outage.
+-- A poller (dispatchOutboxEvents in @bus/shared/outbox.js) publishes
+-- unpublished rows and stamps published_at; failures just retry next tick.
+create table if not exists outbox_events (
+  id uuid primary key default gen_random_uuid(),
+  aggregate_type text not null,
+  aggregate_id uuid not null,
+  event_name text not null,
+  target text not null check (target in ('RABBITMQ', 'KAFKA')),
+  routing_key text not null,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  published_at timestamptz
+);
+
+create index if not exists idx_outbox_events_unpublished on outbox_events(created_at) where published_at is null;
+
 create index if not exists idx_locations_name on locations(name);
 create index if not exists idx_routes_origin_destination on routes(origin_location_id, destination_location_id);
 create index if not exists idx_trips_route_departure on trips(route_id, departure_time);

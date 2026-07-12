@@ -198,6 +198,17 @@ payment-events
 checkin-events
 ```
 
+Booking Service writes its workflow/analytics events (`booking.created`,
+`booking.paid`, `booking.cancelled`, `booking.expired`, `ticket.checked_in`)
+to the `outbox_events` table inside the same transaction as the state
+change, instead of publishing directly. A poller
+(`dispatchOutboxEvents` in `packages/shared/src/outbox.js`, run on an
+interval from `services/booking-service/src/index.js`) reads unpublished
+rows and publishes them; a broker outage just delays dispatch instead of
+losing the event. Consumers on `createWorkflowConsumer` also route
+processing failures to a per-queue dead-letter exchange instead of
+dropping the message.
+
 ## 10. AI and MCP Rules
 
 Chatbot and MCP tools must:

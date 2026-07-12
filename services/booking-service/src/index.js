@@ -1,6 +1,6 @@
-import { publishKafkaEvent, publishWorkflowEvent } from "@bus/shared/events.js";
 import { fail, toGrpcError } from "@bus/shared/errors.js";
 import { grpc, loadProto } from "@bus/shared/grpc.js";
+import { dispatchOutboxEvents } from "@bus/shared/outbox.js";
 import { simulatePaymentWithService } from "./payment-client.js";
 import { confirmSeats, releaseBookedSeats, releaseSeatHold, validateSeatHold } from "./seat-client.js";
 import {
@@ -83,25 +83,9 @@ async function simulatePayment(request) {
     throw error;
   }
 
-  const paidBooking = transition.booking;
-  if (!transition.transitioned) {
-    return paidBooking;
-  }
-
-  const seatIds = paidBooking.passengers.map((passenger) => passenger.seat_id);
-  const eventPayload = {
-    bookingId: paidBooking.id,
-    bookingCode: paidBooking.booking_code,
-    tripId: paidBooking.trip_id,
-    contactEmail: paidBooking.contact_email,
-    totalAmount: paidBooking.total_amount,
-    seatIds
-  };
-
-  await publishWorkflowEvent("booking.paid", eventPayload);
-  await publishKafkaEvent("booking-events", "booking.paid", eventPayload);
-
-  return paidBooking;
+  // booking.paid is queued to the outbox inside settleBookingPayment's own
+  // transaction (see repository.js) and dispatched by the poller below.
+  return transition.booking;
 }
 
 async function createBookingWithEvents(request) {
@@ -117,16 +101,9 @@ async function createBookingWithEvents(request) {
     holdToken: request.hold_token || ""
   });
 
+  // booking.created is queued to the outbox inside createBooking's own
+  // transaction when a new row is actually inserted.
   const result = await createBooking(request);
-  if (result.created) {
-    await publishKafkaEvent("booking-events", "booking.created", {
-      bookingId: result.booking.id,
-      bookingCode: result.booking.booking_code,
-      tripId: result.booking.trip_id,
-      totalAmount: result.booking.total_amount,
-      passengerCount: result.booking.passengers.length
-    });
-  }
   return result.booking;
 }
 
@@ -149,22 +126,13 @@ async function cancelBookingWithEvents(request) {
     );
   }
 
-  await publishKafkaEvent("booking-events", "booking.cancelled", {
-    bookingId: booking.id,
-    bookingCode: booking.booking_code,
-    tripId: booking.trip_id
-  });
+  // booking.cancelled is queued to the outbox inside cancelBooking's own transaction.
   return booking;
 }
 
 async function checkInWithEvents(request) {
-  const booking = await checkInPassenger(request);
-  await publishKafkaEvent("checkin-events", "ticket.checked_in", {
-    bookingId: booking.id,
-    bookingCode: booking.booking_code,
-    tripId: booking.trip_id
-  });
-  return booking;
+  // ticket.checked_in is queued to the outbox inside checkInPassenger's own transaction.
+  return checkInPassenger(request);
 }
 
 const proto = loadProto("booking.proto");
@@ -199,14 +167,6 @@ async function runExpirationJob() {
     const expiredList = await expirePendingBookings(300); // 5 minutes TTL
     for (const b of expiredList) {
       console.log(`[booking-service] Expired booking: ${b.bookingCode}`);
-      
-      const eventPayload = {
-        bookingId: b.bookingId,
-        bookingCode: b.bookingCode,
-        tripId: b.tripId,
-        holdToken: b.holdToken,
-        seatIds: b.seatIds
-      };
 
       if (b.holdToken) {
         try {
@@ -217,12 +177,20 @@ async function runExpirationJob() {
           );
         }
       }
-
-      await publishWorkflowEvent("booking.expired", eventPayload);
+      // booking.expired is queued to the outbox inside expirePendingBookings's own transaction.
     }
   } catch (error) {
     console.error("[booking-service] Expiration job failed", error);
   }
 }
 
+async function runOutboxDispatchJob() {
+  try {
+    await dispatchOutboxEvents();
+  } catch (error) {
+    console.error("[booking-service] Outbox dispatch failed", error);
+  }
+}
+
 setInterval(runExpirationJob, 15_000);
+setInterval(runOutboxDispatchJob, 3_000);

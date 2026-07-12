@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { query, transaction } from "@bus/shared/db.js";
 import { fail } from "@bus/shared/errors.js";
+import { writeOutboxEvent } from "@bus/shared/outbox.js";
 import { canCancel, canCheckIn, canCheckInTripState } from "./status.js";
 
 function bookingCode() {
@@ -315,6 +316,20 @@ export async function createBooking(input, { runTransaction = transaction } = {}
         JSON.stringify({ bookingCode: inserted.booking_code, tripId: input.trip_id, seatIds })
       ]
     );
+    await writeOutboxEvent(client, {
+      aggregateType: "booking",
+      aggregateId: inserted.id,
+      eventName: "booking.created",
+      target: "KAFKA",
+      routingKey: "booking-events",
+      payload: {
+        bookingId: inserted.id,
+        bookingCode: inserted.booking_code,
+        tripId: inserted.trip_id,
+        totalAmount: Number(inserted.total_amount),
+        passengerCount: passengers.length
+      }
+    });
 
     return {
       booking: await fetchBookingById(inserted.id, client),
@@ -378,8 +393,36 @@ export async function settleBookingPayment(
       ["booking.paid", "booking", booking.id, JSON.stringify({ bookingId: booking.id })]
     );
 
+    const paidBooking = await fetchBookingById(booking.id, client);
+    const paidEventPayload = {
+      bookingId: paidBooking.id,
+      bookingCode: paidBooking.booking_code,
+      tripId: paidBooking.trip_id,
+      contactEmail: paidBooking.contact_email,
+      totalAmount: paidBooking.total_amount,
+      seatIds: paidBooking.passengers.map((passenger) => passenger.seat_id)
+    };
+    // ticket-worker and email-worker consume this from RabbitMQ; analytics
+    // consumes the Kafka copy. Same payload, two brokers, one transaction.
+    await writeOutboxEvent(client, {
+      aggregateType: "booking",
+      aggregateId: paidBooking.id,
+      eventName: "booking.paid",
+      target: "RABBITMQ",
+      routingKey: "booking.paid",
+      payload: paidEventPayload
+    });
+    await writeOutboxEvent(client, {
+      aggregateType: "booking",
+      aggregateId: paidBooking.id,
+      eventName: "booking.paid",
+      target: "KAFKA",
+      routingKey: "booking-events",
+      payload: paidEventPayload
+    });
+
     return {
-      booking: await fetchBookingById(booking.id, client),
+      booking: paidBooking,
       transitioned: true
     };
   });
@@ -418,6 +461,18 @@ export async function cancelBooking({ booking_code, email }) {
       "insert into event_logs (event_type, entity_type, entity_id, payload) values ($1, $2, $3, $4)",
       ["booking.cancelled", "booking", booking.id, JSON.stringify({ bookingCode: booking.booking_code })]
     );
+    await writeOutboxEvent(client, {
+      aggregateType: "booking",
+      aggregateId: booking.id,
+      eventName: "booking.cancelled",
+      target: "KAFKA",
+      routingKey: "booking-events",
+      payload: {
+        bookingId: booking.id,
+        bookingCode: booking.booking_code,
+        tripId: booking.trip_id
+      }
+    });
 
     return fetchBookingById(booking.id, client);
   });
@@ -490,6 +545,20 @@ export async function expirePendingBookings(ageSeconds = 300, { bookingIds = nul
           JSON.stringify({ bookingCode: b.bookingCode, seatIds: b.seatIds })
         ]
       );
+      await writeOutboxEvent(client, {
+        aggregateType: "booking",
+        aggregateId: b.bookingId,
+        eventName: "booking.expired",
+        target: "RABBITMQ",
+        routingKey: "booking.expired",
+        payload: {
+          bookingId: b.bookingId,
+          bookingCode: b.bookingCode,
+          tripId: b.tripId,
+          holdToken: b.holdToken,
+          seatIds: b.seatIds
+        }
+      });
     }
 
     return expiredList;
@@ -551,6 +620,18 @@ export async function checkInPassenger({ code, staff_user_id }) {
         JSON.stringify({ bookingCode: booking.booking_code, staffUserId: staff_user_id || null })
       ]
     );
+    await writeOutboxEvent(client, {
+      aggregateType: "booking",
+      aggregateId: booking.id,
+      eventName: "ticket.checked_in",
+      target: "KAFKA",
+      routingKey: "checkin-events",
+      payload: {
+        bookingId: booking.id,
+        bookingCode: booking.booking_code,
+        tripId: booking.trip_id
+      }
+    });
 
     return fetchBookingById(booking.id, client);
   });

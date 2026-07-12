@@ -6,6 +6,7 @@
   "exports": {
     "./db.js": "./src/db.js",
     "./events.js": "./src/events.js",
+    "./outbox.js": "./src/outbox.js",
     "./grpc.js": "./src/grpc.js",
     "./errors.js": "./src/errors.js"
   },

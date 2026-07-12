@@ -76,6 +76,9 @@ function repositoryClient(initialStatus = "PENDING_PAYMENT") {
       if (sql.startsWith("insert into event_logs")) {
         return { rows: [], rowCount: 1 };
       }
+      if (sql.startsWith("insert into outbox_events")) {
+        return { rows: [], rowCount: 1 };
+      }
 
       throw new Error(`Unexpected SQL in test: ${sql}`);
     }

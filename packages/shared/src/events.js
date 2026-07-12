@@ -4,6 +4,7 @@ import { Kafka } from "kafkajs";
 
 const rabbitUrl = process.env.RABBITMQ_URL || "amqp://localhost:5672";
 const workflowExchange = process.env.RABBITMQ_WORKFLOW_EXCHANGE || "bus.workflow";
+const workflowDeadLetterExchange = `${workflowExchange}.dlx`;
 const kafkaBrokers = (process.env.KAFKA_BROKERS || "localhost:9092").split(",");
 
 let rabbitChannelPromise;
@@ -48,6 +49,7 @@ async function rabbitChannel() {
         rabbitChannelPromise = null;
       });
       await channel.assertExchange(workflowExchange, "topic", { durable: true });
+      await channel.assertExchange(workflowDeadLetterExchange, "topic", { durable: true });
       return channel;
     })();
   }
@@ -101,7 +103,19 @@ export async function publishKafkaEvent(topic, eventName, payload) {
 
 export async function createWorkflowConsumer(queueName, routingKeys, onMessage) {
   const channel = await rabbitChannel();
-  const queue = await channel.assertQueue(queueName, { durable: true });
+
+  // Failed messages route here (via the queue's DLX argument below) instead
+  // of being dropped, per Week 4 slide 12/13. Nothing consumes the DLQ
+  // automatically in this demo; it exists so failures are inspectable
+  // (`rabbitmqctl list_queues` / management UI) instead of silently gone.
+  const deadLetterQueueName = `${queueName}.dlq`;
+  await channel.assertQueue(deadLetterQueueName, { durable: true });
+  await channel.bindQueue(deadLetterQueueName, workflowDeadLetterExchange, "#");
+
+  const queue = await channel.assertQueue(queueName, {
+    durable: true,
+    arguments: { "x-dead-letter-exchange": workflowDeadLetterExchange }
+  });
 
   for (const routingKey of routingKeys) {
     await channel.bindQueue(queue.queue, workflowExchange, routingKey);
@@ -118,6 +132,8 @@ export async function createWorkflowConsumer(queueName, routingKeys, onMessage) 
       channel.ack(message);
     } catch (error) {
       console.error(`[${queueName}] failed to process message`, error);
+      // requeue=false: since the queue has a DLX, RabbitMQ routes the
+      // message there instead of discarding it.
       channel.nack(message, false, false);
     }
   });
