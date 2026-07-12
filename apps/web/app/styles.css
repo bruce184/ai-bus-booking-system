@@ -446,32 +446,99 @@ input:focus {
   padding: 0;
 }
 
+/*
+ * Trạng thái ghế phân biệt bằng HÌNH DẠNG chứ không chỉ màu
+ * (đạt accessibility cho người mù màu):
+ * trống = viền rỗng, giữ = sọc chéo, đã đặt = đặc xám, khóa = icon + đỏ nhạt.
+ */
 .seat-available {
-  background: #fbfdff;
+  background: #ffffff;
+  border: 1.5px solid var(--seat-available);
+  color: var(--seat-available);
+  font-weight: 600;
+}
+
+.seat-available:hover:not(:disabled) {
+  background: var(--seat-available-bg);
 }
 
 .seat-held {
-  background: #fff8e8;
-  border-color: #f7d99b;
-  color: #7a4b00;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--seat-held-bg),
+    var(--seat-held-bg) 5px,
+    #fde68a 5px,
+    #fde68a 10px
+  );
+  border: 1.5px solid var(--seat-held);
+  color: var(--seat-held);
 }
 
 .seat-booked {
-  background: #eef0f3;
-  color: var(--muted);
+  background: var(--seat-booked-bg);
+  border: 1.5px solid var(--seat-booked-bg);
+  color: var(--seat-booked);
 }
 
 .seat-blocked {
-  background: #fff4f2;
-  border-color: #f5c2bd;
-  color: var(--danger);
+  background: var(--seat-blocked-bg);
+  border: 1.5px solid var(--seat-blocked);
+  color: var(--seat-blocked);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
 }
 
 .seat-selected,
 .seat.seat-selected {
-  background: var(--brand);
-  border-color: var(--brand);
+  background: var(--seat-selected);
+  border-color: var(--seat-selected);
   color: white;
+  box-shadow: 0 4px 10px rgba(16, 92, 66, 0.35);
+  transform: scale(1.04);
+}
+
+.seat {
+  transition: transform 0.12s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Khung xe: bo tròn "đầu xe", khu tài xế, lối đi ở giữa grid */
+.bus-frame {
+  border: 2px solid var(--line);
+  border-radius: 26px 26px 14px 14px;
+  padding: 14px 16px 18px;
+  background: var(--surface);
+  display: inline-block;
+}
+
+.bus-driver {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  border-bottom: 1px dashed var(--line);
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+}
+
+/* Vòng đếm ngược giữ ghế */
+.countdown-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.countdown-ring-time {
+  position: absolute;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .seat-hold-button {
@@ -486,11 +553,14 @@ input:focus {
 
 .seat-hold-countdown {
   border: 1px solid #f7d99b;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 10px 14px;
   background: #fff8e8;
   color: #7a4b00;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .seat-deck h3 {
