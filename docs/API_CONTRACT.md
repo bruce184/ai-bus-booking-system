@@ -76,7 +76,7 @@ Admin login is required for admin screens in the MVP. Local demo auth may use se
 | `adminCreateStop(input)` / `adminUpdateStop` / `adminDeleteStop` | Admin pickup/dropoff stop CRUD |
 | `adminCreateVehicle(input)` / `adminUpdateVehicle` / `adminDeleteVehicle` | Admin vehicle CRUD |
 | `adminConfigureVehicleSeats(vehicleId, seats)` | Configure vehicle seat layout |
-| `adminCreateTrip(input)` / `adminUpdateTrip` / `adminDeleteTrip` | Admin trip CRUD |
+| `adminCreateTrip(input)` / `adminUpdateTrip` / `adminDeleteTrip` | Admin trip CRUD; changing `vehicleId` rebuilds `trip_seats` from the new vehicle's layout and is rejected if any seat on the trip is already held, booked, or blocked |
 | `adminUpdateTripStatus(input)` | Activate, lock, depart, complete, cancel, or draft a trip |
 | `adminBlockSeats(input)` | Block seats from sale with an optional reason |
 | `adminCheckIn(input)` | Check in by booking code, ticket code, or simulated QR payload |

@@ -274,18 +274,62 @@ export async function updateTrip(call) {
     ? call.request.status
     : null;
   if (status && !VALID_TRIP_STATUS.includes(status)) throw invalidArgument('invalid trip status');
-  const { rowCount } = await query(
-    `update trips set
-        route_id = coalesce($2, route_id),
-        vehicle_id = coalesce($3, vehicle_id),
-        departure_time = coalesce($4, departure_time),
-        arrival_time = coalesce($5, arrival_time),
-        price = coalesce($6, price),
-        status = coalesce($7, status)
-      where id = $1`,
-    [id, route_id || null, vehicle_id || null, departure_time || null, arrival_time || null, price || null, status],
-  );
-  if (rowCount === 0) throw notFound('Trip not found');
+
+  const client = await pool.connect();
+  let vehicleChanging = false;
+  try {
+    await client.query('begin');
+
+    const current = await client.query('select vehicle_id from trips where id = $1 for update', [id]);
+    if (current.rowCount === 0) throw notFound('Trip not found');
+
+    vehicleChanging = Boolean(vehicle_id) && vehicle_id !== current.rows[0].vehicle_id;
+    if (vehicleChanging) {
+      // The old vehicle's trip_seats are about to be replaced with the new
+      // vehicle's layout - refuse if any seat already has a real hold/booking
+      // on it instead of silently orphaning that passenger's seat.
+      const occupied = await client.query(
+        `select 1 from trip_seats where trip_id = $1 and status <> 'AVAILABLE' limit 1`,
+        [id],
+      );
+      if (occupied.rowCount > 0) {
+        throw invalidArgument('Cannot change vehicle: trip already has held, booked, or blocked seats');
+      }
+    }
+
+    await client.query(
+      `update trips set
+          route_id = coalesce($2, route_id),
+          vehicle_id = coalesce($3, vehicle_id),
+          departure_time = coalesce($4, departure_time),
+          arrival_time = coalesce($5, arrival_time),
+          price = coalesce($6, price),
+          status = coalesce($7, status)
+        where id = $1`,
+      [id, route_id || null, vehicle_id || null, departure_time || null, arrival_time || null, price || null, status],
+    );
+
+    if (vehicleChanging) {
+      await client.query('delete from trip_seats where trip_id = $1', [id]);
+      await client.query(
+        `insert into trip_seats (trip_id, seat_label, status)
+           select $1, seat_label, 'AVAILABLE' from vehicle_seats where vehicle_id = $2`,
+        [id, vehicle_id],
+      );
+    }
+
+    await client.query('commit');
+  } catch (err) {
+    await client.query('rollback').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  if (vehicleChanging) {
+    await logEvent('trip.vehicle_changed', 'trip', id, { vehicle_id });
+  }
+
   return { trip: await fetchTrip(id) };
 }
 
