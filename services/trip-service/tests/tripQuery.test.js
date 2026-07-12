@@ -28,10 +28,15 @@ const tripRow = {
   available_seats: 30
 };
 
-test('maps trip rows without leaking Array.map indexes into route stops', () => {
-  const trips = rowsToTrips([tripRow, { ...tripRow, id: 'trip-2' }]);
+test('maps trip rows without leaking Array.map indexes into route stops', async () => {
+  const trips = await rowsToTrips([tripRow, { ...tripRow, id: 'trip-2' }]);
 
   assert.equal(trips.length, 2);
   assert.deepEqual(trips[0].route.stops, []);
   assert.deepEqual(trips[1].route.stops, []);
+});
+
+test('available_seats falls back to the DB count when the hold cache is not configured', async () => {
+  const [trip] = await rowsToTrips([tripRow]);
+  assert.equal(trip.available_seats, tripRow.available_seats);
 });

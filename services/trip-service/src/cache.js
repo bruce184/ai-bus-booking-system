@@ -64,6 +64,31 @@ export async function setCachedSearch(params, value) {
   }
 }
 
+// Read-only visibility into Seat Inventory Service's Redis holds (documented
+// `hold:{tripId}:{seatId}` key format, ARCHITECTURE.md section 8). Trip
+// Service never writes these keys - same read-only cross-service precedent
+// as Trip Service reading the analytics_daily search-count projection.
+// Reuses the same optional connection as the search cache above: if Redis is
+// down, availability just falls back to the DB-only count instead of erroring.
+export async function getHeldSeatCount(tripId) {
+  if (!enabled || !client) return 0;
+
+  let cursor = '0';
+  let count = 0;
+  try {
+    do {
+      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', `hold:${tripId}:*`, 'COUNT', 100);
+      cursor = nextCursor;
+      count += keys.length;
+    } while (cursor !== '0');
+  } catch (err) {
+    logger.warn('Held-seat SCAN failed; showing DB-only availability', err.message);
+    return 0;
+  }
+
+  return count;
+}
+
 export async function closeCache() {
   if (client) {
     await client.quit().catch(() => {});

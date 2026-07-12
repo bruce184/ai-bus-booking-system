@@ -359,5 +359,5 @@ export async function listVehicles(call) {
 
 export async function listTrips(call) {
   const { rows } = await query(`${TRIP_SELECT} order by t.departure_time desc`);
-  return { trips: rowsToTrips(rows) };
+  return { trips: await rowsToTrips(rows) };
 }

@@ -9,7 +9,7 @@ import { publishSearchPerformed } from '../events.js';
 import { config } from '../config.js';
 import { notFound, invalidArgument } from '../errors.js';
 import { CANCELLATION_POLICY, CHECKIN_POLICY } from '../policies.js';
-import { TRIP_SELECT, rowToTrip } from '../tripQuery.js';
+import { TRIP_SELECT, rowsToTrips, correctedAvailableSeats } from '../tripQuery.js';
 import {
   mapLocation,
   mapStop,
@@ -93,7 +93,7 @@ export async function searchTrips(call) {
     params,
   );
 
-  let trips = rows.map(rowToTrip);
+  let trips = await rowsToTrips(rows);
   if (req.min_available_seats) {
     trips = trips.filter((t) => t.available_seats >= req.min_available_seats);
   }
@@ -153,7 +153,7 @@ export async function getTripDetail(call) {
   const route = mapRoute(row, stops);
   const vehicle = mapVehicle(row, []);
   const seoTitle = buildSeoTitle(row.origin_name, row.destination_name, row.departure_time, config.timezone);
-  const trip = mapTrip(row, { route, vehicle, availableSeats: row.available_seats, seoTitle });
+  const trip = mapTrip(row, { route, vehicle, availableSeats: await correctedAvailableSeats(row), seoTitle });
 
   return {
     trip,
