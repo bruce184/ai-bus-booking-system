@@ -26,6 +26,15 @@ function clientThatFails(error) {
   };
 }
 
+function countingClient(handler) {
+  const client = { calls: 0 };
+  client.run = (_request, _options, callback) => {
+    client.calls += 1;
+    handler(callback);
+  };
+  return client;
+}
+
 async function expectGraphqlCode(work, code) {
   await assert.rejects(
     work,
@@ -109,4 +118,50 @@ test("callGrpc keeps unavailable downstream failures internal", async () => {
     ),
     "INTERNAL_ERROR"
   );
+});
+
+test("circuit breaker opens after the failure threshold and stops calling the client", async () => {
+  const client = countingClient((callback) =>
+    callback(grpcError({ code: grpcStatus.UNAVAILABLE, details: "down" }))
+  );
+  const opts = { circuitFailureThreshold: 2, circuitCooldownMs: 60_000 };
+
+  await assert.rejects(callGrpc(client, "run", {}, opts)); // failure 1
+  await assert.rejects(callGrpc(client, "run", {}, opts)); // failure 2 -> opens
+  assert.equal(client.calls, 2);
+
+  await expectGraphqlCode(() => callGrpc(client, "run", {}, opts), "SERVICE_TIMEOUT");
+  assert.equal(client.calls, 2, "client.run must not be invoked while the breaker is open");
+});
+
+test("circuit breaker half-opens after cooldown and closes on a successful trial", async () => {
+  let shouldFail = true;
+  const client = countingClient((callback) =>
+    shouldFail
+      ? callback(grpcError({ code: grpcStatus.UNAVAILABLE, details: "down" }))
+      : callback(null, { ok: true })
+  );
+  const opts = { circuitFailureThreshold: 1, circuitCooldownMs: 10 };
+
+  await assert.rejects(callGrpc(client, "run", {}, opts)); // opens immediately (threshold 1)
+  await new Promise((resolve) => setTimeout(resolve, 20)); // let the cooldown elapse
+
+  shouldFail = false;
+  const response = await callGrpc(client, "run", {}, opts); // half-open trial
+  assert.deepEqual(response, { ok: true });
+
+  const response2 = await callGrpc(client, "run", {}, opts); // breaker closed again
+  assert.deepEqual(response2, { ok: true });
+  assert.equal(client.calls, 3);
+});
+
+test("circuit breaker ignores business-logic failures - only connectivity failures count", async () => {
+  const client = countingClient((callback) =>
+    callback(grpcError({ code: grpcStatus.NOT_FOUND, details: "missing" }))
+  );
+  const opts = { circuitFailureThreshold: 1, circuitCooldownMs: 60_000 };
+
+  await expectGraphqlCode(() => callGrpc(client, "run", {}, opts), "NOT_FOUND");
+  await expectGraphqlCode(() => callGrpc(client, "run", {}, opts), "NOT_FOUND");
+  assert.equal(client.calls, 2, "NOT_FOUND must not trip the breaker even past the failure threshold");
 });
