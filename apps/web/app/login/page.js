@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { graphqlRequest } from "../../lib/graphql";
+import { graphqlRequest, setCustomerSession } from "../../lib/graphql";
 import { TopBar } from "../../src/components/TopBar.jsx";
 
 const LOGIN = `
@@ -38,8 +38,7 @@ function LoginContent() {
     setError("");
     try {
       const data = await graphqlRequest(LOGIN, { input: { email, password } });
-      window.localStorage.setItem("customer_token", data.login.token);
-      window.localStorage.setItem("customer_user", JSON.stringify(data.login.user));
+      setCustomerSession(data.login.token, data.login.user);
       router.push(nextPath);
     } catch (err) {
       setError(err.message);
