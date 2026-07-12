@@ -56,10 +56,11 @@ test("cancellation window matches the 24h-before-departure refund policy", () =>
   assert.equal(canCancelBeforeDeparture("2026-06-19T12:00:00.000Z", now), false); // already departed
 });
 
-test("check-in is rejected for cancelled trips only", () => {
-  assert.equal(canCheckInTripState("CANCELLED"), false);
+test("check-in only allows ACTIVE and DEPARTED trips", () => {
   assert.equal(canCheckInTripState("ACTIVE"), true);
-  assert.equal(canCheckInTripState("LOCKED"), true);
   assert.equal(canCheckInTripState("DEPARTED"), true);
-  assert.equal(canCheckInTripState("COMPLETED"), true);
+  assert.equal(canCheckInTripState("DRAFT"), false);
+  assert.equal(canCheckInTripState("LOCKED"), false);
+  assert.equal(canCheckInTripState("COMPLETED"), false);
+  assert.equal(canCheckInTripState("CANCELLED"), false);
 });

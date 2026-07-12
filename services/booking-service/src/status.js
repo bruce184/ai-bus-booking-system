@@ -32,8 +32,10 @@ export function canCheckIn(status) {
   return status === "TICKET_ISSUED";
 }
 
-// Docs only rule out cancelled trips explicitly ("check-in flows must respect
-// trip state"); DEPARTED stays allowed for late boarding in the local demo.
+// Allowlist, not a CANCELLED-only blocklist: a trip only boards passengers
+// once it's live. DRAFT/LOCKED haven't gone on sale for check-in yet and
+// COMPLETED already finished; DEPARTED stays allowed for late boarding in
+// the local demo.
 export function canCheckInTripState(tripStatus) {
-  return tripStatus !== "CANCELLED";
+  return tripStatus === "ACTIVE" || tripStatus === "DEPARTED";
 }
