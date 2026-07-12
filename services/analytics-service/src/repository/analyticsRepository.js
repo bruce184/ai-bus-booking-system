@@ -1,14 +1,15 @@
 import { pool } from "../db/postgres.js";
 
 /**
- * Consumer idempotency (Tuan04): records the eventId before the handler runs.
- * Returns false when the event was already processed, so Kafka redeliveries
- * (rebalance, offset replay) cannot double-count aggregates.
- * ponytail: mark-then-process; a crash between mark and handler drops that one
- * event. Move the mark into a shared handler transaction if that ever matters.
+ * Consumer idempotency (Tuan04): records the eventId in the same transaction
+ * as the handler's aggregate write, so a crash or thrown error mid-handler
+ * rolls back the marker too and the event is retried instead of silently
+ * marked-but-never-applied. Returns false when the event was already
+ * processed, so Kafka redeliveries (rebalance, offset replay) cannot
+ * double-count aggregates.
  */
-export async function markEventProcessed(eventId, topic) {
-  const { rowCount } = await pool.query(
+export async function markEventProcessed(client, eventId, topic) {
+  const { rowCount } = await client.query(
     `insert into processed_events (event_id, topic)
      values ($1, $2)
      on conflict (event_id) do nothing`,
@@ -23,8 +24,8 @@ export async function markEventProcessed(eventId, topic) {
  * `paid_booking_count`. Atomic single-statement upsert; safe under concurrent
  * writers because Postgres serializes conflicting upserts per row.
  */
-export async function upsertSearchCount({ metricDate, routeLabel }) {
-  const { rows } = await pool.query(
+export async function upsertSearchCount(client, { metricDate, routeLabel }) {
+  const { rows } = await client.query(
     `insert into analytics_daily (metric_date, route_label, search_count)
      values ($1, $2, 1)
      on conflict (metric_date, route_label)
@@ -48,14 +49,14 @@ export async function upsertSearchCount({ metricDate, routeLabel }) {
  * Deltas are clamped at 0 so out-of-order or partial demo events can never
  * push a metric negative.
  */
-export async function applyPaidBookingDelta({
+export async function applyPaidBookingDelta(client, {
   metricDate,
   routeLabel,
   paidBookingDelta = 0,
   revenueDelta = 0,
   ticketsSoldDelta = 0
 }) {
-  const { rows } = await pool.query(
+  const { rows } = await client.query(
     `insert into analytics_daily (metric_date, route_label, paid_booking_count, revenue, tickets_sold)
      values ($1, $2, greatest($3, 0), greatest($4, 0), greatest($5, 0))
      on conflict (metric_date, route_label)

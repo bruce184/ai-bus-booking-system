@@ -16,7 +16,7 @@ import { toMetricDate } from "../../utils/date.js";
 
 const FALLBACK_ROUTE_LABEL = "Unknown Route";
 
-export async function handleBookingEvent({ eventName, payload, occurredAt }) {
+export async function handleBookingEvent({ eventName, payload, occurredAt, client }) {
   switch (eventName) {
     case "booking.created":
       console.log(
@@ -24,9 +24,9 @@ export async function handleBookingEvent({ eventName, payload, occurredAt }) {
       );
       return;
     case "booking.paid":
-      return handleBookingPaid(payload, occurredAt);
+      return handleBookingPaid(client, payload, occurredAt);
     case "booking.cancelled":
-      return handleBookingCancelled(payload);
+      return handleBookingCancelled(client, payload);
     default:
       console.warn(`[analytics-service] unexpected booking-events eventName: ${eventName}`);
   }
@@ -40,7 +40,7 @@ async function resolveRouteLabel(tripId) {
   return routeLabel ?? FALLBACK_ROUTE_LABEL;
 }
 
-async function handleBookingPaid(payload, occurredAt) {
+async function handleBookingPaid(client, payload, occurredAt) {
   const tripId = payload?.tripId;
   const totalAmount = Number(payload?.totalAmount ?? 0);
   const ticketCount = Array.isArray(payload?.seatIds) ? payload.seatIds.length : 0;
@@ -53,7 +53,7 @@ async function handleBookingPaid(payload, occurredAt) {
   const routeLabel = await resolveRouteLabel(tripId);
   const metricDate = toMetricDate(occurredAt);
 
-  await applyPaidBookingDelta({
+  await applyPaidBookingDelta(client, {
     metricDate,
     routeLabel,
     paidBookingDelta: 1,
@@ -62,7 +62,7 @@ async function handleBookingPaid(payload, occurredAt) {
   });
 }
 
-async function handleBookingCancelled(payload) {
+async function handleBookingCancelled(client, payload) {
   const tripId = payload?.tripId;
   const bookingId = payload?.bookingId;
 
@@ -83,7 +83,7 @@ async function handleBookingCancelled(payload) {
 
   const metricDate = toMetricDate(paidAt);
 
-  await applyPaidBookingDelta({
+  await applyPaidBookingDelta(client, {
     metricDate,
     routeLabel,
     paidBookingDelta: -1,

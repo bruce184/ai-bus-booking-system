@@ -2,7 +2,7 @@
 import { upsertSearchCount } from "../../repository/analyticsRepository.js";
 import { toMetricDate } from "../../utils/date.js";
 
-export async function handleSearchEvent({ eventName, payload, occurredAt }) {
+export async function handleSearchEvent({ eventName, payload, occurredAt, client }) {
   if (eventName !== "trip.search_performed") {
     console.warn(`[analytics-service] unexpected search-events eventName: ${eventName}`);
     return;
@@ -22,5 +22,5 @@ export async function handleSearchEvent({ eventName, payload, occurredAt }) {
   const metricDate = toMetricDate(occurredAt);
   const routeLabel = `${origin} -> ${destination}`;
 
-  await upsertSearchCount({ metricDate, routeLabel });
+  await upsertSearchCount(client, { metricDate, routeLabel });
 }

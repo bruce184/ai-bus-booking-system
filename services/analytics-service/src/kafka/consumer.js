@@ -6,6 +6,7 @@ import { handlePaymentEvent } from "./handlers/paymentEventsHandler.js";
 import { handleCheckinEvent } from "./handlers/checkinEventsHandler.js";
 import { parseAnalyticsEvent } from "./eventEnvelope.js";
 import { markEventProcessed } from "../repository/analyticsRepository.js";
+import { transaction } from "../db/postgres.js";
 
 const TOPIC_HANDLERS = {
   [config.topics.search]: handleSearchEvent,
@@ -54,12 +55,17 @@ export async function startAnalyticsConsumer() {
           return;
         }
 
-        if (eventId && !(await markEventProcessed(eventId, topic))) {
-          console.log(`[analytics-service] skipping duplicate event ${eventId} on ${topic}`);
-          return;
-        }
+        // markEventProcessed and the handler's aggregate write share this
+        // transaction, so a thrown error rolls back both - a redelivery
+        // retries the whole thing instead of the marker outliving the write.
+        await transaction(async (client) => {
+          if (eventId && !(await markEventProcessed(client, eventId, topic))) {
+            console.log(`[analytics-service] skipping duplicate event ${eventId} on ${topic}`);
+            return;
+          }
 
-        await handler({ eventName, payload, occurredAt });
+          await handler({ eventName, payload, occurredAt, client });
+        });
       } catch (error) {
         console.error(`[analytics-service] failed to process message on topic ${topic}`, error);
       }

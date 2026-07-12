@@ -70,8 +70,8 @@ async function verifyEventDeduplication() {
   const { markEventProcessed } = await import("../src/repository/analyticsRepository.js");
   const eventId = randomUUID();
 
-  const first = await markEventProcessed(eventId, "search-events");
-  const second = await markEventProcessed(eventId, "search-events");
+  const first = await markEventProcessed(pool, eventId, "search-events");
+  const second = await markEventProcessed(pool, eventId, "search-events");
 
   if (first !== true || second !== false) {
     throw new Error(`Expected first=true second=false, got first=${first} second=${second}`);
