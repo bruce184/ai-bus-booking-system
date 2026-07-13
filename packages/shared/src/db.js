@@ -6,7 +6,16 @@ const connectionString =
   process.env.DATABASE_URL ||
   "postgres://bus_app:change_me_local_only@localhost:5432/bus_booking";
 
-export const pool = new Pool({ connectionString });
+export const pool = new Pool({
+  connectionString,
+  max: 10,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000
+});
+
+pool.on("error", (error) => {
+  console.error("[postgres] unexpected idle client error", error);
+});
 
 export async function query(text, params = []) {
   return pool.query(text, params);

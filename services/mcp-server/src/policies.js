@@ -22,8 +22,13 @@ export const resources = {
     text: "Cac tuyen demo pho bien: TP.HCM - Da Lat, TP.HCM - Nha Trang, Da Nang - Ha Noi."
   },
   "bus://system/health": {
-    name: "System health",
+    name: "MCP process health",
     mimeType: "application/json",
-    text: JSON.stringify({ service: "mcp-server", status: "ok" })
+    text: JSON.stringify({
+      service: "mcp-server",
+      status: "ready",
+      scope: "process",
+      dependenciesChecked: false
+    })
   }
 };

@@ -23,7 +23,12 @@ test("health endpoint reports the MCP service", async () => {
   await withServer(async (baseUrl) => {
     const response = await fetch(`${baseUrl}/health`);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { ok: true, service: "mcp-server" });
+    assert.deepEqual(await response.json(), {
+      ok: true,
+      service: "mcp-server",
+      scope: "process",
+      dependenciesChecked: false
+    });
   });
 });
 

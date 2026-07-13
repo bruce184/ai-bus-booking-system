@@ -16,7 +16,10 @@ npm install          # lần đầu
 npm run dev:all      # bật infra (docker) + 11 process service/worker/web
 ```
 
-Chờ banner `SYSTEM IS READY FOR DEMO!` (~35s). Nếu cần làm lại từ đầu (xóa sạch dữ liệu): `npm run dev:reset`.
+Chờ banner `SYSTEM IS READY FOR DEMO (semantic probes passed)`. Banner chỉ
+xuất hiện khi GraphQL, ba gRPC service, HTTP health và dữ liệu seed chuẩn đều
+trả kết quả hợp lệ; mở được cổng nhưng nghiệp vụ lỗi vẫn chưa được xem là
+READY. Nếu cần làm lại từ đầu (xóa sạch dữ liệu): `npm run dev:reset`.
 
 | Thành phần | URL |
 |---|---|

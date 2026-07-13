@@ -478,7 +478,7 @@ MCP resources:
 | `bus://policy/cancellation` | Cancellation policy |
 | `bus://policy/checkin` | Check-in policy |
 | `bus://routes/popular` | Popular demo routes |
-| `bus://system/health` | Demo service health |
+| `bus://system/health` | MCP process liveness only; it does not claim dependency or whole-system readiness |
 
 `bus://policy/cancellation`, Trip detail, chatbot policy answers, MCP policy
 reads, and Booking Service enforcement share one demo rule: only a `PAID`
@@ -490,6 +490,10 @@ MCP and chatbot responses must not fabricate trip inventory, booking status, sea
 The MCP endpoint uses the official TypeScript SDK v1 stateless Streamable HTTP
 transport. Standard SDK clients negotiate the protocol version and required
 HTTP headers; the server does not hand-roll lifecycle or JSON-RPC dispatch.
+The MCP `/health` endpoint and `bus://system/health` resource report only
+MCP process liveness (`scope: "process"`, `dependenciesChecked: false`).
+Whole-demo readiness is established by `npm run dev:all`, which executes
+bounded semantic GraphQL and gRPC calls against deterministic seed records.
 
 ## 12. Frontend Integration Rules
 

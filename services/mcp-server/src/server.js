@@ -76,7 +76,12 @@ export function createMcpServer() {
   });
 
   app.get("/health", (_req, res) => {
-    res.json({ ok: true, service: "mcp-server" });
+    res.json({
+      ok: true,
+      service: "mcp-server",
+      scope: "process",
+      dependenciesChecked: false
+    });
   });
 
   app.use("/mcp", attachBearerAuth);

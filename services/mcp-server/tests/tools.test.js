@@ -35,6 +35,16 @@ test("exposes exactly the resources required by the lecturer spec", () => {
   );
   assert.equal(resources[CANCELLATION_POLICY_URI].text, CANCELLATION_POLICY_TEXT);
   assert.equal(resources[CHECKIN_POLICY_URI].text, CHECKIN_POLICY_TEXT);
+  assert.equal(resources["bus://system/health"].name, "MCP process health");
+  assert.deepEqual(
+    JSON.parse(resources["bus://system/health"].text),
+    {
+      service: "mcp-server",
+      status: "ready",
+      scope: "process",
+      dependenciesChecked: false
+    }
+  );
 });
 
 test("get_booking_status requires both booking code and email", async () => {

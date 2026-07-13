@@ -144,9 +144,12 @@ docker compose up -d postgres redis rabbitmq zookeeper kafka nginx
 ```
 
 `npm run infra:up` uses Compose `--wait` and returns only after configured
-health checks pass. `npm run dev:all` prints the READY banner only after HTTP
-and TCP probes confirm the application services, rather than after a fixed
-sleep.
+health checks pass. `npm run dev:all` prints the READY banner only after
+bounded semantic probes succeed: a public GraphQL query, direct Trip/Seat/
+Booking gRPC calls against deterministic seed records, and explicit HTTP
+health responses. An open port or a GraphQL HTTP 200 containing resolver
+errors is not considered ready. Run `npm run demo:reset` if those canonical
+seed records were removed from a disposable local database.
 
 Stop infrastructure:
 

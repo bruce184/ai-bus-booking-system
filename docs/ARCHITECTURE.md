@@ -129,7 +129,16 @@ calls use the shared `@bus/shared/http.js` wrapper. It applies a bounded
 deadline (default 5 seconds, configurable with `HTTP_REQUEST_TIMEOUT_MS`);
 callers may shorten or extend that bound only for a documented operation.
 `check:source` rejects raw runtime `fetch()` calls so one path cannot wait
-forever while another path times out.
+forever while another path times out. PostgreSQL pools used by the core
+services also use a five-second connection timeout, so a missing database
+cannot leave readiness or business requests waiting indefinitely.
+
+The local READY banner is a release/demo gate, not a TCP-port check. It calls
+the Gateway with a public GraphQL query and calls Trip, Seat Inventory, and
+Booking directly over gRPC with deadlines, validating deterministic seed
+records. Payment and Analytics health responses must report `ok: true`.
+MCP `/health` and `bus://system/health` intentionally describe only the MCP
+process; they do not claim that downstream services are healthy.
 
 ## 5. Core Workflows
 
