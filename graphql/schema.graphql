@@ -327,7 +327,7 @@ input AdminTripInput {
   departureTime: DateTime!
   arrivalTime: DateTime!
   price: Int!
-  status: TripStatus = DRAFT
+  status: TripStatus
 }
 
 input AdminTripStatusInput {

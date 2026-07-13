@@ -6,8 +6,22 @@ import {
   createTrip,
   deleteTrip,
   updateTrip,
-  updateTripStatus
+  updateTripStatus,
+  updateVehicle
 } from "../src/service/adminCatalog.js";
+
+function tripUpdateRequest(overrides = {}) {
+  return {
+    id: "trip-1",
+    route_id: "route-1",
+    vehicle_id: "vehicle-1",
+    departure_time: "2026-07-20T01:00:00Z",
+    arrival_time: "2026-07-20T03:00:00Z",
+    price: 100000,
+    status: "TRIP_STATUS_UNSPECIFIED",
+    ...overrides
+  };
+}
 
 test("trip deletion explicitly cleans the seat projection without an FK cascade", async () => {
   const statements = [];
@@ -133,7 +147,12 @@ test("vehicle layout cannot change after assignment to a trip", async () => {
 
   await assert.rejects(
     configureVehicleSeats(
-      { request: { vehicle_id: "vehicle-1", seats: [{ label: "A1" }] } },
+      {
+        request: {
+          vehicle_id: "vehicle-1",
+          seats: [{ label: "A1", deck: 1, row: 1, column: 1 }]
+        }
+      },
       { database: { connect: async () => client } }
     ),
     /vehicle is already assigned to a trip/
@@ -155,7 +174,15 @@ test("trip creation snapshots a vehicle layout under the shared layout lock", as
     async query(text) {
       const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
       statements.push(sql);
-      if (sql.startsWith("insert into trips")) return { rowCount: 1, rows: [{ id: "trip-new" }] };
+      if (sql.startsWith("select seat_count from vehicles")) {
+        return { rowCount: 1, rows: [{ seat_count: 2 }] };
+      }
+      if (sql.startsWith("select count(*)")) {
+        return { rowCount: 1, rows: [{ seat_count: 2 }] };
+      }
+      if (sql.startsWith("insert into trips")) {
+        return { rowCount: 1, rows: [{ id: "trip-new" }] };
+      }
       return { rowCount: 1, rows: [] };
     },
     release() {
@@ -186,6 +213,9 @@ test("trip creation snapshots a vehicle layout under the shared layout lock", as
   assert.deepEqual(statements, [
     "begin",
     "select pg_advisory_xact_lock(hashtext('vehicle-layout'), hashtext($1))",
+    "select 1 from routes where id = $1",
+    "select seat_count from vehicles where id = $1",
+    "select count(*)::int as seat_count from vehicle_seats where vehicle_id = $1",
     "insert into trips (route_id, vehicle_id, departure_time, arrival_time, price, status) values ($1, $2, $3, $4, $5, $6) returning id",
     "insert into trip_seats (trip_id, seat_label, status) select $1, seat_label, 'available' from vehicle_seats where vehicle_id = $2",
     "commit",
@@ -199,7 +229,7 @@ test("vehicle change is rejected before database mutation when Redis reports act
 
   await assert.rejects(
     updateTrip(
-      { request: { id: "trip-1", vehicle_id: "vehicle-new" } },
+      { request: tripUpdateRequest({ vehicle_id: "vehicle-new" }) },
       {
         database: { connect: async () => {
           connected = true;
@@ -227,6 +257,12 @@ test("vehicle change keeps Redis maintenance locked through the committed snapsh
       if (sql.startsWith("select vehicle_id")) {
         return { rowCount: 1, rows: [{ vehicle_id: "vehicle-old" }] };
       }
+      if (sql.startsWith("select seat_count from vehicles")) {
+        return { rowCount: 1, rows: [{ seat_count: 2 }] };
+      }
+      if (sql.startsWith("select count(*)")) {
+        return { rowCount: 1, rows: [{ seat_count: 2 }] };
+      }
       if (sql.startsWith("select status from trip_seats")) {
         return { rowCount: 2, rows: [{ status: "AVAILABLE" }, { status: "AVAILABLE" }] };
       }
@@ -239,7 +275,7 @@ test("vehicle change keeps Redis maintenance locked through the committed snapsh
   const maintenancePhases = [];
 
   const result = await updateTrip(
-    { request: { id: "trip-1", vehicle_id: "vehicle-new" } },
+    { request: tripUpdateRequest({ vehicle_id: "vehicle-new" }) },
     {
       database: { connect: async () => client },
       getVehicleId: async () => "vehicle-old",
@@ -260,11 +296,15 @@ test("vehicle change keeps Redis maintenance locked through the committed snapsh
   assert.deepEqual(maintenancePhases, ["locked", "renewed", "after-commit"]);
   assert.deepEqual(statements, [
     "begin",
+    "select pg_advisory_xact_lock(hashtext('trip-lifecycle'), hashtext($1))",
     "select vehicle_id, status from trips where id = $1 for update",
+    "select 1 from routes where id = $1",
     "set local statement_timeout = '30s'",
     "select pg_advisory_xact_lock(hashtext('vehicle-layout'), hashtext($1))",
+    "select seat_count from vehicles where id = $1",
+    "select count(*)::int as seat_count from vehicle_seats where vehicle_id = $1",
     "select status from trip_seats where trip_id = $1 for update",
-    "update trips set route_id = coalesce($2, route_id), vehicle_id = coalesce($3, vehicle_id), departure_time = coalesce($4, departure_time), arrival_time = coalesce($5, arrival_time), price = coalesce($6, price), status = coalesce($7, status) where id = $1",
+    "update trips set route_id = $2, vehicle_id = $3, departure_time = $4, arrival_time = $5, price = $6 where id = $1",
     "delete from trip_seats where trip_id = $1",
     "insert into trip_seats (trip_id, seat_label, status) select $1, seat_label, 'available' from vehicle_seats where vehicle_id = $2",
     "commit",
@@ -353,32 +393,155 @@ test("repeating COMPLETED is idempotent and emits no duplicate completion event"
   assert.equal(statements.some((sql) => sql.startsWith("insert into event_logs")), false);
 });
 
-test("generic trip update cannot bypass the completion workflow", async () => {
-  const outbox = [];
+test("generic trip update rejects status changes before opening a transaction", async () => {
+  let connected = false;
+
+  await assert.rejects(
+    updateTrip(
+      {
+        request: tripUpdateRequest({
+          status: "COMPLETED"
+        })
+      },
+      {
+        database: {
+          connect: async () => {
+            connected = true;
+            throw new Error("must not connect");
+          }
+        },
+        getVehicleId: async () => "vehicle-1"
+      }
+    ),
+    /adminUpdateTripStatus/
+  );
+
+  assert.equal(connected, false);
+});
+
+test("invalid trip status jumps roll back without an event", async () => {
+  const statements = [];
+  let outboxWrites = 0;
   const client = {
     async query(text) {
       const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
-      if (sql.startsWith("select vehicle_id, status")) {
-        return {
-          rowCount: 1,
-          rows: [{ vehicle_id: "vehicle-1", status: "DEPARTED" }]
-        };
+      statements.push(sql);
+      if (sql.startsWith("select status from trips")) {
+        return { rowCount: 1, rows: [{ status: "DRAFT" }] };
       }
       return { rowCount: 1, rows: [] };
     },
-    release() {}
+    release() {
+      statements.push("release");
+    }
   };
 
-  await updateTrip(
-    { request: { id: "trip-1", status: "COMPLETED" } },
-    {
-      database: { connect: async () => client },
-      getTrip: async (id) => ({ id, status: "COMPLETED" }),
-      getVehicleId: async () => "vehicle-1",
-      writeOutbox: async (_client, event) => outbox.push(event)
-    }
+  await assert.rejects(
+    updateTripStatus(
+      { request: { trip_id: "trip-1", status: "COMPLETED" } },
+      {
+        database: { connect: async () => client },
+        writeOutbox: async () => {
+          outboxWrites += 1;
+        }
+      }
+    ),
+    /Invalid trip status transition: DRAFT -> COMPLETED/
   );
 
-  assert.equal(outbox.length, 1);
-  assert.equal(outbox[0].eventName, "trip.completed");
+  assert.equal(outboxWrites, 0);
+  assert.equal(
+    statements.some((sql) => sql.startsWith("update trips set status")),
+    false
+  );
+  assert.equal(statements.at(-2), "rollback");
+  assert.equal(statements.at(-1), "release");
+});
+
+test("trip creation rejects an unconfigured vehicle before inserting a trip", async () => {
+  const statements = [];
+  const client = {
+    async query(text) {
+      const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
+      statements.push(sql);
+      if (sql.startsWith("select seat_count from vehicles")) {
+        return { rowCount: 1, rows: [{ seat_count: 29 }] };
+      }
+      if (sql.startsWith("select count(*)")) {
+        return { rowCount: 1, rows: [{ seat_count: 0 }] };
+      }
+      return { rowCount: 1, rows: [] };
+    },
+    release() {
+      statements.push("release");
+    }
+  };
+
+  await assert.rejects(
+    createTrip(
+      {
+        request: {
+          route_id: "route-1",
+          vehicle_id: "vehicle-empty",
+          departure_time: "2026-07-20T01:00:00Z",
+          arrival_time: "2026-07-20T03:00:00Z",
+          price: 100000,
+          status: "DRAFT"
+        }
+      },
+      { database: { connect: async () => client } }
+    ),
+    /configure its seat layout first/
+  );
+
+  assert.equal(
+    statements.some((sql) => sql.startsWith("insert into trips")),
+    false
+  );
+  assert.equal(statements.at(-2), "rollback");
+  assert.equal(statements.at(-1), "release");
+});
+
+test("vehicle metadata cannot diverge from an existing seat layout", async () => {
+  const statements = [];
+  const client = {
+    async query(text) {
+      const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
+      statements.push(sql);
+      if (sql.startsWith("select seat_count from vehicles")) {
+        return { rowCount: 1, rows: [{ seat_count: 29 }] };
+      }
+      if (sql.startsWith("select count(*)")) {
+        return { rowCount: 1, rows: [{ seat_count: 29 }] };
+      }
+      return { rowCount: 1, rows: [] };
+    },
+    release() {
+      statements.push("release");
+    }
+  };
+
+  await assert.rejects(
+    updateVehicle(
+      {
+        request: {
+          id: "vehicle-1",
+          operator_name: "Demo",
+          vehicle_code: "V01",
+          license_plate: "",
+          vehicle_type: "seat_29",
+          seat_count: 30
+        }
+      },
+      { database: { connect: async () => client } }
+    ),
+    /cannot diverge/
+  );
+
+  assert.equal(
+    statements.some((sql) => sql.startsWith("update vehicles")),
+    false
+  );
+  assert.equal(statements.at(-2), "rollback");
+  assert.equal(statements.at(-1), "release");
 });

@@ -81,7 +81,37 @@ COMPLETED
 CANCELLED
 ```
 
-Admin can activate or lock a trip, mark it departed/completed, or cancel it according to the assigned task.
+Trip Service accepts only these transitions:
+
+```text
+DRAFT -> ACTIVE | CANCELLED
+ACTIVE -> LOCKED | CANCELLED
+LOCKED -> ACTIVE | DEPARTED | CANCELLED
+DEPARTED -> COMPLETED
+COMPLETED and CANCELLED are terminal
+```
+
+New trips may start only as `DRAFT` or `ACTIVE`. Generic trip CRUD cannot
+change status; `adminUpdateTripStatus` is the only workflow entry point.
+
+### Admin catalog invariants
+
+The shared admin contract and Trip Service enforce these rules; PostgreSQL repeats every row-local rule and unique key that it can represent:
+
+- route origin and destination differ; optional distance is positive
+- stop order and declared vehicle capacity are positive integers
+- a vehicle layout contains 1..200 seats with unique case-insensitive labels,
+  unique coordinates, deck 1..2, row 1..20, and column 1..10
+- `vehicles.seat_count` is derived from a configured layout once that layout
+  exists and cannot diverge from it
+- a trip cannot be created or moved to a vehicle until that vehicle has a
+  non-empty, count-consistent layout
+- trip price is positive and arrival is strictly after departure
+
+These checks intentionally exist at the web/Gateway boundary, in Trip Service,
+and as stable PostgreSQL constraints where representable. Existing disposable
+volumes created before these checks must use `npm run demo:reset` so
+`database/schema.sql` is applied to a fresh database.
 
 ## 6. Seat Status
 
@@ -128,9 +158,9 @@ PAID -> CANCELLED
 ```
 
 `COMPLETED` is retained for lecturer-contract compatibility and historical
-seed rows. The current MVP has no public operation or worker for the final
-`CHECKED_IN -> COMPLETED` transition; adding one requires coordinated API and
-runtime work rather than a database-only update.
+seed rows. Booking Service consumes the transactional `trip.completed`
+workflow event and advances only `CHECKED_IN` bookings to `COMPLETED`
+idempotently; other booking states are left unchanged.
 
 ## 8. Ownership and Privacy
 
@@ -228,6 +258,7 @@ Minimum indexes:
 ```text
 locations.name
 routes.origin_location_id + routes.destination_location_id
+vehicle_seats.vehicle_id + lower(seat_label) (unique)
 trips.route_id + trips.departure_time
 trip_seats.trip_id + trip_seats.seat_label
 bookings.booking_code

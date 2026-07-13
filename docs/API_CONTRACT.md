@@ -62,6 +62,13 @@ Admin login is required for admin screens in the MVP. Local demo auth may use se
 
 ### Mutations
 
+Admin catalog inputs use one shared normalization contract in the web form,
+GraphQL Gateway, and Trip Service. Distances are absent or positive; stop
+orders and capacities are positive integers; route endpoints differ; seat
+labels and coordinates are unique and bounded; trip price is positive and
+arrival is after departure. Trip Service remains authoritative and PostgreSQL
+repeats the stable structural checks for defense in depth.
+
 | Operation | Purpose |
 |---|---|
 | `login(input)` | Local demo login for admin/customer flows |
@@ -76,8 +83,8 @@ Admin login is required for admin screens in the MVP. Local demo auth may use se
 | `adminCreateStop(input)` / `adminUpdateStop` / `adminDeleteStop` | Admin pickup/dropoff stop CRUD |
 | `adminCreateVehicle(input)` / `adminUpdateVehicle` / `adminDeleteVehicle` | Admin vehicle CRUD |
 | `adminConfigureVehicleSeats(vehicleId, seats)` | Configure vehicle seat layout only before the vehicle is assigned to any trip; the layout and derived `seatCount` are replaced atomically |
-| `adminCreateTrip(input)` / `adminUpdateTrip` / `adminDeleteTrip` | Admin trip CRUD; create/update snapshots the vehicle layout under a shared lock; changing `vehicleId` is rejected if Redis has an active hold or any persistent seat is booked/blocked, and fails closed when Redis is unavailable; deletion is rejected while any Redis hold or booking logically references the trip |
-| `adminUpdateTripStatus(input)` | Activate, lock, depart, complete, cancel, or draft a trip |
+| `adminCreateTrip(input)` / `adminUpdateTrip` / `adminDeleteTrip` | Admin trip CRUD; create requires `DRAFT` or `ACTIVE`, positive price, arrival after departure, and a non-empty vehicle layout whose derived count matches `seatCount`; generic update cannot change status; create/update snapshots the vehicle layout under a shared lock; changing `vehicleId` is rejected if Redis has an active hold or any persistent seat is booked/blocked, and fails closed when Redis is unavailable; deletion is rejected while any Redis hold or booking logically references the trip |
+| `adminUpdateTripStatus(input)` | The only trip-status mutation; follows `DRAFT -> ACTIVE\|CANCELLED`, `ACTIVE -> LOCKED\|CANCELLED`, `LOCKED -> ACTIVE\|DEPARTED\|CANCELLED`, and `DEPARTED -> COMPLETED`; terminal states cannot reopen |
 | `adminBlockSeats(input)` | Block seats from sale with an optional reason |
 | `adminCheckIn(input)` | Check in by booking code, ticket code, or simulated QR payload |
 

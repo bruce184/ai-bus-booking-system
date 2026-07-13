@@ -175,7 +175,10 @@ The B-3 seed includes deterministic fake data for the local demo:
 8 bookings, 6 tickets, saved passengers, event logs, and 7 analytics rows.
 ```
 
-If the local PostgreSQL volume was created before B-3, Docker will not rerun `database/seed.sql` automatically. For a disposable local demo database, reset the compose volume before starting Postgres again.
+If the local PostgreSQL volume was created before B-3 or before the current
+admin catalog constraints, Docker will not retrofit `database/schema.sql` or
+rerun `database/seed.sql` automatically. For a disposable local demo
+database, run `npm run demo:reset` before starting the demo.
 
 ## 8. Baseline Verification
 
@@ -207,7 +210,7 @@ Implemented test targets:
 | Seat Inventory unit | `npm run test:seat` | ACTIVE-trip guard, post-write race rollback, Redis hold lifecycle, and persistent seat invariants |
 | Payment service unit | `npm run test:payment` | Payment result and Kafka-outage isolation |
 | Email worker unit | `npm run test:email-worker` | Consumer idempotency and normalized simulated delivery |
-| Trip service unit | `npm run test:trip` | Sort aliases and popular-route aggregate mapping |
+| Trip service unit | `npm run test:trip` | Admin input/state invariants, vehicle-layout locks, trip lifecycle/outbox rules, sort aliases, and popular-route mapping |
 | Analytics service unit | `npm run test:analytics` | Canonical and legacy search-event envelope compatibility |
 | Search analytics integration | `npm run test:analytics:integration` | Requires PostgreSQL, Kafka, and Analytics Service; bounded to 15 seconds and cleans test data |
 | Gateway API / contract smoke | `npm run test:gateway:api` | Requires a gateway already running on `http://localhost:4000/graphql` |

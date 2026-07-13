@@ -1,6 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import {
+  nextTripStatuses,
+  normalizeTripInput
+} from '@bus/shared/admin-contract.js';
+
 import { queryGraphQL } from '../../graphql.js';
 import { businessDateTimeLocal } from '../../../lib/date.js';
 
@@ -145,19 +150,18 @@ export default function TripsCrud() {
     `;
 
     try {
-      const formattedDepTime = new Date(departureTime).toISOString();
-      const formattedArrTime = new Date(arrivalTime).toISOString();
-      
-      const variables = {
-        input: {
+      const input = normalizeTripInput(
+        {
           routeId,
           vehicleId,
-          departureTime: formattedDepTime,
-          arrivalTime: formattedArrTime,
-          price: parseInt(price, 10),
-          status
-        }
-      };
+          departureTime,
+          arrivalTime,
+          price,
+          status: isEditing ? undefined : status
+        },
+        { isUpdate: isEditing }
+      );
+      const variables = { input };
       if (isEditing) {
         variables.id = editingTrip.id;
       }
@@ -447,12 +451,12 @@ export default function TripsCrud() {
                           color: sColor.color
                         }}
                       >
-                        <option value="DRAFT">DRAFT</option>
-                        <option value="ACTIVE">ACTIVE</option>
-                        <option value="LOCKED">LOCKED</option>
-                        <option value="DEPARTED">DEPARTED</option>
-                        <option value="COMPLETED">COMPLETED</option>
-                        <option value="CANCELLED">CANCELLED</option>
+                        <option value={t.status}>{t.status}</option>
+                        {nextTripStatuses(t.status).map((nextStatus) => (
+                          <option key={nextStatus} value={nextStatus}>
+                            {nextStatus}
+                          </option>
+                        ))}
                       </select>
                     </td>
                     <td style={{ padding: '16px 8px', textAlign: 'right' }}>
@@ -546,29 +550,27 @@ export default function TripsCrud() {
                 placeholder="e.g. 250000"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                min="0"
+                min="1"
                 required
                 disabled={loading}
               />
             </div>
 
-            <div style={{ marginBottom: '25px' }}>
-              <label htmlFor="status">Default Status</label>
-              <select
-                id="status"
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                required
-                disabled={loading}
-              >
-                <option value="DRAFT">DRAFT</option>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="LOCKED">LOCKED</option>
-                <option value="DEPARTED">DEPARTED</option>
-                <option value="COMPLETED">COMPLETED</option>
-                <option value="CANCELLED">CANCELLED</option>
-              </select>
-            </div>
+            {!editingTrip && (
+              <div style={{ marginBottom: '25px' }}>
+                <label htmlFor="status">Initial Status</label>
+                <select
+                  id="status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  required
+                  disabled={loading}
+                >
+                  <option value="DRAFT">DRAFT</option>
+                  <option value="ACTIVE">ACTIVE</option>
+                </select>
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={loading}>

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { normalizeStopInput } from '@bus/shared/admin-contract.js';
+
 import { queryGraphQL } from '../../graphql.js';
 
 export default function StopsCrud() {
@@ -103,12 +105,12 @@ export default function StopsCrud() {
 
     try {
       const variables = {
-        input: {
+        input: normalizeStopInput({
           routeId,
           locationId,
           stopType,
-          stopOrder: stopOrder ? parseInt(stopOrder, 10) : 1
-        }
+          stopOrder
+        })
       };
       if (isEditing) {
         variables.id = editingStop.id;

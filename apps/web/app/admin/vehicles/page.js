@@ -1,6 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import {
+  normalizeVehicleInput,
+  normalizeVehicleSeatLayout,
+  positiveInteger
+} from '@bus/shared/admin-contract.js';
+
 import { queryGraphQL } from '../../graphql.js';
 
 export default function VehiclesCrud() {
@@ -15,9 +21,9 @@ export default function VehiclesCrud() {
   const [configuringSeatsVehicle, setConfiguringSeatsVehicle] = useState(null);
 
   // Seat config form states
-  const [decks, setDecks] = useState(1);
-  const [rows, setRows] = useState(6);
-  const [cols, setCols] = useState(4);
+  const [decks, setDecks] = useState('1');
+  const [rows, setRows] = useState('6');
+  const [cols, setCols] = useState('4');
   const [generatedSeats, setGeneratedSeats] = useState([]);
 
   const [loading, setLoading] = useState(false);
@@ -92,13 +98,13 @@ export default function VehiclesCrud() {
 
     try {
       const variables = {
-        input: {
+        input: normalizeVehicleInput({
           operatorName,
           vehicleCode,
           licensePlate,
           vehicleType,
-          seatCount: seatCount ? parseInt(seatCount, 10) : 0
-        }
+          seatCount
+        })
       };
       if (isEditing) {
         variables.id = editingVehicle.id;
@@ -145,26 +151,34 @@ export default function VehiclesCrud() {
   };
 
   const generateSeatGrid = () => {
-    const list = [];
-    let count = 1;
-    for (let d = 1; d <= decks; d++) {
-      for (let r = 1; r <= rows; r++) {
-        for (let c = 1; c <= cols; c++) {
-          // Label logic e.g., A01, A02 for deck 1, B01, B02 for deck 2
-          const prefix = d === 1 ? 'A' : 'B';
-          const numStr = count < 10 ? `0${count}` : `${count}`;
-          list.push({
-            label: `${prefix}${numStr}`,
-            deck: d,
-            row: r,
-            column: c
-          });
-          count++;
+    try {
+      const deckCount = positiveInteger(decks, 'decks');
+      const rowCount = positiveInteger(rows, 'rows');
+      const columnCount = positiveInteger(cols, 'columns');
+      const list = [];
+      let count = 1;
+      for (let d = 1; d <= deckCount; d++) {
+        for (let r = 1; r <= rowCount; r++) {
+          for (let column = 1; column <= columnCount; column++) {
+            // Label logic e.g., A01, A02 for deck 1, B01, B02 for deck 2
+            const prefix = d === 1 ? 'A' : 'B';
+            const numStr = count < 10 ? `0${count}` : `${count}`;
+            list.push({
+              label: `${prefix}${numStr}`,
+              deck: d,
+              row: r,
+              column
+            });
+            count++;
+          }
         }
       }
+      const normalized = normalizeVehicleSeatLayout(list);
+      setGeneratedSeats(normalized);
+      showToast(`Generated grid with ${normalized.length} seats!`);
+    } catch (error) {
+      showToast(error.message || 'Invalid seat grid.', 'error');
     }
-    setGeneratedSeats(list);
-    showToast(`Generated grid with ${list.length} seats!`);
   };
 
   const handleSaveSeats = async () => {
@@ -188,14 +202,10 @@ export default function VehiclesCrud() {
     `;
 
     try {
+      const seats = normalizeVehicleSeatLayout(generatedSeats);
       await queryGraphQL(saveSeatsMutation, {
         vehicleId: configuringSeatsVehicle.id,
-        seats: generatedSeats.map(({ label, deck, row, column }) => ({
-          label,
-          deck,
-          row,
-          column
-        }))
+        seats
       });
 
       // Update local vehicles seatCount to match generated seats
@@ -414,7 +424,7 @@ export default function VehiclesCrud() {
               
               <div style={{ marginBottom: '16px' }}>
                 <label htmlFor="decks">Number of Decks</label>
-                <select id="decks" value={decks} onChange={(e) => setDecks(parseInt(e.target.value))} disabled={loading}>
+                <select id="decks" value={decks} onChange={(e) => setDecks(e.target.value)} disabled={loading}>
                   <option value={1}>1 Deck (Single-decker)</option>
                   <option value={2}>2 Decks (Double-decker sleeper)</option>
                 </select>
@@ -422,12 +432,12 @@ export default function VehiclesCrud() {
 
               <div style={{ marginBottom: '16px' }}>
                 <label htmlFor="gridRows">Rows</label>
-                <input id="gridRows" type="number" value={rows} onChange={(e) => setRows(parseInt(e.target.value))} min="1" max="15" disabled={loading} />
+                <input id="gridRows" type="number" value={rows} onChange={(e) => setRows(e.target.value)} min="1" max="15" disabled={loading} />
               </div>
 
               <div style={{ marginBottom: '24px' }}>
                 <label htmlFor="gridCols">Columns</label>
-                <input id="gridCols" type="number" value={cols} onChange={(e) => setCols(parseInt(e.target.value))} min="1" max="6" disabled={loading} />
+                <input id="gridCols" type="number" value={cols} onChange={(e) => setCols(e.target.value)} min="1" max="6" disabled={loading} />
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

@@ -267,15 +267,25 @@ orders.
 ## 7. Trip State
 
 ```text
-DRAFT
-ACTIVE
-LOCKED
-DEPARTED
-COMPLETED
-CANCELLED
+DRAFT -> ACTIVE | CANCELLED
+ACTIVE -> LOCKED | CANCELLED
+LOCKED -> ACTIVE | DEPARTED | CANCELLED
+DEPARTED -> COMPLETED
 ```
 
-Trip state is owned by Trip Service. Booking/check-in flows must respect trip state.
+`DRAFT` and `ACTIVE` are the only creation states. `CANCELLED` and
+`COMPLETED` are terminal. A locked trip may return to `ACTIVE` to reopen
+sales; all other reverse or skipped transitions are rejected. Generic trip
+CRUD cannot mutate status: `adminUpdateTripStatus` is the single workflow
+entry point, writes the status event transactionally, and emits
+`trip.completed` through the outbox.
+
+Trip state is owned by Trip Service. Schedule/vehicle edits and status changes
+share the `trip-lifecycle` advisory lock because booking cancellation and
+check-in depend on the same status/departure snapshot. Admin input shape is
+normalized by one shared pure contract at web and Gateway boundaries, then
+revalidated by Trip Service; PostgreSQL checks the durable numeric, topology,
+and chronological invariants.
 
 ## 8. Seat State
 

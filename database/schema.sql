@@ -20,8 +20,9 @@ create table if not exists routes (
   id uuid primary key default gen_random_uuid(),
   origin_location_id uuid not null references locations(id),
   destination_location_id uuid not null references locations(id),
-  distance_km integer,
+  distance_km integer check (distance_km is null or distance_km > 0),
   created_at timestamptz not null default now(),
+  check (origin_location_id <> destination_location_id),
   unique (origin_location_id, destination_location_id)
 );
 
@@ -30,7 +31,7 @@ create table if not exists route_stops (
   route_id uuid not null references routes(id) on delete cascade,
   location_id uuid not null references locations(id),
   stop_type text not null check (stop_type in ('PICKUP', 'DROPOFF')),
-  stop_order integer not null default 1
+  stop_order integer not null default 1 check (stop_order > 0)
 );
 
 create table if not exists vehicles (
@@ -39,7 +40,7 @@ create table if not exists vehicles (
   vehicle_code text not null unique,
   license_plate text,
   vehicle_type text not null,
-  seat_count integer not null,
+  seat_count integer not null check (seat_count > 0),
   created_at timestamptz not null default now()
 );
 
@@ -47,10 +48,11 @@ create table if not exists vehicle_seats (
   id uuid primary key default gen_random_uuid(),
   vehicle_id uuid not null references vehicles(id) on delete cascade,
   seat_label text not null,
-  deck integer not null default 1,
-  seat_row integer not null,
-  seat_column integer not null,
-  unique (vehicle_id, seat_label)
+  deck integer not null default 1 check (deck between 1 and 2),
+  seat_row integer not null check (seat_row between 1 and 20),
+  seat_column integer not null check (seat_column between 1 and 10),
+  unique (vehicle_id, seat_label),
+  unique (vehicle_id, deck, seat_row, seat_column)
 );
 
 create table if not exists trips (
@@ -59,7 +61,8 @@ create table if not exists trips (
   vehicle_id uuid not null references vehicles(id),
   departure_time timestamptz not null,
   arrival_time timestamptz not null,
-  price integer not null check (price >= 0),
+  price integer not null check (price > 0),
+  check (arrival_time > departure_time),
   status text not null default 'ACTIVE' check (status in ('DRAFT', 'ACTIVE', 'LOCKED', 'DEPARTED', 'COMPLETED', 'CANCELLED')),
   created_at timestamptz not null default now()
 );
@@ -220,6 +223,7 @@ create index if not exists idx_outbox_events_unpublished on outbox_events(create
 
 create index if not exists idx_locations_name on locations(name);
 create index if not exists idx_routes_origin_destination on routes(origin_location_id, destination_location_id);
+create unique index if not exists idx_vehicle_seats_label_ci on vehicle_seats(vehicle_id, lower(seat_label));
 create index if not exists idx_trips_route_departure on trips(route_id, departure_time);
 create index if not exists idx_trip_seats_trip_label on trip_seats(trip_id, seat_label);
 create index if not exists idx_bookings_code on bookings(booking_code);

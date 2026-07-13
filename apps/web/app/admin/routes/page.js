@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { normalizeRouteInput } from '@bus/shared/admin-contract.js';
+
 import { queryGraphQL } from '../../graphql.js';
 
 export default function RoutesCrud() {
@@ -83,11 +85,11 @@ export default function RoutesCrud() {
 
     try {
       const variables = {
-        input: {
+        input: normalizeRouteInput({
           originLocationId: originId,
           destinationLocationId: destinationId,
-          distanceKm: distanceKm ? parseInt(distanceKm, 10) : 0,
-        }
+          distanceKm
+        })
       };
       if (isEditing) {
         variables.id = editingRoute.id;

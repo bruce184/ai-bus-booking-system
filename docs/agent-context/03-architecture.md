@@ -32,3 +32,7 @@ popular-route catalog, but Analytics Service remains the sole aggregate writer.
 - Seat hold must not be frontend-only.
 - Booking state transitions must not be duplicated across unrelated services.
 - Admin CRUD must stay in the service that owns the underlying domain data.
+- Admin input normalization is shared across web/Gateway/Trip boundaries, but
+  Trip Service remains authoritative and PostgreSQL repeats durable invariants.
+- Trip status changes use only `adminUpdateTripStatus`; generic trip CRUD
+  cannot skip or reverse the documented state transitions.

@@ -18,6 +18,21 @@ export const internal = (msg = 'Internal service error') =>
 export const failedPrecondition = (msg = 'Operation precondition failed') =>
   new ServiceError(grpc.status.FAILED_PRECONDITION, msg);
 
+export function mapDatabaseError(error) {
+  switch (error?.code) {
+    case '23505':
+      return invalidArgument('Duplicate catalog value');
+    case '23503':
+      return failedPrecondition('Resource is still referenced and cannot be changed');
+    case '23514':
+      return invalidArgument('Input violates a catalog constraint');
+    case '22P02':
+      return invalidArgument('Input has an invalid identifier or value');
+    default:
+      return null;
+  }
+}
+
 // Wraps an async handler so thrown ServiceErrors become proper gRPC errors and
 // anything else becomes INTERNAL without crashing the server.
 export function wrap(name, handler, logger) {
@@ -26,8 +41,14 @@ export function wrap(name, handler, logger) {
       const result = await handler(call);
       callback(null, result);
     } catch (err) {
-      if (err instanceof ServiceError) {
-        callback({ code: err.grpcCode, message: err.message });
+      const serviceError = err instanceof ServiceError
+        ? err
+        : mapDatabaseError(err);
+      if (serviceError) {
+        callback({
+          code: serviceError.grpcCode,
+          message: serviceError.message,
+        });
         return;
       }
       logger.error(`Unhandled error in ${name}`, err.stack || err.message);

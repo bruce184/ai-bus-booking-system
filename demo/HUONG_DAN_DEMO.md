@@ -65,7 +65,11 @@ Xem chi tiết trong [DEMO_DATA.md](DEMO_DATA.md). Tóm tắt:
 1. Đăng nhập http://localhost:3000/admin/login bằng **staff** → chỉ thấy trang Bookings/Check-in (phân quyền STAFF).
 2. Check-in booking `BK202606240001` tại Boarding Desk → trạng thái thành `CHECKED_IN`.
 3. Đăng xuất, đăng nhập **admin** → đủ menu: Dashboard, Trips, Routes, Vehicles, Locations, Bookings, Event Logs.
-4. Demo CRUD chuyến, **khóa ghế không bán** (Block Seats với lý do), đổi trạng thái chuyến, xem Event Logs.
+4. Demo tạo xe rồi **Configure Seats** trước khi gán xe vào chuyến; layout
+trùng nhãn/toạ độ hoặc lệch `seatCount` sẽ bị từ chối.
+5. Demo CRUD chuyến, **khóa ghế không bán** (Block Seats với lý do), đổi trạng
+thái theo luồng `DRAFT → ACTIVE → LOCKED → DEPARTED → COMPLETED` (có thể
+`LOCKED → ACTIVE` để mở bán lại), rồi xem Event Logs.
 
 ### Module 5 — Analytics, Chatbot AI & MCP
 1. Admin Dashboard: doanh thu ngày, vé theo tuyến, top tuyến tìm kiếm, tỷ lệ booking thành công (từ Kafka consumer + bảng `analytics_daily`, có **idempotency bằng eventId** chống đếm trùng).

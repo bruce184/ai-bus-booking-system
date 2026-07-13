@@ -1,3 +1,12 @@
+import {
+  AdminInputError,
+  normalizeRouteInput,
+  normalizeStopInput,
+  normalizeTripInput,
+  normalizeVehicleInput,
+  normalizeVehicleSeatLayout
+} from "@bus/shared/admin-contract.js";
+
 import { requireAdmin, requireAdminOrStaff } from "../auth/authorization.js";
 import { gatewayError } from "../auth/errors.js";
 import { callGrpc } from "../grpc/call.js";
@@ -14,60 +23,47 @@ function requireNonEmpty(value, fieldName) {
   return trimmed;
 }
 
-function mapRouteInput(input, id) {
-  return {
-    id: id ?? "",
-    originLocationId: requireNonEmpty(input.originLocationId, "originLocationId"),
-    destinationLocationId: requireNonEmpty(input.destinationLocationId, "destinationLocationId"),
-    distanceKm: input.distanceKm ?? 0
-  };
-}
-
-function mapStopInput(input, id) {
-  return {
-    id: id ?? "",
-    routeId: requireNonEmpty(input.routeId, "routeId"),
-    locationId: requireNonEmpty(input.locationId, "locationId"),
-    stopType: requireNonEmpty(input.stopType, "stopType"),
-    stopOrder: input.stopOrder
-  };
-}
-
-function mapVehicleInput(input, id) {
-  return {
-    id: id ?? "",
-    operatorName: requireNonEmpty(input.operatorName, "operatorName"),
-    vehicleCode: requireNonEmpty(input.vehicleCode, "vehicleCode"),
-    licensePlate: input.licensePlate ?? "",
-    vehicleType: requireNonEmpty(input.vehicleType, "vehicleType"),
-    seatCount: input.seatCount
-  };
-}
-
-function mapTripInput(input, id) {
-  return {
-    id: id ?? "",
-    routeId: requireNonEmpty(input.routeId, "routeId"),
-    vehicleId: requireNonEmpty(input.vehicleId, "vehicleId"),
-    departureTime: input.departureTime,
-    arrivalTime: input.arrivalTime,
-    price: input.price,
-    status: input.status ?? "DRAFT"
-  };
-}
-
-function mapVehicleSeats(seats) {
-  if (!seats || seats.length === 0) {
-    throw gatewayError("At least one vehicle seat is required.", "VALIDATION_ERROR");
+function validateAdminInput(work) {
+  try {
+    return work();
+  } catch (error) {
+    if (error instanceof AdminInputError) {
+      throw gatewayError(error.message, "VALIDATION_ERROR");
+    }
+    throw error;
   }
+}
 
-  return seats.map((seat) => ({
-    id: "",
-    label: requireNonEmpty(seat.label, "seat.label"),
-    deck: seat.deck,
-    row: seat.row,
-    column: seat.column
-  }));
+export function mapRouteInput(input, id) {
+  const normalized = validateAdminInput(() => normalizeRouteInput(input));
+  return { id: id ?? "", ...normalized };
+}
+
+export function mapStopInput(input, id) {
+  const normalized = validateAdminInput(() => normalizeStopInput(input));
+  return { id: id ?? "", ...normalized };
+}
+
+export function mapVehicleInput(input, id) {
+  const normalized = validateAdminInput(() => normalizeVehicleInput(input));
+  return { id: id ?? "", ...normalized };
+}
+
+export function mapTripInput(input, id) {
+  const normalized = validateAdminInput(() => normalizeTripInput(
+    input,
+    { isUpdate: Boolean(id) }
+  ));
+  return {
+    id: id ?? "",
+    ...normalized,
+    status: normalized.status ?? "TRIP_STATUS_UNSPECIFIED"
+  };
+}
+
+export function mapVehicleSeats(seats) {
+  return validateAdminInput(() => normalizeVehicleSeatLayout(seats))
+    .map((seat) => ({ id: "", ...seat }));
 }
 
 export const adminMutationResolvers = {
