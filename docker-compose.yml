@@ -11,6 +11,7 @@ services:
       - bus_postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - ./database:/app/database:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U bus_app -d bus_booking"]
       interval: 5s

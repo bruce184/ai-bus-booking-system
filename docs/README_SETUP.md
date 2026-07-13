@@ -152,6 +152,14 @@ Stop infrastructure:
 docker compose down
 ```
 
+Reset and MCP demo commands:
+
+```bash
+npm run demo:reset:data  # canonical SQL seed + Redis; stop services first
+npm run demo:reset       # safest reset: recreates every infra volume
+npm run demo:mcp         # official SDK lifecycle against the running MCP server
+```
+
 Use fake demo data only.
 
 The B-3 seed includes deterministic fake data for the local demo:

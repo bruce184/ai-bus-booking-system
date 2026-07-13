@@ -100,8 +100,18 @@ export function createMcpServer() {
         });
       }
     } finally {
-      await transport.close();
-      await protocolServer.close();
+      const cleanup = await Promise.allSettled([
+        transport.close(),
+        protocolServer.close()
+      ]);
+      for (const result of cleanup) {
+        if (result.status === "rejected") {
+          console.error(
+            "[mcp-server] transport cleanup failed",
+            result.reason
+          );
+        }
+      }
     }
   });
 

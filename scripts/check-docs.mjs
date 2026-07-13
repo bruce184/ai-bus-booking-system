@@ -28,7 +28,8 @@ const requiredFiles = [
   "proto/trip.proto",
   "proto/booking.proto",
   "database/schema.sql",
-  "database/seed.sql"
+  "database/seed.sql",
+  "database/reset-demo.sql"
 ];
 
 const missing = requiredFiles.filter((file) => !existsSync(file));

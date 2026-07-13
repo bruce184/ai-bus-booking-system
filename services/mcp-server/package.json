@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node src/index.js",
     "start": "node src/index.js",
+    "demo": "node scripts/demo-client.mjs",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {

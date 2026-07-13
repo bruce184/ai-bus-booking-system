@@ -67,18 +67,15 @@ Xem chi tiết trong [DEMO_DATA.md](DEMO_DATA.md). Tóm tắt:
 ### Module 5 — Analytics, Chatbot AI & MCP
 1. Admin Dashboard: doanh thu ngày, vé theo tuyến, top tuyến tìm kiếm, tỷ lệ booking thành công (từ Kafka consumer + bảng `analytics_daily`, có **idempotency bằng eventId** chống đếm trùng).
 2. Chatbot (widget trên web): hỏi "Tìm chuyến TP.HCM đi Đà Lạt ngày mai", hỏi chính sách hủy vé (bot trích **nguồn** `bus://policy/cancellation`), tra booking bằng mã + email.
-3. MCP Server — demo bằng curl:
+3. MCP Server — demo bằng official SDK client:
 
 ```bash
-curl -s http://localhost:4010/mcp -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-
-curl -s http://localhost:4010/mcp -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_trips","arguments":{"origin":"TP.HCM","destination":"Da Lat","departureDate":"2026-07-16"}}}'
-
-curl -s http://localhost:4010/mcp -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"bus://policy/cancellation"}}'
+npm run demo:mcp
 ```
+
+Client này thực hiện đúng lifecycle `initialize -> tools/list -> tools/call ->
+resources/read -> close` qua Streamable HTTP. Không gọi thẳng
+`tools/list` bằng curl vì cách đó bỏ qua bước khởi tạo protocol.
 
 ## 5. Chạy kiểm thử (chứng minh chất lượng)
 
@@ -91,15 +88,19 @@ npm run test:web:e2e             # Playwright: luồng khách đặt vé + admin
 
 ## 6. Reset dữ liệu demo giữa các lần chạy
 
+Dừng các process app/service trước khi reset.
+
 ```bash
-# Trả ghế A04 + booking BK202606240001 về trạng thái ban đầu (sau demo check-in/block)
-docker exec bus-postgres psql -U bus_app -d bus_booking -c "
-  update trip_seats set status='AVAILABLE', block_reason=null where seat_label='A04' and trip_id='00000000-0000-4000-8004-000000000001';
-  update bookings set status='TICKET_ISSUED' where booking_code='BK202606240001';
-  delete from bookings where contact_email like 'e2e-%@example.com';"
+# Reset nhanh toàn bộ bảng mutable từ schema/seed chuẩn và xóa Redis holds
+npm run demo:reset:data
+
+# Reset kín cả PostgreSQL, Redis, RabbitMQ và Kafka bằng volume mới
+npm run demo:reset
 ```
 
-Reset toàn bộ (xóa hết dữ liệu, seed lại): `npm run dev:reset`.
+`demo:reset:data` chỉ dùng khi các queue không còn message cũ. Trước buổi
+báo cáo, ưu tiên `demo:reset` để không còn workflow event hoặc consumer
+offset từ lần chạy trước.
 
 ## 7. Sự cố thường gặp
 
@@ -107,6 +108,6 @@ Reset toàn bộ (xóa hết dữ liệu, seed lại): `npm run dev:reset`.
 |---|---|
 | `EADDRINUSE 50051..50056` | Service cũ còn chạy — tắt process node cũ rồi chạy lại |
 | Redis/RabbitMQ không lên | Trùng cổng với container lab khác — `docker stop redis_w09 rabbitmq_w09` |
-| Kafka Exited(1) | Kafka bật trước Zookeeper — `docker start bus-kafka` lại sau vài giây |
+| Kafka Exited(1) | Kafka bật trước Zookeeper — `docker compose restart kafka` lại sau vài giây |
 | Chatbot báo `AI_PROVIDER_UNCONFIGURED` | Thiếu `OPENAI_API_KEY` — vẫn demo được bằng nút gọi tool trực tiếp |
 | Trang admin trống với staff | Đúng thiết kế: STAFF chỉ có quyền check-in |

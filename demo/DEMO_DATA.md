@@ -44,7 +44,7 @@ Tra cứu tại `/lookup` — luôn cần **cả mã booking và email**.
 Ngày giờ chuyến được seed tương đối so với lúc chạy `database/seed.sql`. Liệt kê chuyến hiện có để chọn ngày demo tìm kiếm:
 
 ```bash
-docker exec bus-postgres psql -U bus_app -d bus_booking -c "
+docker compose exec -T postgres psql -U bus_app -d bus_booking -c "
   select ol.name||' -> '||dl.name as route,
          to_char(t.departure_time,'YYYY-MM-DD HH24:MI') as departure,
          t.price, t.status
