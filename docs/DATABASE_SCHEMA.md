@@ -127,6 +127,11 @@ PENDING_PAYMENT -> EXPIRED
 PAID -> CANCELLED
 ```
 
+`COMPLETED` is retained for lecturer-contract compatibility and historical
+seed rows. The current MVP has no public operation or worker for the final
+`CHECKED_IN -> COMPLETED` transition; adding one requires coordinated API and
+runtime work rather than a database-only update.
+
 ## 8. Ownership and Privacy
 
 1. Registered customer bookings link to `users.id`.
@@ -250,7 +255,10 @@ Phuong Trang Demo, Thanh Buoi Demo, Kumho Demo
 seat_29, sleeper_34, limousine_22
 ```
 
-The current `database/seed.sql` includes the B-3 deterministic demo dataset: 3 users, 12 locations/stations, 3 vehicles with generated seat layouts, 5 routes, 12 trips, 8 bookings, 6 tickets, saved passengers, event logs, and 7 analytics rows.
+The current `database/seed.sql` includes 3 users, 12 locations/stations, 3
+vehicles with generated seat layouts, 5 routes, 20 trips (12 deterministic
+historical/state examples plus 8 rolling upcoming demo trips), 8 bookings, 6
+tickets, saved passengers, event logs, and 7 analytics rows.
 
 ## 13. Schema Change Rule
 

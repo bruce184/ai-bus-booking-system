@@ -157,7 +157,8 @@ Use fake demo data only.
 The B-3 seed includes deterministic fake data for the local demo:
 
 ```text
-3 users, 12 locations/stations, 3 vehicle layouts, 5 routes, 12 trips,
+3 users, 12 locations/stations, 3 vehicle layouts, 5 routes, 20 trips
+(12 historical/state examples + 8 rolling upcoming demo trips),
 8 bookings, 6 tickets, saved passengers, event logs, and 7 analytics rows.
 ```
 

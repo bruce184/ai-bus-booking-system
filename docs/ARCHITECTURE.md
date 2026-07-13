@@ -149,7 +149,7 @@ time-sensitive seat availability as cached truth.
 2. Booking Service validates hold and creates `PENDING_PAYMENT`.
 3. Payment Service returns simulated success/failure.
 4. On success, Booking Service confirms seats through Seat Inventory Service and marks booking `PAID`.
-5. Booking Service publishes `booking.paid` to RabbitMQ and analytics events to Kafka.
+5. Booking Service writes `booking.paid` and analytics events to its transactional outbox; the outbox dispatcher publishes them to RabbitMQ/Kafka.
 6. Ticket Worker creates e-ticket records with ticket code, QR payload, policy snapshot, and simple HTML/PDF-ready content.
 7. Ticket Worker publishes `ticket.issued`.
 8. Email Worker logs simulated email delivery.
@@ -201,6 +201,12 @@ PAID -> CANCELLED
 
 Only Booking Service may own state transitions.
 
+`COMPLETED` remains a valid historical/target domain state required by the
+lecturer contract and seed data. The current MVP exposes transitions only
+through check-in (`TICKET_ISSUED -> CHECKED_IN`); it has no GraphQL/gRPC
+operation or scheduled worker that advances bookings from `CHECKED_IN` to
+`COMPLETED`. Adding that transition requires an explicit contract change.
+
 ## 7. Trip State
 
 ```text
@@ -247,10 +253,13 @@ RabbitMQ workflow events:
 ```text
 booking.paid
 ticket.issued
-email.requested
 booking.expired
 booking.cancelled
 ```
+
+`email.requested` is accepted by Email Worker as a reserved compatibility
+event, but the current MVP has no producer for it. Normal delivery is driven
+by `booking.paid` and `ticket.issued`.
 
 Kafka analytics events:
 

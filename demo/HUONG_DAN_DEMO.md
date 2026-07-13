@@ -83,7 +83,7 @@ curl -s http://localhost:4010/mcp -H "Content-Type: application/json" \
 ## 5. Chạy kiểm thử (chứng minh chất lượng)
 
 ```bash
-npm run test:unit                # 70+ unit tests: gateway, booking, trip, analytics, seat, mcp, ticket-worker
+npm run test:unit                # 120+ unit tests across shared, web, services, workers, readiness
 npm run test:seat:race           # chứng minh chống race condition ghế
 npm run test:analytics:integration  # Kafka producer -> consumer + dedup eventId
 npm run test:web:e2e             # Playwright: luồng khách đặt vé + admin/staff (cần hệ thống đang chạy infra)

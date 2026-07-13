@@ -290,7 +290,7 @@ Owns booking state machine, passenger-per-seat data, booking lookup privacy, can
 |---|---|---|
 | `booking.paid` | Booking Service | Ticket Worker, Email Worker |
 | `ticket.issued` | Ticket Worker | Email Worker |
-| `email.requested` | Booking/Ticket flow | Email Worker |
+| `email.requested` | Reserved compatibility event; no current MVP producer | Email Worker |
 | `booking.expired` | Booking Service | Seat Inventory Service |
 | `booking.cancelled` | Booking Service | Seat Inventory Service (idempotent recovery for booked-seat release) |
 
@@ -304,6 +304,10 @@ Owns booking state machine, passenger-per-seat data, booking lookup privacy, can
 | `checkin-events` | `ticket.checked_in` |
 
 Analytics Service consumes Kafka events and stores aggregates for daily revenue, tickets sold by route, popular routes, and booking success rate versus search count.
+
+`COMPLETED` remains an allowed booking value for historical/target contract
+compatibility. No current GraphQL mutation, gRPC method, or worker performs
+`CHECKED_IN -> COMPLETED`; adding one is a coordinated contract change.
 
 Payment Service treats `payment-events` as best-effort analytics. It returns
 the already-decided simulation result without waiting for Kafka and logs an

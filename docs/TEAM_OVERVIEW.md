@@ -50,7 +50,7 @@ graph LR
   BOOK -- gRPC --> SEAT
   TRIP & SEAT & BOOK --> PG
   TRIP & SEAT --> RD
-  BOOK --> RMQ --> TW --> RMQ2[(RabbitMQ)] --> EW
+  BOOK --> OB[(PostgreSQL outbox)] --> RMQ --> TW --> RMQ2[(RabbitMQ)] --> EW
   TRIP & BOOK & PAY -- eventId envelope --> KFK --> ANA --> PG
 ```
 
@@ -68,6 +68,7 @@ sequenceDiagram
   participant P as Payment
   participant R as Redis
   participant MQ as RabbitMQ
+  participant O as PostgreSQL outbox
   participant T as Ticket Worker
 
   U->>W: Chọn ghế
@@ -87,7 +88,8 @@ sequenceDiagram
   G->>B: SimulatePayment
   B->>P: POST /simulate (HTTP)
   B->>S: ConfirmSeats (ghế → BOOKED)
-  B->>MQ: publish booking.paid
+  B->>O: commit booking.paid in same transaction
+  O->>MQ: outbox dispatcher publishes booking.paid
   B-->>W: status = PAID
   MQ->>T: booking.paid
   T->>T: Sinh vé + QR "bookingCode-ticketId" → TICKET_ISSUED
@@ -104,7 +106,7 @@ stateDiagram-v2
   PAID --> TICKET_ISSUED: Ticket Worker sinh vé
   PAID --> CANCELLED: hủy theo chính sách
   TICKET_ISSUED --> CHECKED_IN: staff check-in
-  CHECKED_IN --> COMPLETED: chuyến hoàn tất
+  CHECKED_IN --> COMPLETED: trạng thái đích (MVP chưa có operation)
 ```
 
 Trạng thái ghế: `AVAILABLE → HELD (Redis TTL) → BOOKED`, admin có thể `BLOCKED`. Hai người giành 1 ghế → chỉ 1 người thắng (Lua atomic + `FOR UPDATE`).
@@ -146,7 +148,7 @@ Trạng thái ghế: `AVAILABLE → HELD (Redis TTL) → BOOKED`, admin có th�
 
 | Loại | Lệnh | Phạm vi |
 |---|---|---|
-| Unit (70+) | `npm run test:unit` | gateway, booking, trip, analytics, seat, mcp, ticket-worker |
+| Unit (120+) | `npm run test:unit` | shared, readiness, web, gateway, booking, payment, trip, analytics, seat, MCP, ticket/email workers |
 | Race condition | `npm run test:seat:race` | 2 client giành 1 ghế → 1 thắng |
 | Integration | `npm run test:gateway:integration`, `test:seat:integration`, `test:analytics:integration` | gRPC/Redis/Kafka thật |
 | E2E (Playwright) | `npm run test:web:e2e` | luồng khách đặt vé + admin/staff + phân quyền |
