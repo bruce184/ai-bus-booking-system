@@ -64,7 +64,7 @@ Xem chi tiết trong [DEMO_DATA.md](DEMO_DATA.md). Tóm tắt:
 ### Module 4 — Quản trị & vận hành
 1. Đăng nhập http://localhost:3000/admin/login bằng **staff** → chỉ thấy trang Bookings/Check-in (phân quyền STAFF).
 2. Check-in booking `BK202606240001` tại Boarding Desk → trạng thái thành `CHECKED_IN`.
-3. Đăng xuất, đăng nhập **admin** → đủ menu: Dashboard, Trips, Routes, Vehicles, Locations, Bookings, Event Logs.
+3. Đăng xuất, đăng nhập **admin** → đủ menu: Dashboard, Trips, Routes, Stops, Vehicles, Bookings, Event Logs.
 4. Demo tạo xe rồi **Configure Seats** trước khi gán xe vào chuyến; layout
 trùng nhãn/toạ độ hoặc lệch `seatCount` sẽ bị từ chối.
 5. Demo CRUD chuyến, **khóa ghế không bán** (Block Seats với lý do), đổi trạng
@@ -90,7 +90,7 @@ resources/read -> close` qua Streamable HTTP. Không gọi thẳng
 npm run test:unit                # 120+ unit tests across shared, web, services, workers, readiness
 npm run test:seat:race           # chứng minh chống race condition ghế
 npm run test:analytics:integration  # Kafka producer -> consumer + dedup eventId
-npm run test:web:e2e             # Playwright: luồng khách đặt vé + admin/staff (cần hệ thống đang chạy infra)
+npm run test:web:e2e             # Playwright cô lập: tự start/cleanup Compose + app, chạy luồng khách và admin/staff
 ```
 
 ## 6. Reset dữ liệu demo giữa các lần chạy
