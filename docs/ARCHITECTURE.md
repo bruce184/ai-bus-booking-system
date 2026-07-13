@@ -239,6 +239,12 @@ losing the event. Consumers on `createWorkflowConsumer` also route
 processing failures to a per-queue dead-letter exchange instead of
 dropping the message.
 
+Ticket Worker claims each canonical `booking.paid` `eventId` in
+`workflow_processed_events` inside the same transaction that creates tickets,
+advances the booking, writes the log, and queues `ticket.issued` in the
+transactional outbox. A RabbitMQ redelivery therefore neither duplicates the
+ticket transition nor creates another downstream event.
+
 ## 10. AI and MCP Rules
 
 Chatbot and MCP tools must:

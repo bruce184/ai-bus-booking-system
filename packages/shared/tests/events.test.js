@@ -2,6 +2,21 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { businessDate, compactBusinessDate, formatDateInTimeZone } from "../src/date.js";
 import { createEventEnvelope } from "../src/events.js";
+import { claimWorkflowEvent } from "../src/idempotency.js";
+
+test("workflow consumers claim an event with a consumer-specific idempotency key", async () => {
+  const calls = [];
+  const client = {
+    async query(text, params) {
+      calls.push({ text, params });
+      return { rowCount: calls.length === 1 ? 1 : 0 };
+    }
+  };
+
+  assert.equal(await claimWorkflowEvent(client, "ticket-worker", "event-1"), true);
+  assert.equal(await claimWorkflowEvent(client, "ticket-worker", "event-1"), false);
+  assert.deepEqual(calls[0].params, ["ticket-worker", "event-1"]);
+});
 
 test("business dates use Asia/Ho_Chi_Minh instead of the UTC calendar date", () => {
   const afterLocalMidnight = new Date("2026-07-13T17:30:00.000Z");

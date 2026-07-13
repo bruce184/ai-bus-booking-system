@@ -304,6 +304,11 @@ Owns booking state machine, passenger-per-seat data, booking lookup privacy, can
 
 Analytics Service consumes Kafka events and stores aggregates for daily revenue, tickets sold by route, popular routes, and booking success rate versus search count.
 
+RabbitMQ consumers use the same canonical `eventId` for idempotency. Ticket
+Worker records `(consumerName, eventId)` in its local transaction and queues
+`ticket.issued` through the transactional outbox; it never publishes that
+workflow event after committing ticket state.
+
 All producers use the canonical JSON envelope:
 
 ```json

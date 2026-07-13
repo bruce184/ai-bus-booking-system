@@ -182,6 +182,16 @@ create table if not exists outbox_events (
   published_at timestamptz
 );
 
+-- RabbitMQ consumers use a consumer-specific key because multiple queues may
+-- legitimately process the same canonical eventId. The claim is inserted in
+-- the same local transaction as the consumer's business writes.
+create table if not exists workflow_processed_events (
+  consumer_name text not null,
+  event_id text not null,
+  processed_at timestamptz not null default now(),
+  primary key (consumer_name, event_id)
+);
+
 -- Keep schema.sql re-runnable against volumes created before event identity
 -- was persisted in the outbox. A retry must reuse the same eventId and
 -- occurredAt or an idempotent consumer cannot recognize the redelivery.

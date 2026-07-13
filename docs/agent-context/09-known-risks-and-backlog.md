@@ -23,14 +23,6 @@ Use this file to orient future tasks. Out-of-scope issues found during implement
   invent booking status or payment state" rule already in
   `docs/agent-context/07-security-privacy.md`. Revisit per-endpoint if a
   specific read path (e.g. search) wants stale-cache-on-failure.
-- `ticket-worker` still commits its DB transaction (ticket rows + booking ->
-  TICKET_ISSUED) and then calls `publishWorkflowEvent("ticket.issued", ...)`
-  outside it, same dual-write shape the booking-service outbox fix
-  (`packages/shared/src/outbox.js`) closed for booking.*/checkin events. Lower
-  severity than the booking.paid case it was modeled on - tickets already
-  exist and the booking is already TICKET_ISSUED by the time this can fail,
-  so the only thing lost is email-worker's log line - but it should move to
-  the same outbox table if ticket.issued ever gains a real consumer.
 - Add service scaffolds with package scripts.
 - Add code generation for GraphQL and gRPC types.
 - Add integration test for two users holding the same seat.

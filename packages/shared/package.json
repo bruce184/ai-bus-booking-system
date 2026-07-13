@@ -12,7 +12,8 @@
     "./outbox.js": "./src/outbox.js",
     "./grpc.js": "./src/grpc.js",
     "./errors.js": "./src/errors.js",
-    "./date.js": "./src/date.js"
+    "./date.js": "./src/date.js",
+    "./idempotency.js": "./src/idempotency.js"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.13.4",
