@@ -60,14 +60,25 @@ export async function searchTrips(call) {
 
   const cached = await getCachedSearch(cacheParams);
   if (cached) {
+    const refreshedTrips = await refreshCachedTrips(cached.trips);
+    const trips = filterByMinimumAvailability(refreshedTrips, req.min_available_seats);
+    const suggestedDates = trips.length === 0
+      ? await findNearbyDates(origin, destination, departureDate)
+      : cached.suggested_dates;
+
     await publishSearchPerformed({
       origin,
       destination,
       departureDate,
-      resultCount: cached.trips.length,
+      resultCount: trips.length,
       cacheHit: true,
     });
-    return { ...cached, cache_hit: true };
+    return {
+      ...cached,
+      trips,
+      suggested_dates: suggestedDates,
+      cache_hit: true,
+    };
   }
 
   const params = [origin, destination, departureDate, config.timezone];
@@ -94,10 +105,8 @@ export async function searchTrips(call) {
     params,
   );
 
-  let trips = await rowsToTrips(rows);
-  if (req.min_available_seats) {
-    trips = trips.filter((t) => t.available_seats >= req.min_available_seats);
-  }
+  const catalogTrips = await rowsToTrips(rows);
+  const trips = filterByMinimumAvailability(catalogTrips, req.min_available_seats);
 
   const seoTitle = buildSeoTitle(origin, destination, `${departureDate}T00:00:00`, config.timezone);
 
@@ -107,9 +116,64 @@ export async function searchTrips(call) {
   }
 
   const response = { trips, suggested_dates: suggestedDates, seo_title: seoTitle, cache_hit: false };
-  await setCachedSearch(cacheParams, { trips, suggested_dates: suggestedDates, seo_title: seoTitle });
+  // Cache the static catalog candidates, not the filtered availability view.
+  // A cache hit rehydrates ACTIVE status and available_seats so Redis holds,
+  // releases, confirmations, and trip-state changes are reflected immediately.
+  await setCachedSearch(cacheParams, {
+    trips: catalogTrips,
+    suggested_dates: suggestedDates,
+    seo_title: seoTitle,
+  });
   await publishSearchPerformed({ origin, destination, departureDate, resultCount: trips.length, cacheHit: false });
   return response;
+}
+
+export function filterByMinimumAvailability(trips, minimumAvailableSeats) {
+  const minimum = Number(minimumAvailableSeats) || 0;
+  return minimum > 0
+    ? trips.filter((trip) => trip.available_seats >= minimum)
+    : trips;
+}
+
+export async function refreshCachedTrips(
+  cachedTrips,
+  { runQuery = query, readAvailableSeats = correctedAvailableSeats } = {},
+) {
+  if (!Array.isArray(cachedTrips) || cachedTrips.length === 0) {
+    return [];
+  }
+
+  const tripIds = cachedTrips.map((trip) => trip.id).filter(Boolean);
+  if (tripIds.length === 0) {
+    return [];
+  }
+
+  const { rows } = await runQuery(
+    `select
+       t.id,
+       t.status,
+       (select count(*) from trip_seats ts
+         where ts.trip_id = t.id and ts.status = 'AVAILABLE')::int as available_seats
+     from trips t
+     where t.id = any($1::uuid[])`,
+    [tripIds],
+  );
+  const liveRows = new Map(rows.map((row) => [row.id, row]));
+
+  const refreshed = await Promise.all(cachedTrips.map(async (trip) => {
+    const liveRow = liveRows.get(trip.id);
+    if (!liveRow || liveRow.status !== 'ACTIVE') {
+      return null;
+    }
+
+    return {
+      ...trip,
+      status: liveRow.status,
+      available_seats: await readAvailableSeats(liveRow),
+    };
+  }));
+
+  return refreshed.filter(Boolean);
 }
 
 // Nearby active departure dates (within +/- 7 days) for empty results.

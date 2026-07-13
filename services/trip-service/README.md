@@ -6,7 +6,8 @@ gRPC service that owns the trip catalog and search. Implemented against
 ## Owns
 
 - Locations, Routes, Stops, Vehicles, Vehicle seat layouts, Trips
-- Trip search, search cache metadata, SEO metadata for popular route pages
+- Trip search with short-lived catalog caching and live seat-availability
+  revalidation, plus SEO metadata for popular route pages
 - Nearby-date suggestions for empty search results
 - Public popular-route ranking from the read-only analytics aggregate
 - Admin CRUD for route, stop, vehicle, seat layout, and trip records

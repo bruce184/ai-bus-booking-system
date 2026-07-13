@@ -120,6 +120,12 @@ the side-effecting search query. Client form submission navigates to the new
 URL and lets that Server Component issue the single business search; client
 filter/sort interactions issue one explicit query per interaction.
 
+The Redis search cache stores catalog candidates for the configured short TTL,
+but a cache hit re-reads each candidate's current trip state and seat count and
+subtracts live Redis holds before applying `minAvailableSeats`. Therefore the
+cache avoids repeating the full catalog join/filter query without treating
+time-sensitive seat availability as cached truth.
+
 ### Trip Detail
 
 1. Web opens a trip detail page.
