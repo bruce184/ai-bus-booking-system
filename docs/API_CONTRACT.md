@@ -336,6 +336,9 @@ Transactional-outbox producers persist `eventId` and `occurredAt` in the
 outbox row together with the business transaction. Every retry republishes that
 same envelope identity. RabbitMQ publishers wait for a broker confirmation
 before the dispatcher stamps `published_at`; Kafka publishers await `send()`.
+When one logical event is routed to both brokers, both outbox rows share the
+same `eventId` and `occurredAt` for end-to-end correlation; uniqueness is per
+target/routing key rather than globally per row.
 
 During the search-event migration, Analytics Service may consume the previous
 flat `{ "event": "trip.search_performed", ... }` shape for queued-message

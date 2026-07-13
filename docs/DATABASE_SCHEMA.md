@@ -54,7 +54,7 @@ create extension if not exists pgcrypto;
 | `analytics_daily` | Demo aggregate reporting |
 | `processed_events` | Kafka consumer idempotency (dedup by `eventId`) |
 | `workflow_processed_events` | RabbitMQ consumer idempotency keyed by consumer name + canonical `eventId` |
-| `outbox_events` | Transactional outbox: events queued with stable `event_id`/`occurred_at` in the same DB transaction as the business write, dispatched by a confirmed publisher |
+| `outbox_events` | Transactional outbox: events queued with stable `event_id`/`occurred_at` in the same DB transaction as the business write, dispatched by a confirmed publisher; cross-broker copies share identity |
 
 ## 4. Roles
 

@@ -77,7 +77,7 @@ test("cancellation queues both analytics and seat-release recovery events", asyn
       }
       if (sql.startsWith("insert into event_logs")) return { rowCount: 1, rows: [] };
       if (sql.startsWith("insert into outbox_events")) {
-        outboxTargets.push({ target: params[3], routingKey: params[4] });
+        outboxTargets.push({ target: params[3], routingKey: params[4], eventId: params[6] });
         return { rowCount: 1, rows: [] };
       }
       if (sql.startsWith("select seat_label from booking_passengers")) {
@@ -108,10 +108,11 @@ test("cancellation queues both analytics and seat-release recovery events", asyn
   );
 
   assert.equal(result.status, "CANCELLED");
-  assert.deepEqual(outboxTargets, [
-    { target: "KAFKA", routingKey: "booking-events" },
-    { target: "RABBITMQ", routingKey: "booking.cancelled" }
-  ]);
+  assert.equal(outboxTargets[0].target, "KAFKA");
+  assert.equal(outboxTargets[0].routingKey, "booking-events");
+  assert.equal(outboxTargets[1].target, "RABBITMQ");
+  assert.equal(outboxTargets[1].routingKey, "booking.cancelled");
+  assert.equal(outboxTargets[0].eventId, outboxTargets[1].eventId);
 });
 
 const input = {

@@ -204,7 +204,9 @@ alter table outbox_events alter column event_id set not null;
 alter table outbox_events alter column occurred_at set default now();
 alter table outbox_events alter column occurred_at set not null;
 
-create unique index if not exists idx_outbox_events_event_id on outbox_events(event_id);
+drop index if exists idx_outbox_events_event_id;
+create unique index idx_outbox_events_event_id
+  on outbox_events(event_id, target, routing_key);
 create index if not exists idx_outbox_events_unpublished on outbox_events(created_at) where published_at is null;
 
 create index if not exists idx_locations_name on locations(name);

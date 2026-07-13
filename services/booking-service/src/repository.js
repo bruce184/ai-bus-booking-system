@@ -403,6 +403,8 @@ export async function settleBookingPayment(
       totalAmount: paidBooking.total_amount,
       seatIds: paidBooking.passengers.map((passenger) => passenger.seat_id)
     };
+    const paidEventId = randomUUID();
+    const paidOccurredAt = new Date().toISOString();
     // ticket-worker and email-worker consume this from RabbitMQ; analytics
     // consumes the Kafka copy. Same payload, two brokers, one transaction.
     await writeOutboxEvent(client, {
@@ -411,7 +413,9 @@ export async function settleBookingPayment(
       eventName: "booking.paid",
       target: "RABBITMQ",
       routingKey: "booking.paid",
-      payload: paidEventPayload
+      payload: paidEventPayload,
+      eventId: paidEventId,
+      occurredAt: paidOccurredAt
     });
     await writeOutboxEvent(client, {
       aggregateType: "booking",
@@ -419,7 +423,9 @@ export async function settleBookingPayment(
       eventName: "booking.paid",
       target: "KAFKA",
       routingKey: "booking-events",
-      payload: paidEventPayload
+      payload: paidEventPayload,
+      eventId: paidEventId,
+      occurredAt: paidOccurredAt
     });
 
     return {
@@ -481,6 +487,8 @@ export async function cancelBooking(
       "insert into event_logs (event_type, entity_type, entity_id, payload) values ($1, $2, $3, $4)",
       ["booking.cancelled", "booking", booking.id, JSON.stringify({ bookingCode: booking.booking_code })]
     );
+    const cancelledEventId = randomUUID();
+    const cancelledOccurredAt = new Date().toISOString();
     await writeOutboxEvent(client, {
       aggregateType: "booking",
       aggregateId: booking.id,
@@ -491,7 +499,9 @@ export async function cancelBooking(
         bookingId: booking.id,
         bookingCode: booking.booking_code,
         tripId: booking.trip_id
-      }
+      },
+      eventId: cancelledEventId,
+      occurredAt: cancelledOccurredAt
     });
     await writeOutboxEvent(client, {
       aggregateType: "booking",
@@ -507,7 +517,9 @@ export async function cancelBooking(
           "select seat_label from booking_passengers where booking_id = $1 order by seat_label",
           [booking.id]
         )).rows.map((row) => row.seat_label)
-      }
+      },
+      eventId: cancelledEventId,
+      occurredAt: cancelledOccurredAt
     });
 
     return fetchBookingById(booking.id, client);
