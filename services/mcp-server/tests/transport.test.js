@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { CANCELLATION_POLICY_TEXT } from "@bus/shared/policies.js";
 
 import { createMcpServer } from "../src/server.js";
 
@@ -49,7 +50,7 @@ test("official SDK client completes MCP initialization and discovery", async () 
       const revenueTool = tools.tools.find((tool) => tool.name === "get_revenue_summary");
       assert.equal(Object.hasOwn(revenueTool.inputSchema.properties, "adminToken"), false);
       assert.equal(resourceList.resources.length, 4);
-      assert.match(policy.contents[0].text, /chinh sach huy ve/i);
+      assert.equal(policy.contents[0].text, CANCELLATION_POLICY_TEXT);
     } finally {
       await client.close();
     }

@@ -3,6 +3,12 @@ import test from "node:test";
 
 import { callTool, toolDefinitions } from "../src/tools.js";
 import { resources } from "../src/policies.js";
+import {
+  CANCELLATION_POLICY_TEXT,
+  CANCELLATION_POLICY_URI,
+  CHECKIN_POLICY_TEXT,
+  CHECKIN_POLICY_URI
+} from "@bus/shared/policies.js";
 
 test("exposes exactly the tools required by the lecturer spec", () => {
   assert.deepEqual(
@@ -27,6 +33,8 @@ test("exposes exactly the resources required by the lecturer spec", () => {
       "bus://system/health"
     ]
   );
+  assert.equal(resources[CANCELLATION_POLICY_URI].text, CANCELLATION_POLICY_TEXT);
+  assert.equal(resources[CHECKIN_POLICY_URI].text, CHECKIN_POLICY_TEXT);
 });
 
 test("get_booking_status requires both booking code and email", async () => {

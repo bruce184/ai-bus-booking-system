@@ -3,6 +3,11 @@ import test from "node:test";
 import { businessDate, compactBusinessDate, formatDateInTimeZone } from "../src/date.js";
 import { createEventEnvelope } from "../src/events.js";
 import { claimWorkflowEvent } from "../src/idempotency.js";
+import {
+  CANCELLATION_CUTOFF_HOURS,
+  CANCELLATION_POLICY_TEXT,
+  CANCELLATION_REFUND_PERCENT
+} from "../src/policies.js";
 
 test("workflow consumers claim an event with a consumer-specific idempotency key", async () => {
   const calls = [];
@@ -47,4 +52,11 @@ test("createEventEnvelope generates canonical metadata for direct publishers", (
   assert.equal(envelope.eventName, "trip.search_performed");
   assert.deepEqual(envelope.payload, { resultCount: 2 });
   assert.equal(Number.isNaN(Date.parse(envelope.occurredAt)), false);
+});
+
+test("cancellation policy constants and source text cannot drift apart", () => {
+  assert.match(CANCELLATION_POLICY_TEXT, /booking dang PAID/);
+  assert.match(CANCELLATION_POLICY_TEXT, new RegExp(`${CANCELLATION_CUTOFF_HOURS} gio`));
+  assert.match(CANCELLATION_POLICY_TEXT, new RegExp(`${CANCELLATION_REFUND_PERCENT}%`));
+  assert.match(CANCELLATION_POLICY_TEXT, /khong du dieu kien huy/);
 });

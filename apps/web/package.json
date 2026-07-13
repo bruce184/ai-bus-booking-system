@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.9",
+    "@bus/shared": "0.1.0",
     "ai": "^7.0.18",
     "graphql-ws": "^6.1.0",
     "lucide-react": "^1.24.0",

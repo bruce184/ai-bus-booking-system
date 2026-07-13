@@ -410,6 +410,11 @@ MCP resources:
 | `bus://routes/popular` | Popular demo routes |
 | `bus://system/health` | Demo service health |
 
+`bus://policy/cancellation`, Trip detail, chatbot policy answers, MCP policy
+reads, and Booking Service enforcement share one demo rule: only a `PAID`
+booking at least 24 hours before departure can be cancelled, with an 80%
+refund; within 24 hours it cannot be cancelled and receives no refund.
+
 MCP and chatbot responses must not fabricate trip inventory, booking status, seat state, or revenue.
 
 The MCP endpoint uses the official TypeScript SDK v1 stateless Streamable HTTP

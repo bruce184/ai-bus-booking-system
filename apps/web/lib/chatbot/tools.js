@@ -1,3 +1,10 @@
+import {
+  CANCELLATION_POLICY_TEXT,
+  CANCELLATION_POLICY_URI,
+  CHECKIN_POLICY_TEXT,
+  CHECKIN_POLICY_URI
+} from "@bus/shared/policies.js";
+
 const GRAPHQL_URL =
   process.env.GRAPHQL_GATEWAY_URL ||
   process.env.NEXT_PUBLIC_GRAPHQL_URL ||
@@ -5,14 +12,12 @@ const GRAPHQL_URL =
 
 export const policyResources = {
   cancellation: {
-    source: "bus://policy/cancellation",
-    text:
-      "Khach co the huy ve khi booking dang PAID va chuyen xe chua khoi hanh. Phi va dieu kien huy duoc ap dung theo cau hinh demo cua nha xe."
+    source: CANCELLATION_POLICY_URI,
+    text: CANCELLATION_POLICY_TEXT
   },
   checkin: {
-    source: "bus://policy/checkin",
-    text:
-      "Hanh khach can co mat truoc gio khoi hanh 30 phut va cung cap ma dat cho, ma ve, hoac QR demo de nhan vien xac nhan."
+    source: CHECKIN_POLICY_URI,
+    text: CHECKIN_POLICY_TEXT
   }
 };
 
