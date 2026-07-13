@@ -292,6 +292,7 @@ Owns booking state machine, passenger-per-seat data, booking lookup privacy, can
 | `ticket.issued` | Ticket Worker | Email Worker |
 | `email.requested` | Booking/Ticket flow | Email Worker |
 | `booking.expired` | Booking Service | Seat Inventory Service |
+| `booking.cancelled` | Booking Service | Seat Inventory Service (idempotent recovery for booked-seat release) |
 
 ### Kafka Analytics Events
 

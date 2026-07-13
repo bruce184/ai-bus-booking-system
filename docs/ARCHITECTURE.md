@@ -217,6 +217,7 @@ booking.paid
 ticket.issued
 email.requested
 booking.expired
+booking.cancelled
 ```
 
 Kafka analytics events:
@@ -244,6 +245,12 @@ Ticket Worker claims each canonical `booking.paid` `eventId` in
 advances the booking, writes the log, and queues `ticket.issued` in the
 transactional outbox. A RabbitMQ redelivery therefore neither duplicates the
 ticket transition nor creates another downstream event.
+
+Cancellation uses a synchronous `ReleaseBookedSeats` RPC as the fast path and
+also queues `booking.cancelled` in the same transaction as the booking state
+change. Seat Inventory consumes that event idempotently, so a transient RPC
+failure cannot leave cancelled seats permanently booked. Consumer failures use
+the shared per-queue DLQ behavior.
 
 ## 10. AI and MCP Rules
 

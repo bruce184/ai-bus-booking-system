@@ -493,6 +493,22 @@ export async function cancelBooking(
         tripId: booking.trip_id
       }
     });
+    await writeOutboxEvent(client, {
+      aggregateType: "booking",
+      aggregateId: booking.id,
+      eventName: "booking.cancelled",
+      target: "RABBITMQ",
+      routingKey: "booking.cancelled",
+      payload: {
+        bookingId: booking.id,
+        bookingCode: booking.booking_code,
+        tripId: booking.trip_id,
+        seatIds: (await client.query(
+          "select seat_label from booking_passengers where booking_id = $1 order by seat_label",
+          [booking.id]
+        )).rows.map((row) => row.seat_label)
+      }
+    });
 
     return fetchBookingById(booking.id, client);
   });

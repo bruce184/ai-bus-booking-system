@@ -62,6 +62,58 @@ test("check-in reads trip status through Trip Service, without joining trips", a
   assert.equal(statements.some((sql) => sql.includes("join trips")), false);
 });
 
+test("cancellation queues both analytics and seat-release recovery events", async () => {
+  let status = "PAID";
+  const outboxTargets = [];
+  const client = {
+    async query(text, params = []) {
+      const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
+      if (sql.startsWith("select * from bookings") && sql.includes("for update")) {
+        return { rows: [{ ...storedBooking(status), status }] };
+      }
+      if (sql.startsWith("update bookings set status = 'cancelled'")) {
+        status = "CANCELLED";
+        return { rowCount: 1, rows: [] };
+      }
+      if (sql.startsWith("insert into event_logs")) return { rowCount: 1, rows: [] };
+      if (sql.startsWith("insert into outbox_events")) {
+        outboxTargets.push({ target: params[3], routingKey: params[4] });
+        return { rowCount: 1, rows: [] };
+      }
+      if (sql.startsWith("select seat_label from booking_passengers")) {
+        return { rows: [{ seat_label: "A01" }, { seat_label: "A02" }] };
+      }
+      if (sql === "select * from bookings where id = $1") {
+        return { rows: [{ ...storedBooking(status), status }] };
+      }
+      if (sql.startsWith("select * from booking_passengers")) {
+        return { rows: storedPassengers() };
+      }
+      if (sql.includes("from tickets tk")) return { rows: [] };
+      throw new Error(`Unexpected SQL in cancellation test: ${sql}`);
+    }
+  };
+
+  const result = await cancelBooking(
+    { booking_code: storedBooking().booking_code, email: storedBooking().contact_email },
+    {
+      runQuery: async () => ({
+        rows: [{ id: storedBooking().id, trip_id: input.trip_id, status: "PAID" }]
+      }),
+      runTransaction: (work) => work(client),
+      getTripSnapshot: async () => ({
+        departureTime: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+      })
+    }
+  );
+
+  assert.equal(result.status, "CANCELLED");
+  assert.deepEqual(outboxTargets, [
+    { target: "KAFKA", routingKey: "booking-events" },
+    { target: "RABBITMQ", routingKey: "booking.cancelled" }
+  ]);
+});
+
 const input = {
   trip_id: "trip-1",
   hold_token: "hold-1",

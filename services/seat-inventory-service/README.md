@@ -114,6 +114,6 @@ requests for the same seat. It requires exactly one successful hold and one
 requests do not partially update the existing seat and that retrying
 `ConfirmSeats` for the same booking succeeds after the Redis hold is consumed.
 
-`consume:booking-expired` listens for `booking.expired` messages on the
-`bus.workflow` topic exchange using routing key `booking.expired`. It releases
+`consume:booking-expired` listens for `booking.expired` and `booking.cancelled`
+messages on the `bus.workflow` topic exchange. It releases
 holds using either `holdToken` or `tripId + seatIds` from the event payload.
