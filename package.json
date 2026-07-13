@@ -55,12 +55,13 @@
     "test:gateway:perf": "npm --prefix services/graphql-gateway run test:perf",
     "test:seat:race": "npm --prefix services/seat-inventory-service run test:race",
     "test:seat:integration": "npm --prefix services/seat-inventory-service run test:integration",
-    "test:web:e2e": "docker compose up -d --wait postgres redis rabbitmq zookeeper kafka && npm --prefix apps/web run test:e2e",
+    "test:web:e2e": "node scripts/run-web-e2e.mjs",
     "test:unit": "npm run test:shared && npm run test:readiness && npm run test:web:unit && npm run test:gateway && npm run test:booking && npm run test:payment && npm run test:trip && npm run test:analytics && npm run test:seat && npm run test:mcp && npm run test:ticket-worker && npm run test:email-worker",
     "test:integration": "npm run test:gateway:integration && npm run test:seat:integration",
     "test:e2e": "npm run test:web:e2e",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e",
-    "validate": "npm run check:docs && npm run check:source && npm run test:unit && npm run test:integration"
+    "validate": "npm run check:docs && npm run check:source && npm run test:unit && npm run test:integration",
+    "release:check": "npm run check:docs && npm run check:source && npm run compose:config && npm run test:all"
   },
   "devDependencies": {
     "concurrently": "^10.0.3"

@@ -200,8 +200,14 @@ Implemented test targets:
 | Gateway performance | `npm run test:gateway:perf` | Requires Apache JMeter on `PATH` |
 | Web lint | `npm --prefix apps/web run lint` | Next.js/React lint |
 | Web auth unit tests | `npm run test:web:unit` | BFF portal-role and secure-cookie invariants |
-| Web admin/customer E2E | `npm run test:web:e2e` | Starts healthy Docker infra plus Trip, Seat, Booking, Payment, Analytics, Gateway, and Web test servers |
+| Web admin/customer E2E | `npm run test:web:e2e` | Uses isolated Compose ports/volume, starts non-reused app servers, and always removes E2E infrastructure in a final cleanup step |
 | Source integrity | `npm run check:source` | Syntax-checks non-Next Node files, resolves all relative imports, and validates the workspace dependency tree; Next JSX is covered by lint/build |
+| Full release gate | `npm run release:check` | Runs docs/source/Compose checks, unit and integration suites, then the hermetic web E2E suite |
+
+The E2E wrapper uses a dedicated Compose project, disposable database volume,
+and non-default host ports. It always executes `docker compose down -v
+--remove-orphans`, including after Playwright failure. Override ports only
+with `E2E_*_PORT`; ordinary demo ports remain unchanged.
 
 ## 9. Local Run Targets
 

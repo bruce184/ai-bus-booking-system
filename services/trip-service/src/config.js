@@ -8,9 +8,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const serviceRoot = path.resolve(here, '..');
 const repoRoot = path.resolve(serviceRoot, '..', '..');
 
-// Root first (shared defaults), then service-local (wins on conflicts).
+// Explicit process variables (including hermetic E2E ports) win. Service-local
+// values fill next, then the root file supplies shared defaults.
+dotenv.config({ path: path.join(serviceRoot, '.env') });
 dotenv.config({ path: path.join(repoRoot, '.env') });
-dotenv.config({ path: path.join(serviceRoot, '.env'), override: true });
 
 export const config = {
   port: Number(process.env.TRIP_SERVICE_PORT || 50051),
