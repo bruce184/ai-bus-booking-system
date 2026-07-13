@@ -42,11 +42,27 @@ directly; Analytics Service is the only service allowed to read or write
 
 ### Database per service
 
-All tables share one PostgreSQL instance in this local deployment, but no
-service holds a physical foreign key into a table it does not own, and no
-service runs a direct SQL join into another service's tables (see
-`docs/DATABASE_SCHEMA.md` section 8 for the full list). Where one service
-needs data another owns, it calls that service's API:
+All tables share one PostgreSQL instance in this student/local deployment.
+Core service references do not use physical foreign keys across ownership
+boundaries; identifiers are validated through APIs where they affect business
+decisions (see `docs/DATABASE_SCHEMA.md` section 8). This is logical
+database-per-service separation, not physically separate databases.
+
+The current MVP still has three explicit shared-database compromises:
+
+- Ticket and Email Workers are asynchronous components of the booking/ticket
+  workflow. They read booking/trip context to render demo tickets/emails, and
+  Booking Service reads issued ticket output for its response.
+- `trip_seats` is a local materialized projection: Trip Service initializes
+  and removes it with trip lifecycle changes, while Seat Inventory owns hold,
+  booked, and blocked state transitions and reads vehicle layout coordinates.
+- `event_logs` is a shared operational log sink written by workflow services
+  and queried through Booking Service for the admin demo.
+
+These joins/projection writes are not hidden as full production isolation. A
+deployment with one database/schema per service would replace them with event
+payload snapshots or service APIs. The boundaries already enforced in this
+MVP are:
 
 - Booking Service calls Trip Service's `GetTripDetail` RPC to verify a
   `trip_id` and read its current price/status/departure time before creating,

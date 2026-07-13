@@ -143,10 +143,11 @@ PAID -> CANCELLED
 `trip_seats.booking_id`, `tickets.booking_id`, `tickets.passenger_id`, and
 `saved_passengers.customer_user_id` are references, not physical foreign
 keys. All tables still live in one PostgreSQL instance for this local
-deployment, but a service only ever reads/writes the tables it owns per
-`docs/ARCHITECTURE.md` section 3 - it does not join into another service's
-tables or rely on a shared-schema constraint to enforce a cross-service
-reference. Instead:
+deployment. Business-critical references do not rely on a shared-schema
+constraint: Trip/Booking/Analytics decisions use service APIs as listed below.
+The Ticket/Email workflow, `trip_seats` materialized projection, and shared
+`event_logs` sink remain explicit local-demo shared-database compromises; see
+`docs/ARCHITECTURE.md` section 3. Instead of physical cross-service FKs:
 
 - `bookings.trip_id` is unauthenticated client input, so Booking Service
   verifies existence/price/status/departure time through Trip Service's
