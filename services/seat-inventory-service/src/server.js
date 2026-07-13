@@ -4,6 +4,17 @@ import { closePostgres } from "./db/postgres.js";
 import { seatInventoryHandlers } from "./grpc/seatInventoryHandlers.js";
 import { seatInventoryServiceDefinition } from "./grpc/proto.js";
 import { closeRedis } from "./redis/holdStore.js";
+import {
+  closeHoldExpiryPublisher,
+  startHoldExpiryPublisher
+} from "./redis/holdExpiryPublisher.js";
+
+try {
+  await startHoldExpiryPublisher();
+} catch (error) {
+  console.error("Failed to start Redis hold-expiry publisher", error);
+  process.exit(1);
+}
 
 const server = new grpc.Server();
 
@@ -29,7 +40,11 @@ function shutdown(signal) {
       process.exit(1);
     }
 
-    await Promise.all([closePostgres(), closeRedis()]);
+    await Promise.all([
+      closePostgres(),
+      closeRedis(),
+      closeHoldExpiryPublisher()
+    ]);
     process.exit(0);
   });
 }

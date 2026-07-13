@@ -8,7 +8,7 @@ import { adminMutationResolvers } from "./adminResolvers.js";
 import { callGrpc } from "../grpc/call.js";
 import { requireAdmin, requireUser } from "../auth/authorization.js";
 import { publishSeatStateChanged, subscribeSeatStateChanged } from "./seatStatePubSub.js";
-import { publishBookingUpdated, subscribeBookingUpdated } from "./bookingUpdatedPubSub.js";
+import { subscribeBookingUpdated } from "./bookingUpdatedPubSub.js";
 
 function requesterIdFromContext(context) {
   return context.user?.id ?? context.requestId ?? "guest";
@@ -315,40 +315,18 @@ export const resolvers = {
     },
 
     simulatePayment: async (_parent, args, context) => {
-      const booking = await callGrpc(context.grpc.booking, "simulatePayment", {
+      return callGrpc(context.grpc.booking, "simulatePayment", {
         bookingCode: args.input.bookingCode,
         success: args.input.success,
         email: args.input.email
       });
-
-      if (args.input.success && booking) {
-        await publishSeatStates(
-          context,
-          booking.tripId,
-          (booking.passengers || []).map((p) => p.seatId)
-        );
-        publishBookingUpdated(booking);
-      }
-
-      return booking;
     },
 
     cancelBooking: async (_parent, args, context) => {
-      const booking = await callGrpc(context.grpc.booking, "cancelBooking", {
+      return callGrpc(context.grpc.booking, "cancelBooking", {
         bookingCode: args.input.bookingCode,
         email: args.input.email
       });
-
-      if (booking) {
-        await publishSeatStates(
-          context,
-          booking.tripId,
-          (booking.passengers || []).map((p) => p.seatId)
-        );
-        publishBookingUpdated(booking);
-      }
-
-      return booking;
     },
 
     savePassengerProfile: async (_parent, args, context) => {

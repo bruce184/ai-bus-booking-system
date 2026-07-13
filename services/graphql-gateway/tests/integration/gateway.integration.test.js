@@ -138,6 +138,7 @@ test.before(async () => {
       GRAPHQL_GATEWAY_PORT: String(gatewayPort),
       JWT_SECRET: "integration_test_secret_change_me_1234567890",
       ANALYTICS_SERVICE_URL: analyticsUrl,
+      DISABLE_RABBITMQ: "true",
       TRIP_SERVICE_GRPC_ADDRESS: "127.0.0.1:59951",
       BOOKING_SERVICE_GRPC_ADDRESS: "127.0.0.1:59953",
       SEAT_INVENTORY_SERVICE_GRPC_ADDRESS:

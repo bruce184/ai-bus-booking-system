@@ -12,6 +12,7 @@ import { useServer } from "graphql-ws/use/ws";
 import { loadGatewayConfig } from "./config/env.js";
 import { closeGrpcClients, createGrpcClients } from "./grpc/clients.js";
 import { loadTypeDefs } from "./graphql/schema.js";
+import { startRealtimeWorkflowBridge } from "./events/workflowBridge.js";
 import { createContextFactory } from "./server/context.js";
 import { createLoaders } from "./server/loaders.js";
 import { resolvers } from "./server/resolvers.js";
@@ -20,6 +21,10 @@ async function main() {
   const config = loadGatewayConfig();
   const typeDefs = await loadTypeDefs();
   const grpcClients = createGrpcClients(config);
+
+  if (config.workflowEventsEnabled) {
+    await startRealtimeWorkflowBridge(grpcClients);
+  }
 
   const schema = makeExecutableSchema({ typeDefs, resolvers });
 

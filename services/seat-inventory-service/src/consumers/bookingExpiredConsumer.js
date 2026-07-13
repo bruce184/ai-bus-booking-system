@@ -1,13 +1,13 @@
 import { createWorkflowConsumer } from "@bus/shared/events.js";
 
 import { config } from "../config.js";
-import { processBookingLifecycleEvent } from "./bookingLifecycleProcessor.js";
+import { handleBookingLifecycleEvent } from "./bookingLifecycleHandler.js";
 
 await createWorkflowConsumer(
   config.bookingExpiredQueue,
   ["booking.expired", "booking.cancelled"],
   async (event) => {
-    const outcome = await processBookingLifecycleEvent(event);
+    const outcome = await handleBookingLifecycleEvent(event);
     console.log(
       `[seat-inventory] ${outcome.eventName} processed: released=${outcome.released} eventId=${
         event.eventId || "legacy"

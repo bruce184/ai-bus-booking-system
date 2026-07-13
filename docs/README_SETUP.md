@@ -228,6 +228,11 @@ npm run dev:ticket-worker
 npm run dev:email-worker
 ```
 
+The Gateway realtime bridge requires RabbitMQ in the integrated demo. Gateway
+unit/integration tests and intentionally isolated local runs must set
+`DISABLE_RABBITMQ=true`; this disables cross-process subscription propagation
+and must not be used for the full demo.
+
 For local service-only smoke tests without RabbitMQ/Kafka/Seat Inventory running, use:
 
 ```bash

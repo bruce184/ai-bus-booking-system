@@ -157,7 +157,9 @@ time-sensitive seat availability as cached truth.
 4. Redis stores hold keys with TTL, default 5 minutes.
 5. Gateway returns hold token and expiry.
 6. Seat updates are broadcast with GraphQL Subscription.
-7. When TTL expires, the seat becomes `AVAILABLE` again and clients receive an update when implemented.
+7. Redis key-expiry notification publishes `seat.hold_expired`.
+8. The Gateway realtime bridge fetches the canonical seat map over gRPC and
+   publishes the affected `AVAILABLE` seat through GraphQL Subscription.
 
 ### Checkout, Payment, Ticket, Email
 
@@ -168,7 +170,14 @@ time-sensitive seat availability as cached truth.
 5. Booking Service writes `booking.paid` and analytics events to its transactional outbox; the outbox dispatcher publishes them to RabbitMQ/Kafka.
 6. Ticket Worker creates e-ticket records with ticket code, QR payload, policy snapshot, and simple HTML/PDF-ready content.
 7. Ticket Worker publishes `ticket.issued`.
-8. Email Worker logs simulated email delivery.
+8. A durable Gateway workflow queue consumes booking/ticket events, re-fetches
+   Booking Service with the event's `bookingCode + contactEmail`, and publishes
+   canonical `bookingUpdated` payloads. Booking-paid also refreshes affected
+   seats from Seat Inventory.
+9. Expiry/cancellation seat releases publish `seat.state_changed` only after
+   Seat Inventory completes the idempotent release; the Gateway then refreshes
+   and broadcasts canonical seats.
+10. Email Worker logs simulated email delivery.
 
 ### Booking Lookup and Customer History
 

@@ -7,6 +7,7 @@ import {
   cancelBooking,
   checkInPassenger,
   createBooking,
+  expirePendingBookings,
   isPaymentSettledStatus,
   settleBookingPayment
 } from "../src/repository.js";
@@ -77,7 +78,12 @@ test("cancellation queues both analytics and seat-release recovery events", asyn
       }
       if (sql.startsWith("insert into event_logs")) return { rowCount: 1, rows: [] };
       if (sql.startsWith("insert into outbox_events")) {
-        outboxTargets.push({ target: params[3], routingKey: params[4], eventId: params[6] });
+        outboxTargets.push({
+          target: params[3],
+          routingKey: params[4],
+          payload: JSON.parse(params[5]),
+          eventId: params[6]
+        });
         return { rowCount: 1, rows: [] };
       }
       if (sql.startsWith("select seat_label from booking_passengers")) {
@@ -112,7 +118,48 @@ test("cancellation queues both analytics and seat-release recovery events", asyn
   assert.equal(outboxTargets[0].routingKey, "booking-events");
   assert.equal(outboxTargets[1].target, "RABBITMQ");
   assert.equal(outboxTargets[1].routingKey, "booking.cancelled");
+  assert.equal(outboxTargets[1].payload.contactEmail, storedBooking().contact_email);
   assert.equal(outboxTargets[0].eventId, outboxTargets[1].eventId);
+});
+
+
+test("expiration event carries the private lookup pair for canonical realtime refresh", async () => {
+  let eventPayload;
+  const client = {
+    async query(text, params = []) {
+      const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
+      if (sql.startsWith("select id, booking_code, trip_id, hold_token, contact_email")) {
+        return {
+          rows: [{
+            id: storedBooking().id,
+            booking_code: storedBooking().booking_code,
+            trip_id: storedBooking().trip_id,
+            hold_token: storedBooking().hold_token,
+            contact_email: storedBooking().contact_email
+          }]
+        };
+      }
+      if (sql.startsWith("update bookings")) return { rowCount: 1, rows: [] };
+      if (sql.startsWith("select booking_id, seat_label")) {
+        return { rows: [{ booking_id: storedBooking().id, seat_label: "A01" }] };
+      }
+      if (sql.startsWith("insert into event_logs")) return { rowCount: 1, rows: [] };
+      if (sql.startsWith("insert into outbox_events")) {
+        eventPayload = JSON.parse(params[5]);
+        return { rowCount: 1, rows: [] };
+      }
+      throw new Error(`Unexpected SQL in expiration test: ${sql}`);
+    }
+  };
+
+  const expired = await expirePendingBookings(300, {
+    runTransaction: (work) => work(client)
+  });
+
+  assert.equal(expired[0].contactEmail, storedBooking().contact_email);
+  assert.equal(eventPayload.bookingCode, storedBooking().booking_code);
+  assert.equal(eventPayload.contactEmail, storedBooking().contact_email);
+  assert.deepEqual(eventPayload.seatIds, ["A01"]);
 });
 
 const input = {

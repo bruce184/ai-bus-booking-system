@@ -35,6 +35,7 @@ export function loadGatewayConfig(env = process.env) {
   return {
     port: readPort(env, "GRAPHQL_GATEWAY_PORT", 4000),
     webOrigin: env.WEB_ORIGIN ?? "http://localhost:3000",
+    workflowEventsEnabled: env.DISABLE_RABBITMQ !== "true",
     auth: {
       jwtSecret: env.JWT_SECRET ?? "local_demo_jwt_secret_change_me",
       jwtExpiresInSeconds: readPort(env, "JWT_EXPIRES_IN_SECONDS", 28800)

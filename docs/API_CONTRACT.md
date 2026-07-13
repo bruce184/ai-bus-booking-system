@@ -288,11 +288,23 @@ Owns booking state machine, passenger-per-seat data, booking lookup privacy, can
 
 | Event | Publisher | Consumers |
 |---|---|---|
-| `booking.paid` | Booking Service | Ticket Worker, Email Worker |
-| `ticket.issued` | Ticket Worker | Email Worker |
+| `booking.paid` | Booking Service | Ticket Worker, Email Worker, GraphQL Gateway realtime bridge |
+| `ticket.issued` | Ticket Worker | Email Worker, GraphQL Gateway realtime bridge |
 | `email.requested` | Reserved compatibility event; no current MVP producer | Email Worker |
-| `booking.expired` | Booking Service | Seat Inventory Service |
-| `booking.cancelled` | Booking Service | Seat Inventory Service (idempotent recovery for booked-seat release) |
+| `booking.expired` | Booking Service | Seat Inventory Service, GraphQL Gateway realtime bridge |
+| `booking.cancelled` | Booking Service | Seat Inventory Service (idempotent recovery for booked-seat release), GraphQL Gateway realtime bridge |
+| `seat.hold_expired` | Seat Inventory Service Redis expiry listener | GraphQL Gateway realtime bridge |
+| `seat.state_changed` | Seat Inventory Service lifecycle consumer | GraphQL Gateway realtime bridge |
+
+Booking workflow events consumed by the realtime bridge carry
+`bookingCode + contactEmail`; the bridge calls Booking Service
+`GetBookingStatus` with that same private lookup pair and publishes only the
+canonical response. Seat events carry identifiers only; the bridge calls
+`GetSeatMap` and publishes canonical affected seats. A booking expiry or
+cancellation emits `seat.state_changed` only after Seat Inventory completes
+the release. Redis key-expiry notification flags are enabled without removing
+existing notification flags, and each expired `hold:{tripId}:{seatId}` key
+emits `seat.hold_expired`.
 
 ### Kafka Analytics Events
 

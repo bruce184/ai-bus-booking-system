@@ -527,6 +527,7 @@ export async function cancelBooking(
         bookingId: booking.id,
         bookingCode: booking.booking_code,
         tripId: booking.trip_id,
+        contactEmail: booking.contact_email,
         seatIds: (await client.query(
           "select seat_label from booking_passengers where booking_id = $1 order by seat_label",
           [booking.id]
@@ -540,11 +541,14 @@ export async function cancelBooking(
   });
 }
 
-export async function expirePendingBookings(ageSeconds = 300, { bookingIds = null } = {}) {
-  return transaction(async (client) => {
+export async function expirePendingBookings(
+  ageSeconds = 300,
+  { bookingIds = null, runTransaction = transaction } = {}
+) {
+  return runTransaction(async (client) => {
     const result = await client.query(
       `
-        select id, booking_code, trip_id, hold_token
+        select id, booking_code, trip_id, hold_token, contact_email
         from bookings
         where status = 'PENDING_PAYMENT'
           and created_at < now() - $1 * interval '1 second'
@@ -591,6 +595,7 @@ export async function expirePendingBookings(ageSeconds = 300, { bookingIds = nul
       bookingCode: b.booking_code,
       tripId: b.trip_id,
       holdToken: b.hold_token || "",
+      contactEmail: b.contact_email,
       seatIds: seatsByBooking.get(b.id) ?? []
     }));
 
@@ -618,6 +623,7 @@ export async function expirePendingBookings(ageSeconds = 300, { bookingIds = nul
           bookingCode: b.bookingCode,
           tripId: b.tripId,
           holdToken: b.holdToken,
+          contactEmail: b.contactEmail,
           seatIds: b.seatIds
         }
       });
