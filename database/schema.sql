@@ -66,7 +66,7 @@ create table if not exists trips (
 
 create table if not exists trip_seats (
   id uuid primary key default gen_random_uuid(),
-  trip_id uuid not null references trips(id) on delete cascade,
+  trip_id uuid not null,
   seat_label text not null,
   status text not null default 'AVAILABLE' check (status in ('AVAILABLE', 'HELD', 'BOOKED', 'BLOCKED')),
   block_reason text,
@@ -123,10 +123,13 @@ create table if not exists saved_passengers (
   created_at timestamptz not null default now()
 );
 
+-- Ticket Worker is a separate runtime boundary. booking_id/passenger_id are
+-- logical references validated from the canonical booking.paid event, not
+-- physical foreign keys into Booking Service tables.
 create table if not exists tickets (
   id uuid primary key default gen_random_uuid(),
-  booking_id uuid not null references bookings(id) on delete cascade,
-  passenger_id uuid not null references booking_passengers(id) on delete cascade,
+  booking_id uuid not null,
+  passenger_id uuid not null,
   ticket_code text not null unique,
   qr_payload text not null,
   ticket_html text,
@@ -181,6 +184,12 @@ create table if not exists outbox_events (
   created_at timestamptz not null default now(),
   published_at timestamptz
 );
+
+-- Keep schema.sql re-runnable against volumes created before service-boundary
+-- foreign keys were removed.
+alter table trip_seats drop constraint if exists trip_seats_trip_id_fkey;
+alter table tickets drop constraint if exists tickets_booking_id_fkey;
+alter table tickets drop constraint if exists tickets_passenger_id_fkey;
 
 -- RabbitMQ consumers use a consumer-specific key because multiple queues may
 -- legitimately process the same canonical eventId. The claim is inserted in

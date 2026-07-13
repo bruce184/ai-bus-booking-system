@@ -61,6 +61,10 @@ needs data another owns, it calls that service's API:
 - `customer_user_id` values are trusted from the GraphQL Gateway's
   already-authenticated caller wherever they appear (`bookings`,
   `saved_passengers`); no service re-validates them against a `users` table.
+- Seat Inventory's `trip_seats.trip_id` and Ticket Worker's
+  `tickets.booking_id`/`passenger_id` are logical references only. The local
+  shared PostgreSQL deployment uses explicit projection cleanup rather than
+  cross-service FK cascades.
 
 ## 4. Communication Rules
 

@@ -139,7 +139,8 @@ PAID -> CANCELLED
 
 ### Database per service
 
-`bookings.customer_user_id`, `bookings.trip_id`, `trip_seats.booking_id`, and
+`bookings.customer_user_id`, `bookings.trip_id`, `trip_seats.trip_id`,
+`trip_seats.booking_id`, `tickets.booking_id`, `tickets.passenger_id`, and
 `saved_passengers.customer_user_id` are references, not physical foreign
 keys. All tables still live in one PostgreSQL instance for this local
 deployment, but a service only ever reads/writes the tables it owns per
@@ -157,6 +158,12 @@ reference. Instead:
   against a `users` table by the service that receives them.
 - `trip_seats.booking_id` is trusted from Booking Service's own
   `ConfirmSeats`/`ReleaseBookedSeats` calls to Seat Inventory Service.
+- `trip_seats.trip_id` is initialized from Trip Service's trip/vehicle
+  projection. Trip deletion explicitly removes those projection rows because
+  there is no cross-service cascade.
+- `tickets.booking_id` / `tickets.passenger_id` come from Ticket Worker's
+  canonical `booking.paid` event context and have no physical constraint into
+  Booking Service tables.
 - Analytics Service resolves a trip's route label via Trip Service's
   `GetTripDetail` RPC and a booking's cancellation metrics via Booking
   Service's internal `GetBookingMetrics` RPC, instead of joining into

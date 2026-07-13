@@ -333,11 +333,25 @@ export async function updateTrip(call) {
   return { trip: await fetchTrip(id) };
 }
 
-export async function deleteTrip(call) {
+export async function deleteTrip(call, { database = pool } = {}) {
   const { id } = call.request;
   if (!id) throw invalidArgument('id is required');
-  const { rowCount } = await query('delete from trips where id = $1', [id]);
-  return { deleted: rowCount > 0 };
+  const client = await database.connect();
+  try {
+    await client.query('begin');
+    // trip_seats belongs to the Seat Inventory boundary, so there is no
+    // cross-service FK cascade. The local shared-DB deployment performs the
+    // projection cleanup explicitly while deleting the catalog trip.
+    await client.query('delete from trip_seats where trip_id = $1', [id]);
+    const { rowCount } = await client.query('delete from trips where id = $1', [id]);
+    await client.query('commit');
+    return { deleted: rowCount > 0 };
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function updateTripStatus(call) {
