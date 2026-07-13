@@ -123,6 +123,13 @@ export async function holdSeats(request) {
     config.seatHoldTtlSeconds
   );
 
+  if (holdResult.maintenanceConflict) {
+    throw serviceError(
+      grpc.status.FAILED_PRECONDITION,
+      "SEAT_NOT_AVAILABLE: Trip seat layout is being updated"
+    );
+  }
+
   if (holdResult.conflictSeatId) {
     throw serviceError(
       grpc.status.FAILED_PRECONDITION,

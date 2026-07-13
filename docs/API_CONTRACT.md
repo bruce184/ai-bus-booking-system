@@ -75,8 +75,8 @@ Admin login is required for admin screens in the MVP. Local demo auth may use se
 | `adminCreateRoute(input)` / `adminUpdateRoute` / `adminDeleteRoute` | Admin route CRUD |
 | `adminCreateStop(input)` / `adminUpdateStop` / `adminDeleteStop` | Admin pickup/dropoff stop CRUD |
 | `adminCreateVehicle(input)` / `adminUpdateVehicle` / `adminDeleteVehicle` | Admin vehicle CRUD |
-| `adminConfigureVehicleSeats(vehicleId, seats)` | Configure vehicle seat layout |
-| `adminCreateTrip(input)` / `adminUpdateTrip` / `adminDeleteTrip` | Admin trip CRUD; changing `vehicleId` rebuilds `trip_seats` from the new vehicle's layout and is rejected if any seat on the trip is already held, booked, or blocked; deletion is rejected while any booking logically references the trip |
+| `adminConfigureVehicleSeats(vehicleId, seats)` | Configure vehicle seat layout only before the vehicle is assigned to any trip; the layout and derived `seatCount` are replaced atomically |
+| `adminCreateTrip(input)` / `adminUpdateTrip` / `adminDeleteTrip` | Admin trip CRUD; create/update snapshots the vehicle layout under a shared lock; changing `vehicleId` is rejected if Redis has an active hold or any persistent seat is booked/blocked, and fails closed when Redis is unavailable; deletion is rejected while any Redis hold or booking logically references the trip |
 | `adminUpdateTripStatus(input)` | Activate, lock, depart, complete, cancel, or draft a trip |
 | `adminBlockSeats(input)` | Block seats from sale with an optional reason |
 | `adminCheckIn(input)` | Check in by booking code, ticket code, or simulated QR payload |
@@ -405,6 +405,22 @@ Payment and expiry for the same booking must be serialized by Booking Service.
 An expiry sweep must skip a booking whose payment transition is in progress,
 and concurrent successful payment retries must produce only one transition to
 `PAID`.
+
+Vehicle layout configuration, trip creation, and trip vehicle replacement
+serialize on a PostgreSQL advisory lock keyed by `vehicleId`. Configuration is
+rejected after any trip references the vehicle. A vehicle replacement also
+takes a bounded Redis maintenance lock keyed by `tripId`; the Seat Inventory
+hold Lua script checks that key atomically before writing any hold. After the
+lock is acquired, Trip Service rejects existing Redis holds, row-locks the
+materialized `trip_seats`, rejects booked/blocked seats, rebuilds the snapshot,
+and renews ownership immediately before commit. The database commit finishes
+before the maintenance lock is released. Redis uncertainty fails closed with
+`SERVICE_TIMEOUT`, without being misclassified as a dead Trip Service by the
+Gateway circuit breaker, so an admin update cannot silently orphan a live hold.
+
+Trip deletion also takes the Redis seat-maintenance lease, rejects existing
+hold keys, renews ownership before commit, and fails closed if Redis cannot
+prove the trip is hold-free.
 
 Booking creation and trip deletion serialize on the same transaction-scoped
 PostgreSQL advisory lock keyed by `tripId`. Creation performs its Trip Service

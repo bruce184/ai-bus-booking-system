@@ -1,12 +1,35 @@
 // Redis-backed search cache.
-// Optional dependency: if Redis is unavailable the service still works, just
-// without cache hits.
-import { createHash } from 'node:crypto';
+// Redis is optional for search/cache reads. Topology mutations that must
+// coordinate with live seat holds use the same connection and fail closed.
+import { createHash, randomUUID } from 'node:crypto';
 import Redis from 'ioredis';
 import { config } from './config.js';
 import { logger } from './logger.js';
+import { failedPrecondition } from './errors.js';
 
 const SEARCH_PREFIX = 'trip:search:';
+const SEAT_MAINTENANCE_PREFIX = 'seat-maintenance:';
+const SEAT_MAINTENANCE_TTL_MS = 120_000;
+
+const RELEASE_SEAT_MAINTENANCE_SCRIPT = `
+  if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("DEL", KEYS[1])
+  end
+  return 0
+`;
+
+const RENEW_SEAT_MAINTENANCE_SCRIPT = `
+  if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("PEXPIRE", KEYS[1], ARGV[2])
+  end
+  return 0
+`;
+
+export class SeatMaintenanceStoreError extends Error {}
+
+export function seatMaintenanceKey(tripId) {
+  return `${SEAT_MAINTENANCE_PREFIX}${tripId}`;
+}
 
 let client = null;
 let enabled = false;
@@ -87,6 +110,102 @@ export async function getHeldSeatCount(tripId) {
   }
 
   return count;
+}
+
+async function hasActiveTripHolds(redisClient, tripId) {
+  let cursor = '0';
+  try {
+    do {
+      const [nextCursor, keys] = await redisClient.scan(
+        cursor,
+        'MATCH',
+        `hold:${tripId}:*`,
+        'COUNT',
+        100,
+      );
+      cursor = nextCursor;
+      if (keys.length > 0) return true;
+    } while (cursor !== '0');
+    return false;
+  } catch (error) {
+    throw new SeatMaintenanceStoreError(error.message);
+  }
+}
+
+export async function withTripSeatMaintenanceClient(redisClient, tripId, work) {
+  const key = seatMaintenanceKey(tripId);
+  const token = randomUUID();
+  let acquired;
+
+  try {
+    acquired = await redisClient.set(
+      key,
+      token,
+      'PX',
+      SEAT_MAINTENANCE_TTL_MS,
+      'NX',
+    );
+  } catch (error) {
+    throw new SeatMaintenanceStoreError(error.message);
+  }
+
+  if (acquired !== 'OK') {
+    return { acquired: false, hasActiveHolds: false };
+  }
+
+  try {
+    if (await hasActiveTripHolds(redisClient, tripId)) {
+      return { acquired: true, hasActiveHolds: true };
+    }
+
+    return {
+      acquired: true,
+      hasActiveHolds: false,
+      value: await work(async () => {
+        let renewed;
+        try {
+          renewed = await redisClient.eval(
+            RENEW_SEAT_MAINTENANCE_SCRIPT,
+            1,
+            key,
+            token,
+            SEAT_MAINTENANCE_TTL_MS,
+          );
+        } catch (error) {
+          throw new SeatMaintenanceStoreError(error.message);
+        }
+        if (Number(renewed) !== 1) {
+          throw new SeatMaintenanceStoreError('Seat-maintenance lease was lost');
+        }
+      }),
+    };
+  } finally {
+    try {
+      await redisClient.eval(RELEASE_SEAT_MAINTENANCE_SCRIPT, 1, key, token);
+    } catch (error) {
+      // The lock has a bounded TTL. Do not report a committed database update
+      // as failed merely because best-effort lock cleanup could not reach Redis.
+      logger.warn('Seat-maintenance lock cleanup failed', error.message);
+    }
+  }
+}
+
+export async function withTripSeatMaintenance(tripId, work) {
+  if (!enabled || !client) {
+    throw failedPrecondition(
+      'SERVICE_TIMEOUT: Seat hold store unavailable; vehicle change was not applied',
+    );
+  }
+
+  try {
+    return await withTripSeatMaintenanceClient(client, tripId, work);
+  } catch (error) {
+    if (!(error instanceof SeatMaintenanceStoreError)) throw error;
+    logger.warn('Seat-maintenance coordination failed', error.message);
+    throw failedPrecondition(
+      'SERVICE_TIMEOUT: Seat hold store unavailable; vehicle change was not applied',
+    );
+  }
 }
 
 export async function closeCache() {

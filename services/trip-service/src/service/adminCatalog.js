@@ -4,6 +4,7 @@ import { notFound, invalidArgument } from '../errors.js';
 import { mapStop, mapVehicleSeat, mapRoute, mapVehicle, mapLocation } from '../mappers.js';
 import { TRIP_SELECT, rowToTrip, rowsToTrips } from '../tripQuery.js';
 import { logger } from '../logger.js';
+import { withTripSeatMaintenance } from '../cache.js';
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -56,6 +57,12 @@ async function fetchTrip(id) {
   const { rows } = await query(`${TRIP_SELECT} where t.id = $1`, [id]);
   if (rows.length === 0) throw notFound('Trip not found');
   return rowToTrip(rows[0]);
+}
+
+async function fetchTripVehicleId(id) {
+  const { rows } = await query('select vehicle_id from trips where id = $1', [id]);
+  if (rows.length === 0) throw notFound('Trip not found');
+  return rows[0].vehicle_id;
 }
 
 // Non-fatal operational logging. event_logs is a shared table; trip-domain
@@ -188,16 +195,30 @@ export async function deleteVehicle(call) {
 }
 
 // Replaces the full seat layout for a vehicle in one transaction.
-export async function configureVehicleSeats(call) {
+export async function configureVehicleSeats(call, { database = pool } = {}) {
   const { vehicle_id, seats } = call.request;
   if (!vehicle_id) throw invalidArgument('vehicle_id is required');
   const list = seats || [];
 
-  const client = await pool.connect();
+  const client = await database.connect();
   try {
     await client.query('begin');
+    await client.query(
+      "select pg_advisory_xact_lock(hashtext('vehicle-layout'), hashtext($1))",
+      [vehicle_id],
+    );
     const exists = await client.query('select 1 from vehicles where id = $1', [vehicle_id]);
     if (exists.rowCount === 0) throw notFound('Vehicle not found');
+
+    // A trip owns a materialized seat snapshot. Editing the source layout after
+    // assignment would make vehicle_seats and trip_seats disagree.
+    const assigned = await client.query(
+      'select 1 from trips where vehicle_id = $1 limit 1',
+      [vehicle_id],
+    );
+    if (assigned.rowCount > 0) {
+      throw invalidArgument('Cannot configure seats: vehicle is already assigned to a trip');
+    }
 
     await client.query('delete from vehicle_seats where vehicle_id = $1', [vehicle_id]);
     for (const s of list) {
@@ -230,7 +251,10 @@ export async function configureVehicleSeats(call) {
 const VALID_TRIP_STATUS = ['DRAFT', 'ACTIVE', 'LOCKED', 'DEPARTED', 'COMPLETED', 'CANCELLED'];
 
 // Creates a trip and materializes its trip_seats from the vehicle layout.
-export async function createTrip(call) {
+export async function createTrip(
+  call,
+  { database = pool, getTrip = fetchTrip, writeEvent = logEvent } = {},
+) {
   const { route_id, vehicle_id, departure_time, arrival_time, price } = call.request;
   const status = call.request.status && call.request.status !== 'TRIP_STATUS_UNSPECIFIED'
     ? call.request.status
@@ -240,10 +264,16 @@ export async function createTrip(call) {
   }
   if (!VALID_TRIP_STATUS.includes(status)) throw invalidArgument('invalid trip status');
 
-  const client = await pool.connect();
+  const client = await database.connect();
   let tripId;
   try {
     await client.query('begin');
+    // Serialize with configureVehicleSeats so the materialized trip_seats
+    // snapshot always comes from one committed vehicle layout.
+    await client.query(
+      "select pg_advisory_xact_lock(hashtext('vehicle-layout'), hashtext($1))",
+      [vehicle_id],
+    );
     const tripRes = await client.query(
       `insert into trips (route_id, vehicle_id, departure_time, arrival_time, price, status)
          values ($1, $2, $3, $4, $5, $6) returning id`,
@@ -263,11 +293,20 @@ export async function createTrip(call) {
     client.release();
   }
 
-  await logEvent('trip.created', 'trip', tripId, { route_id, vehicle_id, status });
-  return { trip: await fetchTrip(tripId) };
+  await writeEvent('trip.created', 'trip', tripId, { route_id, vehicle_id, status });
+  return { trip: await getTrip(tripId) };
 }
 
-export async function updateTrip(call) {
+export async function updateTrip(
+  call,
+  {
+    database = pool,
+    seatMaintenance = withTripSeatMaintenance,
+    getTrip = fetchTrip,
+    getVehicleId = fetchTripVehicleId,
+    writeEvent = logEvent,
+  } = {},
+) {
   const { id, route_id, vehicle_id, departure_time, arrival_time, price } = call.request;
   if (!id) throw invalidArgument('id is required');
   const status = call.request.status && call.request.status !== 'TRIP_STATUS_UNSPECIFIED'
@@ -275,98 +314,161 @@ export async function updateTrip(call) {
     : null;
   if (status && !VALID_TRIP_STATUS.includes(status)) throw invalidArgument('invalid trip status');
 
-  const client = await pool.connect();
-  let vehicleChanging = false;
-  try {
-    await client.query('begin');
+  const requestedVehicleChange = vehicle_id
+    ? vehicle_id !== await getVehicleId(id)
+    : false;
 
-    const current = await client.query('select vehicle_id from trips where id = $1 for update', [id]);
-    if (current.rowCount === 0) throw notFound('Trip not found');
+  const executeUpdate = async ({ allowVehicleChange, refreshMaintenance }) => {
+    const client = await database.connect();
+    let vehicleChanging = false;
+    try {
+      await client.query('begin');
 
-    vehicleChanging = Boolean(vehicle_id) && vehicle_id !== current.rows[0].vehicle_id;
-    if (vehicleChanging) {
-      // The old vehicle's trip_seats are about to be replaced with the new
-      // vehicle's layout - refuse if any seat already has a real hold/booking
-      // on it instead of silently orphaning that passenger's seat.
-      const occupied = await client.query(
-        `select 1 from trip_seats where trip_id = $1 and status <> 'AVAILABLE' limit 1`,
-        [id],
-      );
-      if (occupied.rowCount > 0) {
-        throw invalidArgument('Cannot change vehicle: trip already has held, booked, or blocked seats');
+      const current = await client.query('select vehicle_id from trips where id = $1 for update', [id]);
+      if (current.rowCount === 0) throw notFound('Trip not found');
+
+      vehicleChanging = Boolean(vehicle_id) && vehicle_id !== current.rows[0].vehicle_id;
+      if (vehicleChanging && !allowVehicleChange) {
+        throw invalidArgument('Trip vehicle changed concurrently; retry the update');
       }
-    }
 
-    await client.query(
-      `update trips set
-          route_id = coalesce($2, route_id),
-          vehicle_id = coalesce($3, vehicle_id),
-          departure_time = coalesce($4, departure_time),
-          arrival_time = coalesce($5, arrival_time),
-          price = coalesce($6, price),
-          status = coalesce($7, status)
-        where id = $1`,
-      [id, route_id || null, vehicle_id || null, departure_time || null, arrival_time || null, price || null, status],
-    );
+      if (vehicleChanging) {
+        // Bound every topology statement below the Redis lease. The lease is
+        // refreshed again immediately before commit.
+        await client.query("set local statement_timeout = '30s'");
+        await client.query(
+          "select pg_advisory_xact_lock(hashtext('vehicle-layout'), hashtext($1))",
+          [vehicle_id],
+        );
+        // Lock the whole materialized seat snapshot. Confirm/block operations
+        // either commit first and are observed here, or wait until this update
+        // commits and then fail against the replacement snapshot.
+        const seatRows = await client.query(
+          'select status from trip_seats where trip_id = $1 for update',
+          [id],
+        );
+        if (seatRows.rows.some((seat) => seat.status !== 'AVAILABLE')) {
+          throw invalidArgument('Cannot change vehicle: trip already has booked or blocked seats');
+        }
+      }
 
-    if (vehicleChanging) {
-      await client.query('delete from trip_seats where trip_id = $1', [id]);
       await client.query(
-        `insert into trip_seats (trip_id, seat_label, status)
-           select $1, seat_label, 'AVAILABLE' from vehicle_seats where vehicle_id = $2`,
-        [id, vehicle_id],
+        `update trips set
+            route_id = coalesce($2, route_id),
+            vehicle_id = coalesce($3, vehicle_id),
+            departure_time = coalesce($4, departure_time),
+            arrival_time = coalesce($5, arrival_time),
+            price = coalesce($6, price),
+            status = coalesce($7, status)
+          where id = $1`,
+        [id, route_id || null, vehicle_id || null, departure_time || null, arrival_time || null, price || null, status],
       );
-    }
 
-    await client.query('commit');
-  } catch (err) {
-    await client.query('rollback').catch(() => {});
-    throw err;
-  } finally {
-    client.release();
+      if (vehicleChanging) {
+        await client.query('delete from trip_seats where trip_id = $1', [id]);
+        await client.query(
+          `insert into trip_seats (trip_id, seat_label, status)
+             select $1, seat_label, 'AVAILABLE' from vehicle_seats where vehicle_id = $2`,
+          [id, vehicle_id],
+        );
+      }
+
+      if (vehicleChanging) {
+        await refreshMaintenance();
+      }
+      await client.query('commit');
+      return vehicleChanging;
+    } catch (err) {
+      await client.query('rollback').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+  };
+
+  let vehicleChanging;
+  if (requestedVehicleChange) {
+    const maintenance = await seatMaintenance(
+      id,
+      (refreshMaintenance) => executeUpdate({
+        allowVehicleChange: true,
+        refreshMaintenance,
+      }),
+    );
+    if (!maintenance.acquired) {
+      throw invalidArgument('Cannot change vehicle: trip seat layout is already being updated');
+    }
+    if (maintenance.hasActiveHolds) {
+      throw invalidArgument('Cannot change vehicle: trip has active seat holds');
+    }
+    vehicleChanging = maintenance.value;
+  } else {
+    vehicleChanging = await executeUpdate({
+      allowVehicleChange: false,
+      refreshMaintenance: null,
+    });
   }
 
   if (vehicleChanging) {
-    await logEvent('trip.vehicle_changed', 'trip', id, { vehicle_id });
+    await writeEvent('trip.vehicle_changed', 'trip', id, { vehicle_id });
   }
 
-  return { trip: await fetchTrip(id) };
+  return { trip: await getTrip(id) };
 }
 
-export async function deleteTrip(call, { database = pool } = {}) {
+export async function deleteTrip(
+  call,
+  {
+    database = pool,
+    seatMaintenance = withTripSeatMaintenance,
+  } = {},
+) {
   const { id } = call.request;
   if (!id) throw invalidArgument('id is required');
-  const client = await database.connect();
-  try {
-    await client.query('begin');
-    // Serialize against Booking Service createBooking. Without a physical
-    // cross-service FK, this application-level lock plus reference check is
-    // what prevents a booking from being committed for a deleted trip.
-    await client.query(
-      "select pg_advisory_xact_lock(hashtext('trip-lifecycle'), hashtext($1))",
-      [id],
-    );
-    const referenced = await client.query(
-      'select 1 from bookings where trip_id = $1 limit 1',
-      [id],
-    );
-    if (referenced.rowCount > 0) {
-      throw invalidArgument('Cannot delete trip: existing bookings reference it');
-    }
 
-    // trip_seats belongs to the Seat Inventory boundary, so there is no
-    // cross-service FK cascade. The local shared-DB deployment performs the
-    // projection cleanup explicitly only after the logical reference guard.
-    await client.query('delete from trip_seats where trip_id = $1', [id]);
-    const { rowCount } = await client.query('delete from trips where id = $1', [id]);
-    await client.query('commit');
-    return { deleted: rowCount > 0 };
-  } catch (error) {
-    await client.query('rollback').catch(() => {});
-    throw error;
-  } finally {
-    client.release();
+  const maintenance = await seatMaintenance(id, async (refreshMaintenance) => {
+    const client = await database.connect();
+    try {
+      await client.query('begin');
+      await client.query("set local statement_timeout = '30s'");
+      // Serialize against Booking Service createBooking. Without a physical
+      // cross-service FK, this application-level lock plus reference check is
+      // what prevents a booking from being committed for a deleted trip.
+      await client.query(
+        "select pg_advisory_xact_lock(hashtext('trip-lifecycle'), hashtext($1))",
+        [id],
+      );
+      const referenced = await client.query(
+        'select 1 from bookings where trip_id = $1 limit 1',
+        [id],
+      );
+      if (referenced.rowCount > 0) {
+        throw invalidArgument('Cannot delete trip: existing bookings reference it');
+      }
+
+      // trip_seats belongs to the Seat Inventory boundary, so there is no
+      // cross-service FK cascade. Redis maintenance blocks new holds and the
+      // pre-work scan rejected existing holds before projection cleanup.
+      await client.query('delete from trip_seats where trip_id = $1', [id]);
+      const { rowCount } = await client.query('delete from trips where id = $1', [id]);
+      await refreshMaintenance();
+      await client.query('commit');
+      return { deleted: rowCount > 0 };
+    } catch (error) {
+      await client.query('rollback').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+
+  if (!maintenance.acquired) {
+    throw invalidArgument('Cannot delete trip: seat topology is already being updated');
   }
+  if (maintenance.hasActiveHolds) {
+    throw invalidArgument('Cannot delete trip: trip has active seat holds');
+  }
+  return maintenance.value;
 }
 
 export async function updateTripStatus(call) {

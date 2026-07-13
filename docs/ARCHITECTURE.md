@@ -61,6 +61,17 @@ The current MVP still has three explicit shared-database compromises:
   deletion take the same PostgreSQL advisory lock keyed by `tripId`; creation
   refreshes Trip Service state under that lock, so neither race order can
   commit an orphaned booking.
+- Vehicle layout configuration and trip materialization share a PostgreSQL
+  advisory lock keyed by `vehicleId`. Once a vehicle is assigned to a trip,
+  its source layout is immutable; changing a trip's vehicle rebuilds only that
+  trip's materialized snapshot.
+- Trip vehicle replacement and deletion coordinate with Seat Inventory through a bounded
+  Redis `seat-maintenance:{tripId}` key. Hold creation checks this key inside
+  the same Lua command that creates hold keys. Trip Service scans existing
+  holds after acquiring it, locks persistent seat rows, renews owned lease
+  state immediately before commit, and only releases it after the topology
+  transaction commits. Deletion uses the same protocol before removing the
+  trip-seat projection. Redis failure rejects the admin mutation.
 - `event_logs` is a shared operational log sink written by workflow services
   and queried through Booking Service for the admin demo.
 

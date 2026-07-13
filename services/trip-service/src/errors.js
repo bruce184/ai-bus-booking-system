@@ -15,6 +15,8 @@ export const invalidArgument = (msg = 'Invalid argument') =>
   new ServiceError(grpc.status.INVALID_ARGUMENT, msg);
 export const internal = (msg = 'Internal service error') =>
   new ServiceError(grpc.status.INTERNAL, msg);
+export const failedPrecondition = (msg = 'Operation precondition failed') =>
+  new ServiceError(grpc.status.FAILED_PRECONDITION, msg);
 
 // Wraps an async handler so thrown ServiceErrors become proper gRPC errors and
 // anything else becomes INTERNAL without crashing the server.

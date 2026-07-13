@@ -164,11 +164,19 @@ The Ticket/Email workflow, `trip_seats` materialized projection, and shared
   against a `users` table by the service that receives them.
 - `trip_seats.booking_id` is trusted from Booking Service's own
   `ConfirmSeats`/`ReleaseBookedSeats` calls to Seat Inventory Service.
+- `vehicle_seats` is mutable only until a trip references its vehicle.
+  Vehicle layout configuration and trip create/vehicle-change transactions
+  share the `vehicle-layout` advisory-lock namespace so every `trip_seats`
+  snapshot comes from one committed layout.
 - `trip_seats.trip_id` is initialized from Trip Service's trip/vehicle
   projection. Trip deletion and Booking Service creation serialize on a shared
   transaction-scoped advisory lock keyed by `tripId`; deletion rejects any
   logical `bookings.trip_id` reference before explicitly removing projection
-  rows because there is no cross-service cascade.
+  rows because there is no cross-service cascade. Trip deletion rejects
+  existing Redis holds under the same maintenance lease before removing the
+  projection. Trip vehicle replacement additionally holds the Redis `seat-maintenance:{tripId}` coordinator until
+  the rebuilt projection commits and row-locks the prior projection so
+  concurrent confirm/block operations cannot be lost.
 - `tickets.booking_id` / `tickets.passenger_id` come from Ticket Worker's
   canonical `booking.paid` event context and have no physical constraint into
   Booking Service tables.
