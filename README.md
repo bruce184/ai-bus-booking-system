@@ -110,7 +110,7 @@ npm run test:gateway:integration
 npm run test:analytics:integration
 npm run test:seat:integration
 npm run test:seat:race
-npm run test:web:e2e               # Playwright admin + customer flows (needs infra + services)
+npm run test:web:e2e               # Playwright admin + customer flows (starts healthy infra + core services)
 npm --prefix apps/web run lint
 ```
 

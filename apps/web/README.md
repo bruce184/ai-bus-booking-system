@@ -34,6 +34,10 @@ Run admin E2E tests from the repository root with:
 npm run test:web:e2e
 ```
 
+Run the root command above from the repository root. It waits for Docker
+infrastructure health, then Playwright starts the complete core service set
+needed by the admin and customer flows.
+
 ## Seat Map Component
 
 Task `Q-10` adds a reusable React seat map component:

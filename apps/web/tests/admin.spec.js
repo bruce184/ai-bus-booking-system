@@ -26,7 +26,7 @@ test.describe('Admin & Staff Portal Business Logic E2E Tests', () => {
     await page.locator('button[type="submit"]').click();
     // Assert the actual rejection message so a transient network failure
     // cannot masquerade as a role rejection.
-    await expect(page.getByText('Access denied. Admin or Staff role required.')).toBeVisible();
+    await expect(page.getByText('This account cannot access the selected portal')).toBeVisible();
     await expect(page).toHaveURL(/\/admin\/login/);
 
     await page.locator('#email').fill('staff@example.com');

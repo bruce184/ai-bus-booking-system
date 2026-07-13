@@ -176,7 +176,7 @@ Minimum verification by task type:
 | Booking invariants | `npm run test:booking`; with seeded PostgreSQL, `npm --prefix services/booking-service run test:integration` |
 | Payment simulation | `npm run test:payment` |
 | Seat transition invariants | `npm --prefix services/seat-inventory-service test`; with Seat Inventory running, `npm run test:seat:race` |
-| Frontend | `npm run test:web:e2e` for admin E2E when browser dependencies are installed |
+| Frontend | `npm run test:web:e2e`; starts healthy infra and all core E2E service dependencies when browser dependencies are installed |
 | Worker | Unit/manual event test once worker exists |
 
 ## 8. Module Ownership Suggestions

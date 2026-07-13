@@ -155,7 +155,7 @@ Trạng thái ghế: `AVAILABLE → HELD (Redis TTL) → BOOKED`, admin có th�
 ## 9. Chạy hệ thống & quy trình làm việc
 
 ```bash
-npm install && npm run dev:all   # infra Docker + 11 process, chờ banner READY
+npm install && npm run dev:all   # infra Docker + services, READY sau health checks
 ```
 
 Chi tiết demo cho giảng viên: `demo/HUONG_DAN_DEMO.md`. Setup đầy đủ: `docs/README_SETUP.md`.

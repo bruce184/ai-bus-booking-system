@@ -25,13 +25,44 @@ export default defineConfig({
   ],
   webServer: [
     {
+      command: 'npm --prefix ../../services/trip-service run start',
+      port: 50051,
+      reuseExistingServer: true,
+      timeout: 120000,
+    },
+    {
+      command: 'npm --prefix ../../services/seat-inventory-service run dev',
+      port: 50052,
+      reuseExistingServer: true,
+      timeout: 120000,
+    },
+    {
+      command: 'npm --prefix ../../services/booking-service run start',
+      port: 50053,
+      reuseExistingServer: true,
+      timeout: 120000,
+    },
+    {
+      command: 'npm --prefix ../../services/payment-service run start',
+      url: 'http://localhost:5010/health',
+      reuseExistingServer: true,
+      timeout: 120000,
+    },
+    {
+      command: 'npm --prefix ../../services/analytics-service run start',
+      url: 'http://localhost:50056/health',
+      reuseExistingServer: true,
+      timeout: 120000,
+    },
+    {
       command: 'npm --prefix ../../services/graphql-gateway run dev',
       url: gatewayUrl,
       env: {
         ...process.env,
-        GRAPHQL_GATEWAY_PORT: String(gatewayPort)
+        GRAPHQL_GATEWAY_PORT: String(gatewayPort),
+        WEB_ORIGIN: webUrl
       },
-      reuseExistingServer: false,
+      reuseExistingServer: true,
       timeout: 120000,
     },
     {
@@ -39,11 +70,12 @@ export default defineConfig({
       url: webUrl,
       env: {
         ...process.env,
+        GRAPHQL_GATEWAY_URL: gatewayUrl,
         NEXT_PUBLIC_APP_URL: webUrl,
         NEXT_PUBLIC_GRAPHQL_URL: gatewayUrl,
         NEXT_PUBLIC_GRAPHQL_WS_URL: `ws://localhost:${gatewayPort}/graphql`
       },
-      reuseExistingServer: false,
+      reuseExistingServer: true,
       timeout: 120000,
     }
   ],

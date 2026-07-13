@@ -141,6 +141,11 @@ Start infrastructure:
 docker compose up -d postgres redis rabbitmq zookeeper kafka nginx
 ```
 
+`npm run infra:up` uses Compose `--wait` and returns only after configured
+health checks pass. `npm run dev:all` prints the READY banner only after HTTP
+and TCP probes confirm the application services, rather than after a fixed
+sleep.
+
 Stop infrastructure:
 
 ```bash
@@ -193,7 +198,7 @@ Implemented test targets:
 | Gateway performance | `npm run test:gateway:perf` | Requires Apache JMeter on `PATH` |
 | Web lint | `npm --prefix apps/web run lint` | Next.js/React lint |
 | Web auth unit tests | `npm run test:web:unit` | BFF portal-role and secure-cookie invariants |
-| Web admin E2E | `npm run test:web:e2e` | Uses Playwright and starts configured dev servers |
+| Web admin/customer E2E | `npm run test:web:e2e` | Starts healthy Docker infra plus Trip, Seat, Booking, Payment, Analytics, Gateway, and Web test servers |
 | Source integrity | `npm run check:source` | Syntax-checks non-Next Node files, resolves all relative imports, and validates the workspace dependency tree; Next JSX is covered by lint/build |
 
 ## 9. Local Run Targets
