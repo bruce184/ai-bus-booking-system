@@ -147,8 +147,9 @@ tables or rely on a shared-schema constraint to enforce a cross-service
 reference. Instead:
 
 - `bookings.trip_id` is unauthenticated client input, so Booking Service
-  verifies existence/price/status through Trip Service's `GetTripDetail` RPC
-  (`services/booking-service/src/trip-client.js`) before creating a booking.
+  verifies existence/price/status/departure time through Trip Service's
+  `GetTripDetail` RPC (`services/booking-service/src/trip-client.js`) before
+  creating, cancelling, or checking in a booking.
 - `bookings.customer_user_id` / `saved_passengers.customer_user_id` are
   trusted from the GraphQL Gateway's already-authenticated caller (the
   gateway issues the id after verifying the demo JWT), not re-checked

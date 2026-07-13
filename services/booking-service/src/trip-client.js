@@ -16,6 +16,15 @@ function client() {
   return tripClient;
 }
 
+export function mapTripSnapshot(response) {
+  const trip = response.trip;
+  return {
+    price: trip.price,
+    status: trip.status,
+    departureTime: trip.departure_time
+  };
+}
+
 // bookings.trip_id no longer has a physical FK into Trip Service's table
 // (database-per-service - see docs/ARCHITECTURE.md section 11): trip_id is
 // untrusted input straight from the web client, so its existence and current
@@ -44,6 +53,5 @@ export async function fetchTripSnapshot(tripId) {
     fail("INTERNAL_ERROR", "Trip Service is unavailable");
   }
 
-  const trip = response.trip;
-  return { price: trip.price, status: trip.status };
+  return mapTripSnapshot(response);
 }

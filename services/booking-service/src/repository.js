@@ -429,17 +429,39 @@ export async function settleBookingPayment(
   });
 }
 
-export async function cancelBooking({ booking_code, email }) {
-  return transaction(async (client) => {
+export async function cancelBooking(
+  { booking_code, email },
+  { runQuery = query, runTransaction = transaction, getTripSnapshot = fetchTripSnapshot } = {}
+) {
+  const candidateResult = await runQuery(
+    `select id, trip_id, status from bookings where booking_code = $1 and lower(contact_email) = lower($2)`,
+    [booking_code, email]
+  );
+  const candidate = candidateResult.rows[0];
+  if (!candidate) {
+    fail("NOT_FOUND", "Booking not found");
+  }
+  if (!canCancel(candidate.status)) {
+    fail("BOOKING_STATE_INVALID", "Only PAID bookings can be cancelled");
+  }
+
+  const trip = await getTripSnapshot(candidate.trip_id);
+  if (!canCancelBeforeDeparture(trip.departureTime)) {
+    fail(
+      "BOOKING_STATE_INVALID",
+      "Cancellation is only allowed more than 24 hours before departure"
+    );
+  }
+
+  return runTransaction(async (client) => {
     const result = await client.query(
       `
-        select b.*, t.departure_time
-        from bookings b
-        join trips t on t.id = b.trip_id
-        where b.booking_code = $1 and lower(b.contact_email) = lower($2)
-        for update of b
+        select *
+        from bookings
+        where id = $1
+        for update
       `,
-      [booking_code, email]
+      [candidate.id]
     );
     const booking = result.rows[0];
     if (!booking) {
@@ -447,12 +469,6 @@ export async function cancelBooking({ booking_code, email }) {
     }
     if (!canCancel(booking.status)) {
       fail("BOOKING_STATE_INVALID", "Only PAID bookings can be cancelled");
-    }
-    if (!canCancelBeforeDeparture(booking.departure_time)) {
-      fail(
-        "BOOKING_STATE_INVALID",
-        "Cancellation is only allowed more than 24 hours before departure"
-      );
     }
 
     await client.query(
@@ -569,29 +585,49 @@ export async function expirePendingBookings(ageSeconds = 300, { bookingIds = nul
   });
 }
 
-export async function checkInPassenger({ code, staff_user_id }) {
+export async function checkInPassenger(
+  { code, staff_user_id },
+  { runQuery = query, runTransaction = transaction, getTripSnapshot = fetchTripSnapshot } = {}
+) {
   if (!code) {
     fail("VALIDATION_ERROR", "code is required");
   }
 
-  return transaction(async (client) => {
-    // Postgres rejects DISTINCT together with FOR UPDATE, so resolve the
-    // booking id in a subquery and lock only the target bookings row.
+  const candidateResult = await runQuery(
+    `
+      select b.id, b.trip_id, b.status
+      from bookings b
+      where b.id = (
+        select b2.id
+        from bookings b2
+        left join tickets tk on tk.booking_id = b2.id
+        where b2.booking_code = $1 or tk.ticket_code = $1 or tk.qr_payload = $1
+        limit 1
+      )
+    `,
+    [code]
+  );
+  const candidate = candidateResult.rows[0];
+  if (!candidate) {
+    fail("NOT_FOUND", "Booking or ticket not found");
+  }
+
+  if (candidate.status !== "CHECKED_IN") {
+    const trip = await getTripSnapshot(candidate.trip_id);
+    if (!canCheckInTripState(trip.status)) {
+      fail("BOOKING_STATE_INVALID", "Cannot check in a booking for a cancelled trip");
+    }
+  }
+
+  return runTransaction(async (client) => {
     const result = await client.query(
       `
-        select b.*, t.status as trip_status
-        from bookings b
-        join trips t on t.id = b.trip_id
-        where b.id = (
-          select b2.id
-          from bookings b2
-          left join tickets tk on tk.booking_id = b2.id
-          where b2.booking_code = $1 or tk.ticket_code = $1 or tk.qr_payload = $1
-          limit 1
-        )
-        for update of b
+        select *
+        from bookings
+        where id = $1
+        for update
       `,
-      [code]
+      [candidate.id]
     );
     const booking = result.rows[0];
     if (!booking) {
@@ -602,9 +638,6 @@ export async function checkInPassenger({ code, staff_user_id }) {
     }
     if (!canCheckIn(booking.status)) {
       fail("BOOKING_STATE_INVALID", "Only TICKET_ISSUED bookings can be checked in");
-    }
-    if (!canCheckInTripState(booking.trip_status)) {
-      fail("BOOKING_STATE_INVALID", "Cannot check in a booking for a cancelled trip");
     }
 
     await client.query(

@@ -49,7 +49,8 @@ service runs a direct SQL join into another service's tables (see
 needs data another owns, it calls that service's API:
 
 - Booking Service calls Trip Service's `GetTripDetail` RPC to verify a
-  `trip_id` and read its current price/status before creating a booking
+  `trip_id` and read its current price/status/departure time before creating,
+  cancelling, or checking in a booking
   (`services/booking-service/src/trip-client.js`), instead of joining into
   `trips`.
 - Analytics Service calls Trip Service's `GetTripDetail` RPC for route

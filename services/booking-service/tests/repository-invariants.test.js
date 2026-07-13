@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   bookingCode,
   bookingRequestMatches,
+  cancelBooking,
+  checkInPassenger,
   createBooking,
   isPaymentSettledStatus,
   settleBookingPayment
@@ -12,6 +14,52 @@ import {
 test("booking codes use the Asia/Ho_Chi_Minh business date", () => {
   const afterLocalMidnight = new Date("2026-07-13T17:30:00.000Z");
   assert.match(bookingCode(afterLocalMidnight), /^BK20260714\d{6}$/);
+});
+
+test("cancellation reads departure policy through Trip Service, without joining trips", async () => {
+  const statements = [];
+  const runQuery = async (text) => {
+    statements.push(text.replace(/\s+/g, " ").trim().toLowerCase());
+    return { rows: [{ id: storedBooking().id, trip_id: input.trip_id, status: "PAID" }] };
+  };
+
+  await assert.rejects(
+    cancelBooking(
+      { booking_code: storedBooking().booking_code, email: storedBooking().contact_email },
+      {
+        runQuery,
+        runTransaction: async () => assert.fail("transaction must not start when policy rejects"),
+        getTripSnapshot: async () => ({
+          departureTime: new Date(Date.now() + 23 * 60 * 60 * 1000).toISOString()
+        })
+      }
+    ),
+    (error) => error.code === "BOOKING_STATE_INVALID"
+  );
+
+  assert.equal(statements.some((sql) => sql.includes("join trips")), false);
+});
+
+test("check-in reads trip status through Trip Service, without joining trips", async () => {
+  const statements = [];
+  const runQuery = async (text) => {
+    statements.push(text.replace(/\s+/g, " ").trim().toLowerCase());
+    return { rows: [{ id: storedBooking().id, trip_id: input.trip_id, status: "TICKET_ISSUED" }] };
+  };
+
+  await assert.rejects(
+    checkInPassenger(
+      { code: storedBooking().booking_code, staff_user_id: "staff-1" },
+      {
+        runQuery,
+        runTransaction: async () => assert.fail("transaction must not start for a cancelled trip"),
+        getTripSnapshot: async () => ({ status: "CANCELLED" })
+      }
+    ),
+    (error) => error.code === "BOOKING_STATE_INVALID"
+  );
+
+  assert.equal(statements.some((sql) => sql.includes("join trips")), false);
 });
 
 const input = {
