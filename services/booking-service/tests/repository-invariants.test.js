@@ -48,12 +48,18 @@ test("check-in reads trip status through Trip Service, without joining trips", a
     return { rows: [{ id: storedBooking().id, trip_id: input.trip_id, status: "TICKET_ISSUED" }] };
   };
 
+  const transactionStatements = [];
   await assert.rejects(
     checkInPassenger(
       { code: storedBooking().booking_code, staff_user_id: "staff-1" },
       {
         runQuery,
-        runTransaction: async () => assert.fail("transaction must not start for a cancelled trip"),
+        runTransaction: (work) => work({
+          async query(text) {
+            transactionStatements.push(text.replace(/\s+/g, " ").trim().toLowerCase());
+            return { rows: [] };
+          }
+        }),
         getTripSnapshot: async () => ({ status: "CANCELLED" })
       }
     ),
@@ -61,6 +67,58 @@ test("check-in reads trip status through Trip Service, without joining trips", a
   );
 
   assert.equal(statements.some((sql) => sql.includes("join trips")), false);
+  assert.match(transactionStatements[0], /pg_advisory_xact_lock.*trip-lifecycle/);
+});
+
+test("check-in reads the trip snapshot only after taking the shared lifecycle lock", async () => {
+  const order = [];
+  const candidate = {
+    id: storedBooking().id,
+    trip_id: storedBooking().trip_id,
+    status: "TICKET_ISSUED"
+  };
+  const client = {
+    async query(text) {
+      const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
+      if (sql.includes("pg_advisory_xact_lock")) {
+        order.push("lifecycle-lock");
+        return { rows: [] };
+      }
+      if (sql.startsWith("select * from bookings") && sql.includes("for update")) {
+        order.push("booking-lock");
+        return { rows: [{ ...storedBooking("TICKET_ISSUED"), status: "TICKET_ISSUED" }] };
+      }
+      if (sql.startsWith("update bookings set status = 'checked_in'")) return { rowCount: 1, rows: [] };
+      if (sql.startsWith("update tickets")) return { rowCount: 1, rows: [] };
+      if (sql.startsWith("insert into event_logs")) return { rowCount: 1, rows: [] };
+      if (sql.startsWith("insert into outbox_events")) return { rowCount: 1, rows: [] };
+      if (sql === "select * from bookings where id = $1") {
+        return { rows: [{ ...storedBooking("CHECKED_IN"), status: "CHECKED_IN" }] };
+      }
+      if (sql.startsWith("select * from booking_passengers")) return { rows: storedPassengers() };
+      if (sql.includes("from tickets tk")) return { rows: [] };
+      throw new Error(`Unexpected SQL in check-in ordering test: ${sql}`);
+    }
+  };
+
+  const booking = await checkInPassenger(
+    { code: storedBooking().booking_code, staff_user_id: "staff-1" },
+    {
+      runQuery: async () => ({ rows: [candidate] }),
+      runTransaction: (work) => work(client),
+      getTripSnapshot: async () => {
+        order.push("trip-snapshot");
+        return { status: "ACTIVE" };
+      }
+    }
+  );
+
+  assert.equal(booking.status, "CHECKED_IN");
+  assert.deepEqual(order.slice(0, 3), [
+    "lifecycle-lock",
+    "trip-snapshot",
+    "booking-lock"
+  ]);
 });
 
 test("cancellation queues both analytics and seat-release recovery events", async () => {

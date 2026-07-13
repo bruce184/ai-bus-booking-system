@@ -226,11 +226,13 @@ PAID -> CANCELLED
 
 Only Booking Service may own state transitions.
 
-`COMPLETED` remains a valid historical/target domain state required by the
-lecturer contract and seed data. The current MVP exposes transitions only
-through check-in (`TICKET_ISSUED -> CHECKED_IN`); it has no GraphQL/gRPC
-operation or scheduled worker that advances bookings from `CHECKED_IN` to
-`COMPLETED`. Adding that transition requires an explicit contract change.
+Trip Service does not update bookings directly. When a trip becomes
+`COMPLETED`, its transactional outbox publishes `trip.completed`. Booking
+Service claims the event idempotently and advances only `CHECKED_IN` rows to
+`COMPLETED`, then publishes `booking.completed` for canonical GraphQL
+subscription refresh. Trip completion and check-in serialize on the shared
+`trip-lifecycle` advisory lock, closing the stale-snapshot race in both
+orders.
 
 ## 7. Trip State
 
@@ -276,6 +278,8 @@ Minimum hold metadata:
 RabbitMQ workflow events:
 
 ```text
+trip.completed
+booking.completed
 booking.paid
 ticket.issued
 booking.expired
@@ -295,14 +299,14 @@ payment-events
 checkin-events
 ```
 
-Booking Service writes its workflow/analytics events (`booking.created`,
-`booking.paid`, `booking.cancelled`, `booking.expired`, `ticket.checked_in`)
-to the `outbox_events` table inside the same transaction as the state
-change, instead of publishing directly. A poller
-(`dispatchOutboxEvents` in `packages/shared/src/outbox.js`, run on an
-interval from `services/booking-service/src/index.js`) reads unpublished
-rows and publishes them; a broker outage just delays dispatch instead of
-losing the event. Consumers on `createWorkflowConsumer` also route
+Trip Service, Booking Service, and Ticket Worker write owned workflow events
+to `outbox_events` inside the same transaction as their state changes.
+Each runtime's poller declares its owned aggregate type and claims unpublished
+rows with `FOR UPDATE SKIP LOCKED`; concurrent pollers cannot dispatch another
+owner's row or publish one row simultaneously. A broker outage leaves the row
+unpublished for retry instead of losing the event. At-least-once redelivery
+keeps the original `eventId`, and state-changing consumers claim it
+idempotently. Consumers on `createWorkflowConsumer` also route
 processing failures to a per-queue dead-letter exchange instead of
 dropping the message.
 

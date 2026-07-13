@@ -5,6 +5,7 @@ import { mapStop, mapVehicleSeat, mapRoute, mapVehicle, mapLocation } from '../m
 import { TRIP_SELECT, rowToTrip, rowsToTrips } from '../tripQuery.js';
 import { logger } from '../logger.js';
 import { withTripSeatMaintenance } from '../cache.js';
+import { writeOutboxEvent } from '@bus/shared/outbox.js';
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -250,6 +251,39 @@ export async function configureVehicleSeats(call, { database = pool } = {}) {
 
 const VALID_TRIP_STATUS = ['DRAFT', 'ACTIVE', 'LOCKED', 'DEPARTED', 'COMPLETED', 'CANCELLED'];
 
+async function recordTripStatusChange(
+  client,
+  tripId,
+  previousStatus,
+  nextStatus,
+  writeOutbox = writeOutboxEvent,
+) {
+  if (previousStatus === nextStatus) return false;
+
+  await client.query(
+    `insert into event_logs (event_type, entity_type, entity_id, payload)
+     values ($1, $2, $3, $4::jsonb)`,
+    [
+      'trip.status_changed',
+      'trip',
+      tripId,
+      JSON.stringify({ previousStatus, status: nextStatus }),
+    ],
+  );
+
+  if (nextStatus === 'COMPLETED') {
+    await writeOutbox(client, {
+      aggregateType: 'trip',
+      aggregateId: tripId,
+      eventName: 'trip.completed',
+      target: 'RABBITMQ',
+      routingKey: 'trip.completed',
+      payload: { tripId },
+    });
+  }
+  return true;
+}
+
 // Creates a trip and materializes its trip_seats from the vehicle layout.
 export async function createTrip(
   call,
@@ -305,6 +339,7 @@ export async function updateTrip(
     getTrip = fetchTrip,
     getVehicleId = fetchTripVehicleId,
     writeEvent = logEvent,
+    writeOutbox = writeOutboxEvent,
   } = {},
 ) {
   const { id, route_id, vehicle_id, departure_time, arrival_time, price } = call.request;
@@ -324,7 +359,19 @@ export async function updateTrip(
     try {
       await client.query('begin');
 
-      const current = await client.query('select vehicle_id from trips where id = $1 for update', [id]);
+      if (status) {
+        // Serialize trip completion against Booking Service check-in. The
+        // status is fetched only after this lock, so neither side can commit
+        // from a stale trip snapshot.
+        await client.query(
+          "select pg_advisory_xact_lock(hashtext('trip-lifecycle'), hashtext($1))",
+          [id],
+        );
+      }
+      const current = await client.query(
+        'select vehicle_id, status from trips where id = $1 for update',
+        [id],
+      );
       if (current.rowCount === 0) throw notFound('Trip not found');
 
       vehicleChanging = Boolean(vehicle_id) && vehicle_id !== current.rows[0].vehicle_id;
@@ -370,6 +417,16 @@ export async function updateTrip(
           `insert into trip_seats (trip_id, seat_label, status)
              select $1, seat_label, 'AVAILABLE' from vehicle_seats where vehicle_id = $2`,
           [id, vehicle_id],
+        );
+      }
+
+      if (status) {
+        await recordTripStatusChange(
+          client,
+          id,
+          current.rows[0].status,
+          status,
+          writeOutbox,
         );
       }
 
@@ -471,14 +528,53 @@ export async function deleteTrip(
   return maintenance.value;
 }
 
-export async function updateTripStatus(call) {
+export async function updateTripStatus(
+  call,
+  {
+    database = pool,
+    getTrip = fetchTrip,
+    writeOutbox = writeOutboxEvent,
+  } = {},
+) {
   const { trip_id, status } = call.request;
   if (!trip_id) throw invalidArgument('trip_id is required');
   if (!VALID_TRIP_STATUS.includes(status)) throw invalidArgument('invalid trip status');
-  const { rowCount } = await query('update trips set status = $2 where id = $1', [trip_id, status]);
-  if (rowCount === 0) throw notFound('Trip not found');
-  await logEvent('trip.status_changed', 'trip', trip_id, { status });
-  return { trip: await fetchTrip(trip_id) };
+
+  const client = await database.connect();
+  try {
+    await client.query('begin');
+    await client.query(
+      "select pg_advisory_xact_lock(hashtext('trip-lifecycle'), hashtext($1))",
+      [trip_id],
+    );
+    const current = await client.query(
+      'select status from trips where id = $1 for update',
+      [trip_id],
+    );
+    if (current.rowCount === 0) throw notFound('Trip not found');
+
+    if (current.rows[0].status !== status) {
+      await client.query(
+        'update trips set status = $2 where id = $1',
+        [trip_id, status],
+      );
+      await recordTripStatusChange(
+        client,
+        trip_id,
+        current.rows[0].status,
+        status,
+        writeOutbox,
+      );
+    }
+    await client.query('commit');
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return { trip: await getTrip(trip_id) };
 }
 
 export async function listLocations(call) {

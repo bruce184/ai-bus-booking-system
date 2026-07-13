@@ -6,6 +6,7 @@ import { assertConnection, closePool } from './db.js';
 import { initCache, closeCache } from './cache.js';
 import { initEvents, closeEvents } from './events.js';
 import { startServer } from './server.js';
+import { dispatchOutboxEvents } from '@bus/shared/outbox.js';
 
 async function main() {
   logger.info('Starting Trip Service...');
@@ -25,9 +26,20 @@ async function main() {
   const server = await startServer();
   logger.info(`Trip Service ready on port ${config.port}`);
 
+  const dispatchTripOutbox = async () => {
+    try {
+      await dispatchOutboxEvents({ aggregateTypes: ['trip'] });
+    } catch (error) {
+      logger.warn('Trip outbox dispatch failed', error.message);
+    }
+  };
+  const outboxTimer = setInterval(dispatchTripOutbox, 3000);
+  outboxTimer.unref();
+
   const shutdown = async (signal) => {
     logger.info(`Received ${signal}, shutting down...`);
     server.tryShutdown(async () => {
+      clearInterval(outboxTimer);
       await Promise.allSettled([closeCache(), closeEvents(), closePool()]);
       process.exit(0);
     });

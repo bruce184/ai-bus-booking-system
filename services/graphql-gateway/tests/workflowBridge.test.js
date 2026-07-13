@@ -114,5 +114,6 @@ test("bridge binds one durable consumer callback to all realtime routing keys", 
   assert.equal(registration.queue, "graphql-gateway.realtime");
   assert.ok(registration.keys.includes("seat.hold_expired"));
   assert.ok(registration.keys.includes("ticket.issued"));
+  assert.ok(registration.keys.includes("booking.completed"));
   assert.equal(typeof registration.handler, "function");
 });

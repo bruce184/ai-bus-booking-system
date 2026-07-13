@@ -29,37 +29,77 @@ export async function writeOutboxEvent(
   );
 }
 
-// ponytail: single-instance poller (no FOR UPDATE SKIP LOCKED) - this demo
-// never runs more than one instance of a given service. Add row locking if
-// that changes.
-export async function dispatchOutboxEvents({ limit = 20 } = {}) {
-  const { rows } = await pool.query(
-    `select * from outbox_events where published_at is null order by created_at limit $1`,
-    [limit]
-  );
-
-  for (const row of rows) {
-    try {
-      if (row.target === "RABBITMQ") {
-        await publishWorkflowEvent(row.event_name, row.payload, {
-          eventId: row.event_id,
-          occurredAt: row.occurred_at,
-          routingKey: row.routing_key
-        });
-      } else {
-        await publishKafkaEvent(row.routing_key, row.event_name, row.payload, {
-          eventId: row.event_id,
-          occurredAt: row.occurred_at
-        });
-      }
-      await pool.query(
-        "update outbox_events set published_at = now() where id = $1 and published_at is null",
-        [row.id]
-      );
-    } catch (error) {
-      console.error(`[outbox] failed to publish ${row.event_name} (${row.id}): ${error.message}`);
-    }
+// Each runtime must declare the aggregate types it owns. Rows are locked while
+// publishing so concurrent service instances cannot dispatch the same row at
+// the same time. A broker success followed by a database failure can still
+// redeliver, which is the intended at-least-once contract; consumers claim the
+// canonical eventId idempotently.
+export async function dispatchOutboxEvents(
+  {
+    limit = 20,
+    aggregateTypes,
+    database = pool,
+    publishWorkflow = publishWorkflowEvent,
+    publishKafka = publishKafkaEvent,
+    onError = (message) => console.error(message)
+  } = {}
+) {
+  const ownedTypes = [...new Set(
+    (aggregateTypes || []).map((value) => String(value || "").trim()).filter(Boolean)
+  )];
+  if (ownedTypes.length === 0) {
+    throw new Error("dispatchOutboxEvents requires at least one owned aggregateType");
   }
 
-  return rows.length;
+  const boundedLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+  const client = await database.connect();
+  try {
+    await client.query("begin");
+    const { rows } = await client.query(
+      `
+        select *
+        from outbox_events
+        where published_at is null
+          and aggregate_type = any($1::text[])
+        order by created_at
+        for update skip locked
+        limit $2
+      `,
+      [ownedTypes, boundedLimit]
+    );
+
+    for (const row of rows) {
+      try {
+        if (row.target === "RABBITMQ") {
+          await publishWorkflow(row.event_name, row.payload, {
+            eventId: row.event_id,
+            occurredAt: row.occurred_at,
+            routingKey: row.routing_key
+          });
+        } else if (row.target === "KAFKA") {
+          await publishKafka(row.routing_key, row.event_name, row.payload, {
+            eventId: row.event_id,
+            occurredAt: row.occurred_at
+          });
+        } else {
+          throw new Error(`Unsupported outbox target: ${row.target}`);
+        }
+
+        await client.query(
+          "update outbox_events set published_at = now() where id = $1 and published_at is null",
+          [row.id]
+        );
+      } catch (error) {
+        onError(`[outbox] failed to publish ${row.event_name} (${row.id}): ${error.message}`);
+      }
+    }
+
+    await client.query("commit");
+    return rows.length;
+  } catch (error) {
+    await client.query("rollback").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 }

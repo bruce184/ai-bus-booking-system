@@ -660,14 +660,22 @@ export async function checkInPassenger(
     fail("NOT_FOUND", "Booking or ticket not found");
   }
 
-  if (candidate.status !== "CHECKED_IN") {
-    const trip = await getTripSnapshot(candidate.trip_id);
-    if (!canCheckInTripState(trip.status)) {
-      fail("BOOKING_STATE_INVALID", checkInTripStateError(trip.status));
-    }
-  }
-
   return runTransaction(async (client) => {
+    // Serialize with Trip Service status changes. If check-in wins, the
+    // subsequent trip.completed event sees CHECKED_IN; if completion wins,
+    // this fresh snapshot observes COMPLETED and rejects boarding.
+    await client.query(
+      "select pg_advisory_xact_lock(hashtext('trip-lifecycle'), hashtext($1))",
+      [candidate.trip_id]
+    );
+
+    if (candidate.status !== "CHECKED_IN") {
+      const trip = await getTripSnapshot(candidate.trip_id);
+      if (!canCheckInTripState(trip.status)) {
+        fail("BOOKING_STATE_INVALID", checkInTripStateError(trip.status));
+      }
+    }
+
     const result = await client.query(
       `
         select *

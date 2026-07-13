@@ -1,6 +1,7 @@
 import { fail, toGrpcError } from "@bus/shared/errors.js";
 import { grpc, loadProto } from "@bus/shared/grpc.js";
 import { dispatchOutboxEvents } from "@bus/shared/outbox.js";
+import { startTripCompletedConsumer } from "./consumers/tripCompletedConsumer.js";
 import { simulatePaymentWithService } from "./payment-client.js";
 import { confirmSeats, releaseBookedSeats, releaseSeatHold, validateSeatHold } from "./seat-client.js";
 import {
@@ -136,6 +137,10 @@ async function checkInWithEvents(request) {
   return checkInPassenger(request);
 }
 
+if (process.env.DISABLE_RABBITMQ !== "true") {
+  await startTripCompletedConsumer();
+}
+
 const proto = loadProto("booking.proto");
 const server = new grpc.Server();
 
@@ -188,7 +193,7 @@ async function runExpirationJob() {
 
 async function runOutboxDispatchJob() {
   try {
-    await dispatchOutboxEvents();
+    await dispatchOutboxEvents({ aggregateTypes: ["booking"] });
   } catch (error) {
     console.error("[booking-service] Outbox dispatch failed", error);
   }

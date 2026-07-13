@@ -288,6 +288,8 @@ Owns booking state machine, passenger-per-seat data, booking lookup privacy, can
 
 | Event | Publisher | Consumers |
 |---|---|---|
+| `trip.completed` | Trip Service | Booking Service |
+| `booking.completed` | Booking Service | GraphQL Gateway realtime bridge |
 | `booking.paid` | Booking Service | Ticket Worker, Email Worker, GraphQL Gateway realtime bridge |
 | `ticket.issued` | Ticket Worker | Email Worker, GraphQL Gateway realtime bridge |
 | `email.requested` | Reserved compatibility event; no current MVP producer | Email Worker |
@@ -317,9 +319,15 @@ emits `seat.hold_expired`.
 
 Analytics Service consumes Kafka events and stores aggregates for daily revenue, tickets sold by route, popular routes, and booking success rate versus search count.
 
-`COMPLETED` remains an allowed booking value for historical/target contract
-compatibility. No current GraphQL mutation, gRPC method, or worker performs
-`CHECKED_IN -> COMPLETED`; adding one is a coordinated contract change.
+When an admin moves a trip to `COMPLETED` through either trip-update RPC,
+Trip Service writes `trip.completed` in the same transaction as the status
+change. Booking Service claims that canonical event idempotently, advances only
+that trip's `CHECKED_IN` bookings to `COMPLETED`, and writes one
+`booking.completed` outbox event per changed booking. Repeating trip
+completion or redelivering the workflow event creates no duplicate transition.
+Check-in and trip completion also share the `trip-lifecycle` advisory lock, so
+a stale active-trip snapshot cannot leave a late `CHECKED_IN` booking after
+the completion consumer has run.
 
 Payment Service treats `payment-events` as best-effort analytics. It returns
 the already-decided simulation result without waiting for Kafka and logs an
@@ -369,7 +377,10 @@ aggregate write and `processed_events` marker roll back together before Kafka
 redelivers the canonical `eventId`.
 
 Transactional-outbox producers persist `eventId` and `occurredAt` in the
-outbox row together with the business transaction. Every retry republishes that
+outbox row together with the business transaction. Each dispatcher declares
+its owned aggregate types (`trip`, `booking`, or `ticket`) and claims rows
+with `FOR UPDATE SKIP LOCKED`, so concurrent runtimes cannot publish another
+service's row or dispatch the same row simultaneously. Every retry republishes that
 same envelope identity. RabbitMQ publishers wait for a broker confirmation
 before the dispatcher stamps `published_at`; Kafka publishers await `send()`.
 When one logical event is routed to both brokers, both outbox rows share the

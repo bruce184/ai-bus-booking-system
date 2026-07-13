@@ -5,7 +5,8 @@ import {
   configureVehicleSeats,
   createTrip,
   deleteTrip,
-  updateTrip
+  updateTrip,
+  updateTripStatus
 } from "../src/service/adminCatalog.js";
 
 test("trip deletion explicitly cleans the seat projection without an FK cascade", async () => {
@@ -259,7 +260,7 @@ test("vehicle change keeps Redis maintenance locked through the committed snapsh
   assert.deepEqual(maintenancePhases, ["locked", "renewed", "after-commit"]);
   assert.deepEqual(statements, [
     "begin",
-    "select vehicle_id from trips where id = $1 for update",
+    "select vehicle_id, status from trips where id = $1 for update",
     "set local statement_timeout = '30s'",
     "select pg_advisory_xact_lock(hashtext('vehicle-layout'), hashtext($1))",
     "select status from trip_seats where trip_id = $1 for update",
@@ -269,4 +270,115 @@ test("vehicle change keeps Redis maintenance locked through the committed snapsh
     "commit",
     "release"
   ]);
+});
+
+
+test("dedicated trip completion writes one transactional trip.completed outbox event", async () => {
+  const statements = [];
+  const outbox = [];
+  let status = "DEPARTED";
+  const client = {
+    async query(text) {
+      const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
+      statements.push(sql);
+      if (sql.startsWith("select status from trips")) {
+        return { rowCount: 1, rows: [{ status }] };
+      }
+      if (sql.startsWith("update trips set status")) {
+        status = "COMPLETED";
+        return { rowCount: 1, rows: [] };
+      }
+      return { rowCount: 1, rows: [] };
+    },
+    release() {
+      statements.push("release");
+    }
+  };
+
+  const result = await updateTripStatus(
+    { request: { trip_id: "trip-1", status: "COMPLETED" } },
+    {
+      database: { connect: async () => client },
+      getTrip: async (id) => ({ id, status }),
+      writeOutbox: async (_client, event) => outbox.push(event)
+    }
+  );
+
+  assert.deepEqual(result, { trip: { id: "trip-1", status: "COMPLETED" } });
+  assert.equal(statements[0], "begin");
+  assert.match(statements[1], /pg_advisory_xact_lock.*trip-lifecycle/);
+  assert.equal(statements[2], "select status from trips where id = $1 for update");
+  assert.equal(statements[3], "update trips set status = $2 where id = $1");
+  assert.ok(statements[4].startsWith("insert into event_logs"));
+  assert.equal(statements[5], "commit");
+  assert.equal(statements[6], "release");
+  assert.deepEqual(outbox, [{
+    aggregateType: "trip",
+    aggregateId: "trip-1",
+    eventName: "trip.completed",
+    target: "RABBITMQ",
+    routingKey: "trip.completed",
+    payload: { tripId: "trip-1" }
+  }]);
+});
+
+test("repeating COMPLETED is idempotent and emits no duplicate completion event", async () => {
+  const statements = [];
+  const client = {
+    async query(text) {
+      const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
+      statements.push(sql);
+      if (sql.startsWith("select status from trips")) {
+        return { rowCount: 1, rows: [{ status: "COMPLETED" }] };
+      }
+      return { rowCount: 1, rows: [] };
+    },
+    release() {}
+  };
+
+  let outboxWrites = 0;
+  await updateTripStatus(
+    { request: { trip_id: "trip-1", status: "COMPLETED" } },
+    {
+      database: { connect: async () => client },
+      getTrip: async (id) => ({ id, status: "COMPLETED" }),
+      writeOutbox: async () => {
+        outboxWrites += 1;
+      }
+    }
+  );
+
+  assert.equal(outboxWrites, 0);
+  assert.equal(statements.some((sql) => sql.startsWith("update trips set status")), false);
+  assert.equal(statements.some((sql) => sql.startsWith("insert into event_logs")), false);
+});
+
+test("generic trip update cannot bypass the completion workflow", async () => {
+  const outbox = [];
+  const client = {
+    async query(text) {
+      const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
+      if (sql.startsWith("select vehicle_id, status")) {
+        return {
+          rowCount: 1,
+          rows: [{ vehicle_id: "vehicle-1", status: "DEPARTED" }]
+        };
+      }
+      return { rowCount: 1, rows: [] };
+    },
+    release() {}
+  };
+
+  await updateTrip(
+    { request: { id: "trip-1", status: "COMPLETED" } },
+    {
+      database: { connect: async () => client },
+      getTrip: async (id) => ({ id, status: "COMPLETED" }),
+      getVehicleId: async () => "vehicle-1",
+      writeOutbox: async (_client, event) => outbox.push(event)
+    }
+  );
+
+  assert.equal(outbox.length, 1);
+  assert.equal(outbox[0].eventName, "trip.completed");
 });

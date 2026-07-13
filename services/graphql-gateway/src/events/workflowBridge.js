@@ -9,6 +9,7 @@ const ROUTING_KEYS = [
   "booking.paid",
   "booking.expired",
   "booking.cancelled",
+  "booking.completed",
   "ticket.issued",
   "seat.hold_expired",
   "seat.state_changed"
@@ -17,6 +18,7 @@ const BOOKING_EVENTS = new Set([
   "booking.paid",
   "booking.expired",
   "booking.cancelled",
+  "booking.completed",
   "ticket.issued"
 ]);
 
