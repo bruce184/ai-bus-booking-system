@@ -23,6 +23,11 @@ The repository currently includes merged service runtimes plus the expanded B-3 
 | Display timezone | Asia/Ho_Chi_Minh |
 | Demo data | Fake data only |
 
+Calendar dates used by search defaults, analytics metrics, booking codes, and
+ticket codes are derived in `Asia/Ho_Chi_Minh`. They must not be obtained by
+slicing a UTC ISO timestamp because that returns the previous business date
+between local midnight and 06:59.
+
 Required extension:
 
 ```sql

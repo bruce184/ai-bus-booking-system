@@ -2,14 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { queryGraphQL } from '../../graphql.js';
+import { businessDateTimeLocal } from '../../../lib/date.js';
 
-const getTomorrowString = (hours = 8, minutes = 0) => {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(hours, minutes, 0, 0);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T${pad(tomorrow.getHours())}:${pad(tomorrow.getMinutes())}`;
-};
+const getTomorrowString = (hours = 8, minutes = 0) =>
+  businessDateTimeLocal(hours, minutes, 1);
 
 export default function TripsCrud() {
   const [trips, setTrips] = useState([]);

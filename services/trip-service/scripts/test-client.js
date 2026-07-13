@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
+import { businessDate } from '@bus/shared/date.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const protoPath = path.resolve(here, '..', '..', '..', 'proto', 'trip.proto');
@@ -18,9 +19,7 @@ const target = process.env.TRIP_SERVICE_TARGET || 'localhost:50051';
 const [origin = 'TP.HCM', destination = 'Da Lat', date = defaultDate()] = process.argv.slice(2);
 
 function defaultDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + 2);
-  return d.toISOString().slice(0, 10);
+  return businessDate(new Date(), 2);
 }
 
 function buildClient() {

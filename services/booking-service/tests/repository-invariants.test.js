@@ -2,11 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  bookingCode,
   bookingRequestMatches,
   createBooking,
   isPaymentSettledStatus,
   settleBookingPayment
 } from "../src/repository.js";
+
+test("booking codes use the Asia/Ho_Chi_Minh business date", () => {
+  const afterLocalMidnight = new Date("2026-07-13T17:30:00.000Z");
+  assert.match(bookingCode(afterLocalMidnight), /^BK20260714\d{6}$/);
+});
 
 const input = {
   trip_id: "trip-1",

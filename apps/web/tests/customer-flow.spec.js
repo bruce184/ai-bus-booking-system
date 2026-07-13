@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 import { cleanupCustomerE2EBookings, closeAdminE2EDatabase } from './demoDatabase.js';
+import { businessDate } from '../lib/date.js';
 
 // database/seed.sql schedules its demo trips relative to current_date (so the
 // search demo always has upcoming departures); a hardcoded absolute date here
@@ -8,9 +9,7 @@ import { cleanupCustomerE2EBookings, closeAdminE2EDatabase } from './demoDatabas
 // "Tomorrow" matches both the seed's nearest relative trip and the search
 // page's own defaultSearchDate(), so this stays correct on any run date.
 function tomorrowDate() {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  return date.toISOString().slice(0, 10);
+  return businessDate(new Date(), 1);
 }
 
 const SEARCH = { from: 'TP.HCM', to: 'Da Lat', date: tomorrowDate() };

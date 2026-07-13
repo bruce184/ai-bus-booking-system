@@ -1,8 +1,10 @@
+import { compactBusinessDate } from "@bus/shared/date.js";
+
 export const CHECKIN_POLICY =
   "Vui long co mat tai diem don truoc gio khoi hanh 30 phut va xuat trinh ma QR hoac ma ve khi check-in.";
 
-export function ticketCode(index) {
-  const ymd = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+export function ticketCode(index, now = new Date()) {
+  const ymd = compactBusinessDate(now);
   return `TK${ymd}${String(index + 1).padStart(3, "0")}${Math.floor(1000 + Math.random() * 9000)}`;
 }
 

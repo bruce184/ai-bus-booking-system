@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
+import { compactBusinessDate } from "@bus/shared/date.js";
 import { query, transaction } from "@bus/shared/db.js";
 import { fail } from "@bus/shared/errors.js";
 import { writeOutboxEvent } from "@bus/shared/outbox.js";
 import { fetchTripSnapshot } from "./trip-client.js";
 import { canCancel, canCancelBeforeDeparture, canCheckIn, canCheckInTripState } from "./status.js";
 
-function bookingCode() {
-  const now = new Date();
-  const ymd = now.toISOString().slice(0, 10).replaceAll("-", "");
+export function bookingCode(now = new Date()) {
+  const ymd = compactBusinessDate(now);
   return `BK${ymd}${Math.floor(100000 + Math.random() * 900000)}`;
 }
 

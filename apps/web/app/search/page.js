@@ -1,4 +1,5 @@
 import SearchClient from "./_SearchClient";
+import { businessDate } from "../../lib/date";
 
 const SEARCH_TRIPS = `
   query SearchTrips($input: SearchTripsInput!) {
@@ -30,9 +31,7 @@ const SERVER_GRAPHQL_ENDPOINT =
   "http://localhost:4000/graphql";
 
 function defaultSearchDate() {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return tomorrow.toISOString().slice(0, 10);
+  return businessDate(new Date(), 1);
 }
 
 async function fetchSearchTrips({ origin, destination, departureDate }) {

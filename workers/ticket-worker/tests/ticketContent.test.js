@@ -8,8 +8,9 @@ test("qr payload follows the lecturer format bookingCode-ticketId", () => {
 });
 
 test("ticket codes are dated and sequenced per passenger", () => {
-  assert.match(ticketCode(0), /^TK\d{8}001\d{4}$/);
-  assert.match(ticketCode(1), /^TK\d{8}002\d{4}$/);
+  const afterLocalMidnight = new Date("2026-07-13T17:30:00.000Z");
+  assert.match(ticketCode(0, afterLocalMidnight), /^TK20260714001\d{4}$/);
+  assert.match(ticketCode(1, afterLocalMidnight), /^TK20260714002\d{4}$/);
 });
 
 test("ticket html contains every field required by the spec", () => {

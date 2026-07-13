@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { businessDate, compactBusinessDate, formatDateInTimeZone } from "../src/date.js";
 import { createEventEnvelope } from "../src/events.js";
+
+test("business dates use Asia/Ho_Chi_Minh instead of the UTC calendar date", () => {
+  const afterLocalMidnight = new Date("2026-07-13T17:30:00.000Z");
+
+  assert.equal(formatDateInTimeZone(afterLocalMidnight), "2026-07-14");
+  assert.equal(businessDate(afterLocalMidnight, 1), "2026-07-15");
+  assert.equal(compactBusinessDate(afterLocalMidnight), "20260714");
+});
 
 test("createEventEnvelope preserves persisted outbox identity on retry", () => {
   const metadata = {

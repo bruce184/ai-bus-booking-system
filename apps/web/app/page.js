@@ -5,12 +5,11 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChatbotPanel } from "../components/ChatbotPanel";
+import { businessDate } from "../lib/date";
 import { LocationInput } from "../src/components/LocationInput.jsx";
 
 function getDefaultDate() {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return tomorrow.toISOString().slice(0, 10);
+  return businessDate(new Date(), 1);
 }
 
 export default function HomePage() {

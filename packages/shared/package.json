@@ -11,7 +11,8 @@
     "./events.js": "./src/events.js",
     "./outbox.js": "./src/outbox.js",
     "./grpc.js": "./src/grpc.js",
-    "./errors.js": "./src/errors.js"
+    "./errors.js": "./src/errors.js",
+    "./date.js": "./src/date.js"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.13.4",
