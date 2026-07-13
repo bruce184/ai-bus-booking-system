@@ -76,7 +76,7 @@ Admin login is required for admin screens in the MVP. Local demo auth may use se
 | `adminCreateStop(input)` / `adminUpdateStop` / `adminDeleteStop` | Admin pickup/dropoff stop CRUD |
 | `adminCreateVehicle(input)` / `adminUpdateVehicle` / `adminDeleteVehicle` | Admin vehicle CRUD |
 | `adminConfigureVehicleSeats(vehicleId, seats)` | Configure vehicle seat layout |
-| `adminCreateTrip(input)` / `adminUpdateTrip` / `adminDeleteTrip` | Admin trip CRUD; changing `vehicleId` rebuilds `trip_seats` from the new vehicle's layout and is rejected if any seat on the trip is already held, booked, or blocked |
+| `adminCreateTrip(input)` / `adminUpdateTrip` / `adminDeleteTrip` | Admin trip CRUD; changing `vehicleId` rebuilds `trip_seats` from the new vehicle's layout and is rejected if any seat on the trip is already held, booked, or blocked; deletion is rejected while any booking logically references the trip |
 | `adminUpdateTripStatus(input)` | Activate, lock, depart, complete, cancel, or draft a trip |
 | `adminBlockSeats(input)` | Block seats from sale with an optional reason |
 | `adminCheckIn(input)` | Check in by booking code, ticket code, or simulated QR payload |
@@ -405,6 +405,13 @@ Payment and expiry for the same booking must be serialized by Booking Service.
 An expiry sweep must skip a booking whose payment transition is in progress,
 and concurrent successful payment retries must produce only one transition to
 `PAID`.
+
+Booking creation and trip deletion serialize on the same transaction-scoped
+PostgreSQL advisory lock keyed by `tripId`. Creation performs its Trip Service
+existence/status lookup only after taking that lock. Deletion takes the lock,
+rejects any logical `bookings.trip_id` reference, and only then removes the
+trip-seat projection and trip. Therefore neither operation can commit an
+orphaned booking regardless of which transaction starts first.
 
 ## 11. MCP Server Contract
 

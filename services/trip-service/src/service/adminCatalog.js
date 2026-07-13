@@ -339,9 +339,24 @@ export async function deleteTrip(call, { database = pool } = {}) {
   const client = await database.connect();
   try {
     await client.query('begin');
+    // Serialize against Booking Service createBooking. Without a physical
+    // cross-service FK, this application-level lock plus reference check is
+    // what prevents a booking from being committed for a deleted trip.
+    await client.query(
+      "select pg_advisory_xact_lock(hashtext('trip-lifecycle'), hashtext($1))",
+      [id],
+    );
+    const referenced = await client.query(
+      'select 1 from bookings where trip_id = $1 limit 1',
+      [id],
+    );
+    if (referenced.rowCount > 0) {
+      throw invalidArgument('Cannot delete trip: existing bookings reference it');
+    }
+
     // trip_seats belongs to the Seat Inventory boundary, so there is no
     // cross-service FK cascade. The local shared-DB deployment performs the
-    // projection cleanup explicitly while deleting the catalog trip.
+    // projection cleanup explicitly only after the logical reference guard.
     await client.query('delete from trip_seats where trip_id = $1', [id]);
     const { rowCount } = await client.query('delete from trips where id = $1', [id]);
     await client.query('commit');

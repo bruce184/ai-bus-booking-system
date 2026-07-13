@@ -256,7 +256,7 @@ test("createBooking rejects when Trip Service reports the trip is not ACTIVE", a
   );
 });
 
-test("createBooking propagates a trip lookup failure without touching the database", async () => {
+test("createBooking locks trip lifecycle before propagating a fresh trip lookup failure", async () => {
   const { client, statements } = repositoryClient();
 
   await assert.rejects(
@@ -270,7 +270,8 @@ test("createBooking propagates a trip lookup failure without touching the databa
     }),
     (error) => error.code === "NOT_FOUND"
   );
-  assert.equal(statements.length, 0);
+  assert.equal(statements.length, 1);
+  assert.match(statements[0], /pg_advisory_xact_lock.*trip-lifecycle/);
 });
 
 test("settled payment retry is idempotent and does not process payment again", async () => {

@@ -233,16 +233,24 @@ export async function createBooking(
 ) {
   const { passengers, seatIds } = validateCreateBookingInput(input);
 
-  // trip_id is unauthenticated client input and Trip Service owns that data
-  // (no physical FK across service boundaries - see docs/ARCHITECTURE.md
-  // section 11), so existence/price/status come from its API, fetched
-  // before opening a DB transaction rather than mid-transaction.
-  const trip = await getTripSnapshot(input.trip_id);
-  if (trip.status !== "ACTIVE") {
-    fail("BOOKING_STATE_INVALID", "Trip is not active");
-  }
-
   return runTransaction(async (client) => {
+    // Booking creation and trip deletion share this transaction-scoped lock.
+    // The Trip Service takes the same key before checking logical booking
+    // references, so either creation commits first and blocks deletion, or
+    // deletion commits first and this fresh Trip Service lookup fails.
+    await client.query(
+      "select pg_advisory_xact_lock(hashtext('trip-lifecycle'), hashtext($1))",
+      [input.trip_id]
+    );
+
+    // trip_id is unauthenticated client input and Trip Service owns that data.
+    // Fetch after acquiring the lifecycle lock: a snapshot fetched earlier
+    // could become stale while an admin concurrently deletes the trip.
+    const trip = await getTripSnapshot(input.trip_id);
+    if (trip.status !== "ACTIVE") {
+      fail("BOOKING_STATE_INVALID", "Trip is not active");
+    }
+
     await client.query(
       "select pg_advisory_xact_lock(hashtext('booking-hold'), hashtext($1))",
       [input.hold_token]

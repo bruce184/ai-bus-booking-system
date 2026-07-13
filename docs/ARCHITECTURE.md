@@ -56,6 +56,11 @@ The current MVP still has three explicit shared-database compromises:
 - `trip_seats` is a local materialized projection: Trip Service initializes
   and removes it with trip lifecycle changes, while Seat Inventory owns hold,
   booked, and blocked state transitions and reads vehicle layout coordinates.
+- Trip deletion performs a read-only logical-reference check against
+  `bookings.trip_id` in the shared local database. Booking creation and trip
+  deletion take the same PostgreSQL advisory lock keyed by `tripId`; creation
+  refreshes Trip Service state under that lock, so neither race order can
+  commit an orphaned booking.
 - `event_logs` is a shared operational log sink written by workflow services
   and queried through Booking Service for the admin demo.
 

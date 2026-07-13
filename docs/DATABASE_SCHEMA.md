@@ -165,8 +165,10 @@ The Ticket/Email workflow, `trip_seats` materialized projection, and shared
 - `trip_seats.booking_id` is trusted from Booking Service's own
   `ConfirmSeats`/`ReleaseBookedSeats` calls to Seat Inventory Service.
 - `trip_seats.trip_id` is initialized from Trip Service's trip/vehicle
-  projection. Trip deletion explicitly removes those projection rows because
-  there is no cross-service cascade.
+  projection. Trip deletion and Booking Service creation serialize on a shared
+  transaction-scoped advisory lock keyed by `tripId`; deletion rejects any
+  logical `bookings.trip_id` reference before explicitly removing projection
+  rows because there is no cross-service cascade.
 - `tickets.booking_id` / `tickets.passenger_id` come from Ticket Worker's
   canonical `booking.paid` event context and have no physical constraint into
   Booking Service tables.
