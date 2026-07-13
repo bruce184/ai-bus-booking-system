@@ -165,14 +165,22 @@ time-sensitive seat availability as cached truth.
 ### Seat Hold
 
 1. Web sends `holdSeats(tripId, seatIds)` mutation.
-2. Gateway calls Booking Service or Seat Inventory Service according to the implementation task, but Seat Inventory Service must own the Redis write.
-3. Seat Inventory Service atomically checks booked/blocked state and Redis hold keys.
-4. Redis stores hold keys with TTL, default 5 minutes.
-5. Gateway returns hold token and expiry.
-6. Seat updates are broadcast with GraphQL Subscription.
-7. Redis key-expiry notification publishes `seat.hold_expired`.
-8. The Gateway realtime bridge fetches the canonical seat map over gRPC and
-   publishes the affected `AVAILABLE` seat through GraphQL Subscription.
+2. Gateway calls Seat Inventory Service; it owns the Redis write.
+3. Seat Inventory verifies through Trip Service that the trip is `ACTIVE`,
+   then checks persistent booked/blocked state.
+4. Seat Inventory atomically checks the Redis topology-maintenance key and
+   existing hold keys before creating the TTL hold.
+5. After the Redis write, Seat Inventory rechecks both persistent seat state
+   and Trip Service status. A failed postcondition immediately discards the
+   new hold; if Redis drops during rollback, the request fails and the original
+   TTL remains the bounded cleanup path. A concurrent trip lock/departure
+   therefore cannot return a usable hold.
+6. Redis stores hold keys with TTL, default 5 minutes.
+7. Gateway returns hold token and expiry.
+8. Seat updates are broadcast with GraphQL Subscription.
+9. Redis key-expiry notification publishes `seat.hold_expired`.
+10. The Gateway realtime bridge fetches the canonical seat map over gRPC and
+    publishes the affected `AVAILABLE` seat through GraphQL Subscription.
 
 ### Checkout, Payment, Ticket, Email
 

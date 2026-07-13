@@ -396,11 +396,18 @@ compatibility. New events must use the canonical envelope.
 ### Seat Hold
 
 1. Web sends `holdSeats(tripId, seatIds)` to GraphQL Gateway.
-2. Gateway asks Booking Service to coordinate the request or calls Seat Inventory Service according to the assigned implementation task.
-3. Seat Inventory Service checks persistent booked/blocked state and Redis hold keys atomically.
-4. Redis stores hold keys with a TTL, default 5 minutes.
-5. Gateway returns hold token and expiry.
-6. GraphQL Subscription broadcasts seat changes.
+2. Gateway calls Seat Inventory Service.
+3. Seat Inventory calls Trip Service and accepts only an `ACTIVE` trip.
+4. Seat Inventory checks persistent booked/blocked state, then atomically
+   checks the Redis maintenance key and existing holds while writing the TTL
+   hold.
+5. Seat Inventory rechecks persistent seats and Trip Service status after the
+   Redis write. A failed postcondition discards the new hold and fails closed;
+   if Redis is unavailable during rollback, the hold remains bounded by its
+   original TTL and no token is returned.
+6. Redis stores hold keys with a TTL, default 5 minutes.
+7. Gateway returns hold token and expiry.
+8. GraphQL Subscription broadcasts seat changes.
 
 Hold and seat transition invariants:
 

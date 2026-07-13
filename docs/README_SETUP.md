@@ -201,6 +201,7 @@ Implemented test targets:
 | Gateway unit / whitebox | `npm run test:gateway` | Auth, JWT, role helpers, and context factory |
 | Gateway integration | `npm run test:gateway:integration` | Starts a real gateway on port `4100` and calls GraphQL over HTTP |
 | Booking service unit | `npm run test:booking` | Booking state machine and service client request contracts |
+| Seat Inventory unit | `npm run test:seat` | ACTIVE-trip guard, post-write race rollback, Redis hold lifecycle, and persistent seat invariants |
 | Payment service unit | `npm run test:payment` | Payment result and Kafka-outage isolation |
 | Email worker unit | `npm run test:email-worker` | Consumer idempotency and normalized simulated delivery |
 | Trip service unit | `npm run test:trip` | Sort aliases and popular-route aggregate mapping |

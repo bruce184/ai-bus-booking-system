@@ -4,6 +4,7 @@ import { closePostgres } from "./db/postgres.js";
 import { seatInventoryHandlers } from "./grpc/seatInventoryHandlers.js";
 import { seatInventoryServiceDefinition } from "./grpc/proto.js";
 import { closeRedis } from "./redis/holdStore.js";
+import { closeTripClient } from "./trip-client.js";
 import {
   closeHoldExpiryPublisher,
   startHoldExpiryPublisher
@@ -43,7 +44,8 @@ function shutdown(signal) {
     await Promise.all([
       closePostgres(),
       closeRedis(),
-      closeHoldExpiryPublisher()
+      closeHoldExpiryPublisher(),
+      closeTripClient()
     ]);
     process.exit(0);
   });

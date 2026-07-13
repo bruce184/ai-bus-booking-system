@@ -17,6 +17,7 @@ import {
   releaseHoldByToken,
   getHoldDetails
 } from "../redis/holdStore.js";
+import { fetchTripStatus } from "../trip-client.js";
 
 function getTripId(request) {
   return request.tripId ?? request.trip_id ?? "";
@@ -64,6 +65,17 @@ function toSeatResponse(seat, heldSeatIds) {
   };
 }
 
+export async function requireActiveTrip(tripId, getTripStatus = fetchTripStatus) {
+  const status = await getTripStatus(tripId);
+  if (status !== "ACTIVE") {
+    throw serviceError(
+      grpc.status.FAILED_PRECONDITION,
+      `TRIP_NOT_ACTIVE: Trip ${tripId} is ${status || "UNKNOWN"}`
+    );
+  }
+  return status;
+}
+
 export async function getSeatMap(request) {
   const tripId = getTripId(request).trim();
 
@@ -84,7 +96,15 @@ export async function getSeatMap(request) {
   };
 }
 
-export async function holdSeats(request) {
+export async function holdSeats(
+  request,
+  {
+    getTripStatus = fetchTripStatus,
+    loadSeats = listTripSeatsByIds,
+    createHold = holdSeatsAtomically,
+    discardHold = releaseHoldByToken
+  } = {}
+) {
   const tripId = getTripId(request).trim();
   const seatIds = [...new Set(getSeatIds(request).map((seatId) => seatId.trim()).filter(Boolean))];
   const requesterId = getRequesterId(request).trim() || "guest";
@@ -97,7 +117,9 @@ export async function holdSeats(request) {
     throw serviceError(grpc.status.INVALID_ARGUMENT, "seat_ids must contain at least one seat");
   }
 
-  const seats = await listTripSeatsByIds(tripId, seatIds);
+  await requireActiveTrip(tripId, getTripStatus);
+
+  const seats = await loadSeats(tripId, seatIds);
   const foundSeatIds = new Set(seats.map((seat) => seat.id));
   const missingSeatId = seatIds.find((seatId) => !foundSeatIds.has(seatId));
 
@@ -115,7 +137,7 @@ export async function holdSeats(request) {
   }
 
   const holdToken = randomUUID();
-  const holdResult = await holdSeatsAtomically(
+  const holdResult = await createHold(
     tripId,
     seatIds,
     requesterId,
@@ -126,7 +148,7 @@ export async function holdSeats(request) {
   if (holdResult.maintenanceConflict) {
     throw serviceError(
       grpc.status.FAILED_PRECONDITION,
-      "SEAT_NOT_AVAILABLE: Trip seat layout is being updated"
+      "SEAT_NOT_AVAILABLE: Trip seat sale is temporarily locked"
     );
   }
 
@@ -137,38 +159,52 @@ export async function holdSeats(request) {
     );
   }
 
-  // Close the PostgreSQL/Redis race: an admin block or payment confirmation
-  // may commit after the first persistent-state read but before the Lua hold.
-  // Re-check after acquiring Redis and discard the hold if persistence won.
-  const refreshedSeats = await listTripSeatsByIds(tripId, seatIds);
-  const refreshedIds = new Set(refreshedSeats.map((seat) => seat.id));
-  const disappearedSeatId = seatIds.find((seatId) => !refreshedIds.has(seatId));
-  const persistentlyUnavailable = refreshedSeats.find(
-    (seat) => seat.status === "BLOCKED" || seat.status === "BOOKED"
-  );
-
-  if (disappearedSeatId || persistentlyUnavailable) {
-    await releaseHoldByToken(holdToken);
-    if (disappearedSeatId) {
-      throw serviceError(grpc.status.NOT_FOUND, `Seat ${disappearedSeatId} was not found for trip`);
-    }
-    throw serviceError(
-      grpc.status.FAILED_PRECONDITION,
-      `SEAT_NOT_AVAILABLE: Seat ${persistentlyUnavailable.id} is ${persistentlyUnavailable.status}`
+  try {
+    // Close both races after the Redis write: persistent seat state and the
+    // Trip Service sale state can change after their first snapshots.
+    const refreshedSeats = await loadSeats(tripId, seatIds);
+    const refreshedIds = new Set(refreshedSeats.map((seat) => seat.id));
+    const disappearedSeatId = seatIds.find((seatId) => !refreshedIds.has(seatId));
+    const persistentlyUnavailable = refreshedSeats.find(
+      (seat) => seat.status === "BLOCKED" || seat.status === "BOOKED"
     );
+
+    if (disappearedSeatId) {
+      throw serviceError(
+        grpc.status.NOT_FOUND,
+        `Seat ${disappearedSeatId} was not found for trip`
+      );
+    }
+    if (persistentlyUnavailable) {
+      throw serviceError(
+        grpc.status.FAILED_PRECONDITION,
+        `SEAT_NOT_AVAILABLE: Seat ${persistentlyUnavailable.id} is ${persistentlyUnavailable.status}`
+      );
+    }
+
+    await requireActiveTrip(tripId, getTripStatus);
+
+    return {
+      holdToken,
+      tripId,
+      seats: refreshedSeats.map((seat) => ({
+        ...toSeatResponse(seat, new Set(seatIds)),
+        status: "HELD"
+      })),
+      expiresAt: holdResult.expiresAt
+    };
+  } catch (error) {
+    try {
+      await discardHold(holdToken);
+    } catch {
+      throw serviceError(
+        grpc.status.UNAVAILABLE,
+        "SEAT_HOLD_ROLLBACK_FAILED: Invalid hold will expire by Redis TTL"
+      );
+    }
+    throw error;
   }
-
-  return {
-    holdToken,
-    tripId,
-    seats: refreshedSeats.map((seat) => ({
-      ...toSeatResponse(seat, new Set(seatIds)),
-      status: "HELD"
-    })),
-    expiresAt: holdResult.expiresAt
-  };
 }
-
 export async function releaseHold(request) {
   const holdToken = getHoldToken(request).trim();
 

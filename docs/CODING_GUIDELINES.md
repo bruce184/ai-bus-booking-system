@@ -169,7 +169,8 @@ Rules:
 6. Do not invent live data in AI or MCP responses.
 7. Ticket output must include the fields documented in `docs/API_CONTRACT.md`.
 8. Admin operations must respect role boundaries and service ownership.
-9. Use `@bus/shared/http.js` for bounded HTTP calls; document any timeout override.
+9. Seat Inventory must verify Trip Service reports `ACTIVE` before and after creating a Redis hold.
+10. Use `@bus/shared/http.js` for bounded HTTP calls; document any timeout override.
 
 ## 9. Database Rules
 
