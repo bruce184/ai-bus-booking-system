@@ -7,14 +7,25 @@ import { publishKafkaEvent, publishWorkflowEvent } from "./events.js";
 // the state change it describes.
 export async function writeOutboxEvent(
   client,
-  { aggregateType, aggregateId, eventName, target, routingKey, payload }
+  { aggregateType, aggregateId, eventName, target, routingKey, payload, eventId, occurredAt }
 ) {
   await client.query(
     `
-      insert into outbox_events (aggregate_type, aggregate_id, event_name, target, routing_key, payload)
-      values ($1, $2, $3, $4, $5, $6)
+      insert into outbox_events (
+        aggregate_type, aggregate_id, event_name, target, routing_key, payload, event_id, occurred_at
+      )
+      values ($1, $2, $3, $4, $5, $6, coalesce($7, gen_random_uuid()), coalesce($8, now()))
     `,
-    [aggregateType, aggregateId, eventName, target, routingKey, JSON.stringify(payload)]
+    [
+      aggregateType,
+      aggregateId,
+      eventName,
+      target,
+      routingKey,
+      JSON.stringify(payload),
+      eventId || null,
+      occurredAt || null
+    ]
   );
 }
 
@@ -30,9 +41,16 @@ export async function dispatchOutboxEvents({ limit = 20 } = {}) {
   for (const row of rows) {
     try {
       if (row.target === "RABBITMQ") {
-        await publishWorkflowEvent(row.event_name, row.payload);
+        await publishWorkflowEvent(row.event_name, row.payload, {
+          eventId: row.event_id,
+          occurredAt: row.occurred_at,
+          routingKey: row.routing_key
+        });
       } else {
-        await publishKafkaEvent(row.routing_key, row.event_name, row.payload);
+        await publishKafkaEvent(row.routing_key, row.event_name, row.payload, {
+          eventId: row.event_id,
+          occurredAt: row.occurred_at
+        });
       }
       await pool.query(
         "update outbox_events set published_at = now() where id = $1 and published_at is null",

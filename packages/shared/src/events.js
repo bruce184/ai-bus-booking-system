@@ -39,7 +39,7 @@ async function rabbitChannel() {
   if (!rabbitChannelPromise) {
     rabbitChannelPromise = (async () => {
       const connection = await connectWithRetry(rabbitUrl);
-      const channel = await connection.createChannel();
+      const channel = await connection.createConfirmChannel();
       channel.on("error", (err) => {
         console.error("[RabbitMQ] Channel error", err);
         rabbitChannelPromise = null;
@@ -56,6 +56,15 @@ async function rabbitChannel() {
   return rabbitChannelPromise;
 }
 
+export function createEventEnvelope(eventName, payload, metadata = {}) {
+  return {
+    eventId: metadata.eventId || randomUUID(),
+    eventName,
+    payload,
+    occurredAt: metadata.occurredAt || new Date().toISOString()
+  };
+}
+
 async function kafkaProducer() {
   if (!kafkaProducerPromise) {
     const kafka = new Kafka({
@@ -68,24 +77,29 @@ async function kafkaProducer() {
   return kafkaProducerPromise;
 }
 
-export async function publishWorkflowEvent(eventName, payload) {
+export async function publishWorkflowEvent(eventName, payload, metadata = {}) {
+  const envelope = createEventEnvelope(eventName, payload, metadata);
   if (process.env.DISABLE_RABBITMQ === "true") {
-    console.log(`[rabbitmq:disabled] ${eventName}`, payload);
+    console.log(`[rabbitmq:disabled] ${eventName}`, envelope);
     return;
   }
 
   const channel = await rabbitChannel();
-  channel.publish(
-    workflowExchange,
-    eventName,
-    Buffer.from(JSON.stringify({ eventId: randomUUID(), eventName, payload, occurredAt: new Date().toISOString() })),
-    { contentType: "application/json", persistent: true }
-  );
+  await new Promise((resolve, reject) => {
+    channel.publish(
+      workflowExchange,
+      metadata.routingKey || eventName,
+      Buffer.from(JSON.stringify(envelope)),
+      { contentType: "application/json", persistent: true },
+      (error) => (error ? reject(error) : resolve())
+    );
+  });
 }
 
-export async function publishKafkaEvent(topic, eventName, payload) {
+export async function publishKafkaEvent(topic, eventName, payload, metadata = {}) {
+  const envelope = createEventEnvelope(eventName, payload, metadata);
   if (process.env.DISABLE_KAFKA === "true") {
-    console.log(`[kafka:disabled] ${topic}:${eventName}`, payload);
+    console.log(`[kafka:disabled] ${topic}:${eventName}`, envelope);
     return;
   }
 
@@ -95,7 +109,7 @@ export async function publishKafkaEvent(topic, eventName, payload) {
     messages: [
       {
         key: payload.bookingCode || payload.bookingId || eventName,
-        value: JSON.stringify({ eventId: randomUUID(), eventName, payload, occurredAt: new Date().toISOString() })
+        value: JSON.stringify(envelope)
       }
     ]
   });

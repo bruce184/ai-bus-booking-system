@@ -170,16 +170,31 @@ create table if not exists processed_events (
 -- unpublished rows and stamps published_at; failures just retry next tick.
 create table if not exists outbox_events (
   id uuid primary key default gen_random_uuid(),
+  event_id uuid not null default gen_random_uuid(),
   aggregate_type text not null,
   aggregate_id uuid not null,
   event_name text not null,
   target text not null check (target in ('RABBITMQ', 'KAFKA')),
   routing_key text not null,
   payload jsonb not null default '{}'::jsonb,
+  occurred_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   published_at timestamptz
 );
 
+-- Keep schema.sql re-runnable against volumes created before event identity
+-- was persisted in the outbox. A retry must reuse the same eventId and
+-- occurredAt or an idempotent consumer cannot recognize the redelivery.
+alter table outbox_events add column if not exists event_id uuid;
+alter table outbox_events add column if not exists occurred_at timestamptz;
+update outbox_events set event_id = gen_random_uuid() where event_id is null;
+update outbox_events set occurred_at = created_at where occurred_at is null;
+alter table outbox_events alter column event_id set default gen_random_uuid();
+alter table outbox_events alter column event_id set not null;
+alter table outbox_events alter column occurred_at set default now();
+alter table outbox_events alter column occurred_at set not null;
+
+create unique index if not exists idx_outbox_events_event_id on outbox_events(event_id);
 create index if not exists idx_outbox_events_unpublished on outbox_events(created_at) where published_at is null;
 
 create index if not exists idx_locations_name on locations(name);

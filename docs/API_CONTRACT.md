@@ -326,6 +326,11 @@ All producers use the canonical JSON envelope:
 (at-least-once) are skipped instead of double-counted. Events without an
 `eventId` (legacy) are processed without deduplication.
 
+Transactional-outbox producers persist `eventId` and `occurredAt` in the
+outbox row together with the business transaction. Every retry republishes that
+same envelope identity. RabbitMQ publishers wait for a broker confirmation
+before the dispatcher stamps `published_at`; Kafka publishers await `send()`.
+
 During the search-event migration, Analytics Service may consume the previous
 flat `{ "event": "trip.search_performed", ... }` shape for queued-message
 compatibility. New events must use the canonical envelope.
