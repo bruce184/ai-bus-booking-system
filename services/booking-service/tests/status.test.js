@@ -7,7 +7,8 @@ import {
   canCancel,
   canCancelBeforeDeparture,
   canCheckIn,
-  canCheckInTripState
+  canCheckInTripState,
+  checkInTripStateError
 } from "../src/status.js";
 
 test("booking status set matches documented state names", () => {
@@ -63,4 +64,6 @@ test("check-in only allows ACTIVE and DEPARTED trips", () => {
   assert.equal(canCheckInTripState("LOCKED"), false);
   assert.equal(canCheckInTripState("COMPLETED"), false);
   assert.equal(canCheckInTripState("CANCELLED"), false);
+  assert.equal(checkInTripStateError("LOCKED"), "Cannot check in while trip is LOCKED");
+  assert.equal(checkInTripStateError("CANCELLED"), "Cannot check in while trip is CANCELLED");
 });

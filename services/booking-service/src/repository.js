@@ -4,7 +4,13 @@ import { query, transaction } from "@bus/shared/db.js";
 import { fail } from "@bus/shared/errors.js";
 import { writeOutboxEvent } from "@bus/shared/outbox.js";
 import { fetchTripSnapshot } from "./trip-client.js";
-import { canCancel, canCancelBeforeDeparture, canCheckIn, canCheckInTripState } from "./status.js";
+import {
+  canCancel,
+  canCancelBeforeDeparture,
+  canCheckIn,
+  canCheckInTripState,
+  checkInTripStateError
+} from "./status.js";
 
 export function bookingCode(now = new Date()) {
   const ymd = compactBusinessDate(now);
@@ -643,7 +649,7 @@ export async function checkInPassenger(
   if (candidate.status !== "CHECKED_IN") {
     const trip = await getTripSnapshot(candidate.trip_id);
     if (!canCheckInTripState(trip.status)) {
-      fail("BOOKING_STATE_INVALID", "Cannot check in a booking for a cancelled trip");
+      fail("BOOKING_STATE_INVALID", checkInTripStateError(trip.status));
     }
   }
 

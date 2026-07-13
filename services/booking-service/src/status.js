@@ -37,3 +37,7 @@ export function canCheckIn(status) {
 export function canCheckInTripState(tripStatus) {
   return tripStatus === "ACTIVE" || tripStatus === "DEPARTED";
 }
+
+export function checkInTripStateError(tripStatus) {
+  return `Cannot check in while trip is ${tripStatus || "UNKNOWN"}`;
+}
