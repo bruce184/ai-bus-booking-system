@@ -12,7 +12,7 @@ import {
   ScrollText,
   Ticket
 } from 'lucide-react';
-import { queryGraphQL } from '../graphql.js';
+import { clearSession, getSession } from '../../lib/graphql.js';
 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
@@ -20,9 +20,8 @@ export default function AdminLayout({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const handleLogout = () => {
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_user');
+  const handleLogout = async () => {
+    await clearSession();
     router.push('/admin/login');
   };
 
@@ -32,42 +31,16 @@ export default function AdminLayout({ children }) {
       return;
     }
 
-    const token = localStorage.getItem('admin_token');
-    const userJson = localStorage.getItem('admin_user');
-
-    if (!token || !userJson) {
-      router.push('/admin/login');
-      return;
-    }
-
-    // Verify token with backend
     const verifyToken = async () => {
       try {
-        const data = await queryGraphQL(`
-          query Me {
-            me {
-              id
-              role
-            }
-          }
-        `);
-        if (!data.me || (data.me.role !== 'ADMIN' && data.me.role !== 'STAFF')) {
-          handleLogout();
+        const verifiedUser = await getSession();
+        if (!verifiedUser || (verifiedUser.role !== 'ADMIN' && verifiedUser.role !== 'STAFF')) {
+          await handleLogout();
         } else {
-          setUser(data.me);
+          setUser(verifiedUser);
         }
-      } catch (err) {
-        // Offline or error fallback to localStorage
-        try {
-          const parsedUser = JSON.parse(userJson);
-          if (parsedUser.role !== 'ADMIN' && parsedUser.role !== 'STAFF') {
-            handleLogout();
-          } else {
-            setUser(parsedUser);
-          }
-        } catch (e) {
-          handleLogout();
-        }
+      } catch {
+        await handleLogout();
       } finally {
         setLoading(false);
       }

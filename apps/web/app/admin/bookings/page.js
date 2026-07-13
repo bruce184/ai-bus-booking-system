@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { queryGraphQL } from '../../graphql.js';
+import { getSession } from '../../../lib/graphql.js';
 
 const formatTripOption = (trip) => {
   const origin = trip.route?.origin?.name || 'Unknown origin';
@@ -130,19 +131,17 @@ export default function BookingsCrud() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      let role = null;
-      try {
-        role = JSON.parse(localStorage.getItem('admin_user') || 'null')?.role || null;
-      } catch {
-        role = null;
-      }
-
-      const isAdmin = role === 'ADMIN';
-      setCanViewAdminData(isAdmin);
-      if (isAdmin) {
-        void loadTrips();
-        void queryBookings();
-      }
+      void getSession().then((user) => {
+        const isAdmin = user?.role === 'ADMIN';
+        setCanViewAdminData(isAdmin);
+        if (isAdmin) {
+          void loadTrips();
+          void queryBookings();
+        }
+      }).catch((error) => {
+        setCanViewAdminData(false);
+        showToast(error.message || 'Unable to verify session.', 'error');
+      });
     }, 0);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -191,6 +191,7 @@ Implemented test targets:
 | Gateway API / contract smoke | `npm run test:gateway:api` | Requires a gateway already running on `http://localhost:4000/graphql` |
 | Gateway performance | `npm run test:gateway:perf` | Requires Apache JMeter on `PATH` |
 | Web lint | `npm --prefix apps/web run lint` | Next.js/React lint |
+| Web auth unit tests | `npm run test:web:unit` | BFF portal-role and secure-cookie invariants |
 | Web admin E2E | `npm run test:web:e2e` | Uses Playwright and starts configured dev servers |
 
 ## 9. Local Run Targets

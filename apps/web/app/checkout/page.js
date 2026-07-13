@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { graphqlRequest, getCustomerToken } from "../../lib/graphql";
+import { graphqlRequest } from "../../lib/graphql";
 import { TopBar } from "../../src/components/TopBar.jsx";
 import { CountdownRing } from "../../src/components/ui/CountdownRing.jsx";
 
@@ -91,9 +91,6 @@ function CheckoutContent() {
 
   // Khách đã đăng nhập: nạp hồ sơ hành khách đã lưu để điền nhanh.
   useEffect(() => {
-    if (!getCustomerToken()) {
-      return;
-    }
     graphqlRequest(MY_SAVED_PASSENGERS)
       .then((data) => setSavedPassengers(data.mySavedPassengers ?? []))
       .catch(() => setSavedPassengers([]));

@@ -3,23 +3,8 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { graphqlRequest, setCustomerSession } from "../../lib/graphql";
+import { loginSession } from "../../lib/graphql";
 import { TopBar } from "../../src/components/TopBar.jsx";
-
-const LOGIN = `
-  mutation Login($input: LoginInput!) {
-    login(input: $input) {
-      token
-      expiresAt
-      user {
-        id
-        email
-        fullName
-        role
-      }
-    }
-  }
-`;
 
 function LoginContent() {
   const router = useRouter();
@@ -37,8 +22,7 @@ function LoginContent() {
     setLoading(true);
     setError("");
     try {
-      const data = await graphqlRequest(LOGIN, { input: { email, password } });
-      setCustomerSession(data.login.token, data.login.user);
+      await loginSession({ email, password, portal: "customer" });
       router.push(nextPath);
     } catch (err) {
       setError(err.message);

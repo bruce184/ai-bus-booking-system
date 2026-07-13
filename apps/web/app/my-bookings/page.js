@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { clearCustomerSession, getCustomerToken, getCustomerUser, graphqlRequest } from "../../lib/graphql";
+import { clearSession, getSession, graphqlRequest } from "../../lib/graphql";
 import { TopBar } from "../../src/components/TopBar.jsx";
 
 const MY_BOOKINGS = `
@@ -74,27 +74,28 @@ export default function MyBookingsPage() {
   }, []);
 
   useEffect(() => {
-    const token = getCustomerToken();
-    const user = getCustomerUser();
-
-    if (!token) {
-      // setTimeout keeps setState out of the synchronous effect body
-      // (react-hooks/set-state-in-effect), matching admin/layout.js.
-      const timer = setTimeout(
-        () => setState({ phase: "guest", bookings: [], passengers: [], error: "", user: null }),
-        0
-      );
-      return () => clearTimeout(timer);
-    }
-
-    const timer = setTimeout(() => {
-      void reload(user);
-    }, 0);
-    return () => clearTimeout(timer);
+    let active = true;
+    void getSession()
+      .then((user) => {
+        if (!active) return;
+        if (!user || user.role !== "CUSTOMER") {
+          setState({ phase: "guest", bookings: [], passengers: [], error: "", user: null });
+          return;
+        }
+        void reload(user);
+      })
+      .catch((error) => {
+        if (active) {
+          setState({ phase: "error", bookings: [], passengers: [], error: error.message, user: null });
+        }
+      });
+    return () => {
+      active = false;
+    };
   }, [reload]);
 
-  function logout() {
-    clearCustomerSession();
+  async function logout() {
+    await clearSession();
     router.push("/search");
   }
 

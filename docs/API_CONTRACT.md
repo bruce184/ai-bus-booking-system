@@ -406,6 +406,9 @@ Frontend must:
 4. Ask for booking code and email before private booking lookup.
 5. Treat GraphQL `UNAUTHORIZED` as a login/session issue.
 6. Show policy source text for AI policy answers.
+7. Send browser GraphQL HTTP requests through Next.js `/api/graphql`; store the
+   Gateway JWT only in the BFF-managed `HttpOnly` session cookie, never
+   `localStorage` or a JavaScript-readable cookie.
 
 ## 13. Contract Change Rule
 

@@ -66,13 +66,19 @@ needs data another owns, it calls that service's API:
 
 | Path | Protocol |
 |---|---|
-| Web to Gateway | GraphQL HTTP / GraphQL WebSocket |
+| Web to Gateway | Next.js `/api/graphql` BFF proxy for HTTP; direct GraphQL WebSocket for public seat updates |
 | Gateway to Services | gRPC |
 | Service workflow events | RabbitMQ |
 | Analytics events | Kafka |
 | Seat holds | Redis TTL |
 | Reverse proxy | Nginx |
 | MCP clients to MCP Server | MCP transport selected during implementation |
+
+Browser sessions use one `HttpOnly`, `SameSite=Lax` cookie set by the Next.js
+auth route. Browser code never persists JWTs in `localStorage` or a
+JavaScript-readable cookie. Customer and admin pages use the same GraphQL
+helper and BFF proxy; `/api/auth/session` resolves the current user from the
+Gateway's `me` query instead of trusting a browser-stored role object.
 
 Frontend must not call internal gRPC services directly.
 
