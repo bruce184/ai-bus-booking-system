@@ -332,6 +332,13 @@ All producers use the canonical JSON envelope:
 (at-least-once) are skipped instead of double-counted. Events without an
 `eventId` (legacy) are processed without deduplication.
 
+Analytics consumer retry policy distinguishes deterministic envelope errors
+from transient processing failures. Malformed JSON/envelopes are logged and
+skipped so a poison record cannot block its partition. Database or handler
+failures reject message processing without acknowledging the offset; the
+aggregate write and `processed_events` marker roll back together before Kafka
+redelivers the canonical `eventId`.
+
 Transactional-outbox producers persist `eventId` and `occurredAt` in the
 outbox row together with the business transaction. Every retry republishes that
 same envelope identity. RabbitMQ publishers wait for a broker confirmation

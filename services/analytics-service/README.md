@@ -13,6 +13,12 @@ Kafka producers use `{ eventName, payload, occurredAt }`. The consumer also
 accepts the former flat search-event envelope only for queued-message migration
 compatibility.
 
+Malformed envelopes are logged and skipped because retrying an identical
+poison record cannot repair it. Database, handler, and other processing
+failures reject the Kafka handler so its offset is not acknowledged; Kafka can
+redeliver the event after the shared aggregate/idempotency transaction rolls
+back.
+
 Run:
 
 ```bash
