@@ -306,7 +306,11 @@ rows with `FOR UPDATE SKIP LOCKED`; concurrent pollers cannot dispatch another
 owner's row or publish one row simultaneously. A broker outage leaves the row
 unpublished for retry instead of losing the event. At-least-once redelivery
 keeps the original `eventId`, and state-changing consumers claim it
-idempotently. Consumers on `createWorkflowConsumer` also route
+idempotently. Workflow consumers use dedicated RabbitMQ connections, bind a
+prefetch of one, and automatically recreate their channel, DLQ, queue bindings,
+and subscription after a broker/channel close. Publisher promises are cleared
+after failed confirms/connections so later outbox ticks reconnect instead of
+retaining a rejected broker handle. Consumers on `createWorkflowConsumer` also route
 processing failures to a per-queue dead-letter exchange instead of
 dropping the message.
 

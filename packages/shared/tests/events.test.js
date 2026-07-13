@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { status as grpcStatus } from "@grpc/grpc-js";
 import { businessDate, compactBusinessDate, formatDateInTimeZone } from "../src/date.js";
-import { createEventEnvelope } from "../src/events.js";
+import { createEventEnvelope, createWorkflowConsumer } from "../src/events.js";
 import { claimWorkflowEvent } from "../src/idempotency.js";
 import { isServiceErrorCode, ServiceError, toGrpcError } from "../src/errors.js";
 import {
@@ -70,4 +70,94 @@ test("SERVICE_TIMEOUT is a canonical service error and gRPC deadline", () => {
   const grpcError = toGrpcError(new ServiceError("SERVICE_TIMEOUT", "Trip Service timed out"));
   assert.equal(grpcError.code, grpcStatus.DEADLINE_EXCEEDED);
   assert.deepEqual(grpcError.metadata.get("error-code"), ["SERVICE_TIMEOUT"]);
+});
+
+
+test("workflow consumer reconnects and restores durable bindings after broker close", async () => {
+  class FakeEmitter {
+    constructor() {
+      this.listeners = new Map();
+    }
+    on(name, listener) {
+      const listeners = this.listeners.get(name) || [];
+      listeners.push(listener);
+      this.listeners.set(name, listeners);
+    }
+    emit(name, value) {
+      for (const listener of this.listeners.get(name) || []) listener(value);
+    }
+  }
+
+  function fakeChannel(label) {
+    const channel = new FakeEmitter();
+    channel.label = label;
+    channel.bindings = [];
+    channel.assertExchange = async () => {};
+    channel.assertQueue = async (name) => ({ queue: name });
+    channel.bindQueue = async (queue, exchange, key) => {
+      channel.bindings.push({ queue, exchange, key });
+    };
+    channel.prefetch = async (count) => {
+      channel.prefetchCount = count;
+    };
+    channel.consume = async (queue) => {
+      channel.consumedQueue = queue;
+    };
+    channel.ack = () => {};
+    channel.nack = () => {};
+    channel.close = async () => {
+      channel.closed = true;
+    };
+    return channel;
+  }
+
+  function fakeConnection(channel) {
+    const connection = new FakeEmitter();
+    connection.createChannel = async () => channel;
+    connection.close = async () => {
+      connection.closed = true;
+    };
+    return connection;
+  }
+
+  const firstChannel = fakeChannel("first");
+  const secondChannel = fakeChannel("second");
+  const firstConnection = fakeConnection(firstChannel);
+  const secondConnection = fakeConnection(secondChannel);
+  const connections = [firstConnection, secondConnection];
+  const scheduled = [];
+
+  const handle = await createWorkflowConsumer(
+    "booking-service.trip-completed",
+    ["trip.completed"],
+    async () => {},
+    {
+      connect: async () => connections.shift(),
+      schedule: (work) => {
+        scheduled.push(work);
+        return scheduled.length;
+      },
+      cancelSchedule: () => {}
+    }
+  );
+
+  assert.equal(firstChannel.consumedQueue, "booking-service.trip-completed");
+  assert.equal(firstChannel.prefetchCount, 1);
+  firstConnection.emit("close");
+  assert.equal(scheduled.length, 1);
+
+  await scheduled.shift()();
+  assert.equal(secondChannel.consumedQueue, "booking-service.trip-completed");
+  assert.deepEqual(
+    secondChannel.bindings.filter(({ exchange }) => exchange === "bus.workflow"),
+    [{
+      queue: "booking-service.trip-completed",
+      exchange: "bus.workflow",
+      key: "trip.completed"
+    }]
+  );
+
+  await handle.close();
+  assert.equal(secondChannel.closed, true);
+  assert.equal(secondConnection.closed, true);
 });
