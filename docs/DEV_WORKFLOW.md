@@ -177,7 +177,7 @@ Minimum verification by task type:
 | Payment simulation | `npm run test:payment` |
 | Seat transition invariants | `npm --prefix services/seat-inventory-service test`; with Seat Inventory running, `npm run test:seat:race` |
 | Frontend | `npm run test:web:e2e`; starts healthy infra and all core E2E service dependencies when browser dependencies are installed |
-| Worker | Unit/manual event test once worker exists |
+| Worker | `npm run test:ticket-worker` and `npm run test:email-worker` |
 
 ## 8. Module Ownership Suggestions
 

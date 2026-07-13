@@ -272,6 +272,10 @@ advances the booking, writes the log, and queues `ticket.issued` in the
 transactional outbox. A RabbitMQ redelivery therefore neither duplicates the
 ticket transition nor creates another downstream event.
 
+Email Worker independently claims `(email-worker.notifications, eventId)` in
+`workflow_processed_events` before its simulated delivery log, so RabbitMQ
+redelivery does not log/send the same notification twice.
+
 Cancellation uses a synchronous `ReleaseBookedSeats` RPC as the fast path and
 also queues `booking.cancelled` in the same transaction as the booking state
 change. Seat Inventory consumes that event idempotently, so a transient RPC
