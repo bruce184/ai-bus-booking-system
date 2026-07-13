@@ -32,6 +32,17 @@ export async function callGateway(query, variables = {}, token = "") {
   return { payload, status: response.status };
 }
 
+export function readGatewayData({ payload, status }) {
+  if (status >= 400 || payload.errors?.length) {
+    throw new Error(payload.errors?.[0]?.message || `GraphQL gateway returned HTTP ${status}`);
+  }
+  return payload.data;
+}
+
+export async function requestGatewayData(query, variables = {}, token = "") {
+  return readGatewayData(await callGateway(query, variables, token));
+}
+
 export function sessionCookieOptions() {
   return {
     httpOnly: true,

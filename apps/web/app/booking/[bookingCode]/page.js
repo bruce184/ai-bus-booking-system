@@ -1,6 +1,6 @@
 import Link from "next/link";
 import QRCode from "qrcode";
-import { graphqlRequest } from "../../../lib/graphql";
+import { requestGatewayData } from "../../../lib/server/gateway";
 import PrintTicketButton from "./_PrintTicketButton.jsx";
 import { TopBar } from "../../../src/components/TopBar.jsx";
 
@@ -59,7 +59,7 @@ export default async function BookingConfirmationPage({ params, searchParams }) 
     if (!email) {
       throw new Error("Cần email để tra cứu booking.");
     }
-    const data = await graphqlRequest(BOOKING_STATUS, { bookingCode, email });
+    const data = await requestGatewayData(BOOKING_STATUS, { bookingCode, email });
     booking = data.bookingStatus;
   } catch (err) {
     error = err.message;
