@@ -305,6 +305,11 @@ Owns booking state machine, passenger-per-seat data, booking lookup privacy, can
 
 Analytics Service consumes Kafka events and stores aggregates for daily revenue, tickets sold by route, popular routes, and booking success rate versus search count.
 
+Payment Service treats `payment-events` as best-effort analytics. It returns
+the already-decided simulation result without waiting for Kafka and logs an
+analytics publish failure; broker availability must not change that business
+result into an HTTP 500 response.
+
 RabbitMQ consumers use the same canonical `eventId` for idempotency. Ticket
 Worker records `(consumerName, eventId)` in its local transaction and queues
 `ticket.issued` through the transactional outbox; it never publishes that

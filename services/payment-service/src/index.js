@@ -1,5 +1,5 @@
 import http from "node:http";
-import { publishKafkaEvent } from "@bus/shared/events.js";
+import { processPaymentSimulation } from "./simulation.js";
 
 const port = Number(process.env.PAYMENT_SERVICE_PORT || 5010);
 
@@ -40,23 +40,10 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    const eventName = body.success ? "payment.simulated_success" : "payment.simulated_failure";
-    await publishKafkaEvent("payment-events", eventName, {
-      bookingId: body.bookingId || null,
-      bookingCode: body.bookingCode,
-      tripId: body.tripId || null,
-      amount: Number(body.amount || 0),
-      success: Boolean(body.success)
-    });
+    const payment = processPaymentSimulation(body);
 
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({
-      bookingId: body.bookingId || null,
-      bookingCode: body.bookingCode,
-      tripId: body.tripId || null,
-      amount: Number(body.amount || 0),
-      success: Boolean(body.success)
-    }));
+    response.end(JSON.stringify(payment));
   } catch (error) {
     console.error("[payment-service]", error);
     response.writeHead(500, { "content-type": "application/json" });

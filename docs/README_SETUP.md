@@ -185,6 +185,7 @@ Implemented test targets:
 | Gateway unit / whitebox | `npm run test:gateway` | Auth, JWT, role helpers, and context factory |
 | Gateway integration | `npm run test:gateway:integration` | Starts a real gateway on port `4100` and calls GraphQL over HTTP |
 | Booking service unit | `npm run test:booking` | Booking state machine and service client request contracts |
+| Payment service unit | `npm run test:payment` | Payment result and Kafka-outage isolation |
 | Trip service unit | `npm run test:trip` | Sort aliases and popular-route aggregate mapping |
 | Analytics service unit | `npm run test:analytics` | Canonical and legacy search-event envelope compatibility |
 | Search analytics integration | `npm run test:analytics:integration` | Requires PostgreSQL, Kafka, and Analytics Service; bounded to 15 seconds and cleans test data |

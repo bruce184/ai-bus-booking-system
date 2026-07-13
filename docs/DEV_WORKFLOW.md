@@ -174,6 +174,7 @@ Minimum verification by task type:
 | Trip search/catalog | `npm run test:trip`; with seeded PostgreSQL and Trip Service running, `npm --prefix services/trip-service run test:client` |
 | Analytics event envelope | `npm run test:analytics`; with PostgreSQL/Kafka and Analytics Service running, `npm run test:analytics:integration` |
 | Booking invariants | `npm run test:booking`; with seeded PostgreSQL, `npm --prefix services/booking-service run test:integration` |
+| Payment simulation | `npm run test:payment` |
 | Seat transition invariants | `npm --prefix services/seat-inventory-service test`; with Seat Inventory running, `npm run test:seat:race` |
 | Frontend | `npm run test:web:e2e` for admin E2E when browser dependencies are installed |
 | Worker | Unit/manual event test once worker exists |
