@@ -1,12 +1,4 @@
-import { fail } from "@bus/shared/errors.js";
-
-const STANDARD_ERROR_CODES = new Set([
-  "VALIDATION_ERROR",
-  "NOT_FOUND",
-  "BOOKING_STATE_INVALID",
-  "PAYMENT_FAILED",
-  "INTERNAL_ERROR"
-]);
+import { fail, isServiceErrorCode } from "@bus/shared/errors.js";
 const PAYMENT_SERVICE_TIMEOUT_MS = 10_000;
 
 export function paymentServiceUrl(env = process.env) {
@@ -29,11 +21,25 @@ export function simulatePaymentRequest({ booking, success }) {
 }
 
 function normalizeErrorCode(value) {
-  if (typeof value === "string" && STANDARD_ERROR_CODES.has(value)) {
+  if (isServiceErrorCode(value)) {
     return value;
   }
 
   return null;
+}
+
+export function paymentTransportError(error) {
+  if (error?.name === "TimeoutError") {
+    return {
+      code: "SERVICE_TIMEOUT",
+      message: "Payment Service timed out during booking settlement"
+    };
+  }
+
+  return {
+    code: "INTERNAL_ERROR",
+    message: "Payment Service is unavailable during booking settlement"
+  };
 }
 
 async function readJson(response) {
@@ -62,10 +68,8 @@ export async function simulatePaymentWithService({ booking, success }) {
       signal: AbortSignal.timeout(PAYMENT_SERVICE_TIMEOUT_MS)
     });
   } catch (error) {
-    const message = error?.name === "TimeoutError"
-      ? "Payment Service timed out during booking settlement"
-      : "Payment Service is unavailable during booking settlement";
-    fail("INTERNAL_ERROR", message);
+    const transportError = paymentTransportError(error);
+    fail(transportError.code, transportError.message);
   }
   const payload = await readJson(response);
 

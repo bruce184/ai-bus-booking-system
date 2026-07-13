@@ -223,7 +223,7 @@ Ticket content must include:
 | `HOLD_EXPIRED` | Seat hold token expired |
 | `BOOKING_STATE_INVALID` | Invalid booking transition |
 | `PAYMENT_FAILED` | Simulated payment failed |
-| `SERVICE_TIMEOUT` | Downstream service exceeded the gRPC call deadline |
+| `SERVICE_TIMEOUT` | Downstream gRPC/HTTP service exceeded its configured deadline |
 | `INTERNAL_ERROR` | Unexpected server/service error |
 
 Private resources should return `NOT_FOUND` when the caller should not know they exist.

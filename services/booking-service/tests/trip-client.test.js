@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { status as grpcStatus } from "@grpc/grpc-js";
 
-import { mapTripSnapshot, tripServiceAddress } from "../src/trip-client.js";
+import { mapTripServiceError, mapTripSnapshot, tripServiceAddress } from "../src/trip-client.js";
 
 test("trip client prefers the documented gRPC address", () => {
   assert.equal(
@@ -24,5 +25,12 @@ test("trip snapshot includes every booking policy field", () => {
       status: "ACTIVE",
       departureTime: "2026-07-15T01:00:00.000Z"
     }
+  );
+});
+
+test("trip client maps deadline failures to SERVICE_TIMEOUT", () => {
+  assert.deepEqual(
+    mapTripServiceError({ code: grpcStatus.DEADLINE_EXCEEDED }),
+    { code: "SERVICE_TIMEOUT", message: "Trip Service timed out" }
   );
 });

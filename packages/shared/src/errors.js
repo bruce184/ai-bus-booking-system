@@ -9,8 +9,15 @@ const grpcStatusByCode = {
   HOLD_EXPIRED: grpc.status.FAILED_PRECONDITION,
   BOOKING_STATE_INVALID: grpc.status.FAILED_PRECONDITION,
   PAYMENT_FAILED: grpc.status.FAILED_PRECONDITION,
+  SERVICE_TIMEOUT: grpc.status.DEADLINE_EXCEEDED,
   INTERNAL_ERROR: grpc.status.INTERNAL
 };
+
+const serviceErrorCodes = new Set(Object.keys(grpcStatusByCode));
+
+export function isServiceErrorCode(value) {
+  return typeof value === "string" && serviceErrorCodes.has(value);
+}
 
 export class ServiceError extends Error {
   constructor(code, message, details = {}) {

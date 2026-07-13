@@ -25,6 +25,16 @@ export function mapTripSnapshot(response) {
   };
 }
 
+export function mapTripServiceError(error) {
+  if (error.code === grpc.status.NOT_FOUND) {
+    return { code: "NOT_FOUND", message: "Trip not found" };
+  }
+  if (error.code === grpc.status.DEADLINE_EXCEEDED) {
+    return { code: "SERVICE_TIMEOUT", message: "Trip Service timed out" };
+  }
+  return { code: "INTERNAL_ERROR", message: "Trip Service is unavailable" };
+}
+
 // bookings.trip_id no longer has a physical FK into Trip Service's table
 // (database-per-service - see docs/ARCHITECTURE.md section 11): trip_id is
 // untrusted input straight from the web client, so its existence and current
@@ -47,10 +57,8 @@ export async function fetchTripSnapshot(tripId) {
       );
     });
   } catch (error) {
-    if (error.code === grpc.status.NOT_FOUND) {
-      fail("NOT_FOUND", "Trip not found");
-    }
-    fail("INTERNAL_ERROR", "Trip Service is unavailable");
+    const serviceError = mapTripServiceError(error);
+    fail(serviceError.code, serviceError.message);
   }
 
   return mapTripSnapshot(response);

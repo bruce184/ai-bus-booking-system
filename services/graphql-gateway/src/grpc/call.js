@@ -1,18 +1,6 @@
 import { status as grpcStatus } from "@grpc/grpc-js";
+import { isServiceErrorCode } from "@bus/shared/errors.js";
 import { gatewayError } from "../auth/errors.js";
-
-const STANDARD_ERROR_CODES = new Set([
-  "VALIDATION_ERROR",
-  "UNAUTHORIZED",
-  "FORBIDDEN",
-  "NOT_FOUND",
-  "SEAT_NOT_AVAILABLE",
-  "HOLD_EXPIRED",
-  "BOOKING_STATE_INVALID",
-  "PAYMENT_FAILED",
-  "SERVICE_TIMEOUT",
-  "INTERNAL_ERROR"
-]);
 
 const DEFAULT_CALL_TIMEOUT_MS = Number(process.env.GRPC_CALL_TIMEOUT_MS || 5000);
 const CIRCUIT_FAILURE_THRESHOLD = Number(process.env.CIRCUIT_BREAKER_FAILURE_THRESHOLD || 5);
@@ -54,7 +42,7 @@ function recordSuccess(breaker) {
 }
 
 function normalizeErrorCode(value) {
-  if (typeof value === "string" && STANDARD_ERROR_CODES.has(value)) {
+  if (isServiceErrorCode(value)) {
     return value;
   }
 

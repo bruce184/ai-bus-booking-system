@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { status as grpcStatus } from "@grpc/grpc-js";
 
 import {
   confirmSeatsRequest,
+  mapSeatInventoryErrorCode,
   releaseBookedSeatsRequest,
   releaseHoldRequest,
   seatInventoryAddress,
@@ -83,5 +85,12 @@ test("seat inventory release booked seats request uses the documented proto fiel
       seat_ids: ["seat-1"],
       booking_id: "booking-1"
     }
+  );
+});
+
+test("seat inventory client maps deadline failures to SERVICE_TIMEOUT", () => {
+  assert.equal(
+    mapSeatInventoryErrorCode({ code: grpcStatus.DEADLINE_EXCEEDED }),
+    "SERVICE_TIMEOUT"
   );
 });

@@ -1,15 +1,8 @@
-import { fail } from "@bus/shared/errors.js";
+import { fail, isServiceErrorCode } from "@bus/shared/errors.js";
 import { createInsecureClient, grpc, loadProto } from "@bus/shared/grpc.js";
 
 let seatClient;
 
-const STANDARD_ERROR_CODES = new Set([
-  "VALIDATION_ERROR",
-  "NOT_FOUND",
-  "SEAT_NOT_AVAILABLE",
-  "HOLD_EXPIRED",
-  "INTERNAL_ERROR"
-]);
 const SEAT_INVENTORY_TIMEOUT_MS = 10_000;
 
 export function seatInventoryAddress(env = process.env) {
@@ -63,7 +56,7 @@ function client() {
 }
 
 function normalizeErrorCode(value) {
-  if (typeof value === "string" && STANDARD_ERROR_CODES.has(value)) {
+  if (isServiceErrorCode(value)) {
     return value;
   }
 
@@ -91,7 +84,7 @@ function readPrefixedErrorCode(error) {
   return normalizeErrorCode(prefix);
 }
 
-function mapSeatInventoryErrorCode(error) {
+export function mapSeatInventoryErrorCode(error) {
   const explicitCode = readMetadataErrorCode(error) || readPrefixedErrorCode(error);
 
   if (explicitCode) {
@@ -103,6 +96,8 @@ function mapSeatInventoryErrorCode(error) {
       return "VALIDATION_ERROR";
     case grpc.status.NOT_FOUND:
       return "NOT_FOUND";
+    case grpc.status.DEADLINE_EXCEEDED:
+      return "SERVICE_TIMEOUT";
     default:
       return null;
   }

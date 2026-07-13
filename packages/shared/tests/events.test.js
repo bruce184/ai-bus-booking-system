@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { status as grpcStatus } from "@grpc/grpc-js";
 import { businessDate, compactBusinessDate, formatDateInTimeZone } from "../src/date.js";
 import { createEventEnvelope } from "../src/events.js";
 import { claimWorkflowEvent } from "../src/idempotency.js";
+import { isServiceErrorCode, ServiceError, toGrpcError } from "../src/errors.js";
 import {
   CANCELLATION_CUTOFF_HOURS,
   CANCELLATION_POLICY_TEXT,
@@ -59,4 +61,13 @@ test("cancellation policy constants and source text cannot drift apart", () => {
   assert.match(CANCELLATION_POLICY_TEXT, new RegExp(`${CANCELLATION_CUTOFF_HOURS} gio`));
   assert.match(CANCELLATION_POLICY_TEXT, new RegExp(`${CANCELLATION_REFUND_PERCENT}%`));
   assert.match(CANCELLATION_POLICY_TEXT, /khong du dieu kien huy/);
+});
+
+test("SERVICE_TIMEOUT is a canonical service error and gRPC deadline", () => {
+  assert.equal(isServiceErrorCode("SERVICE_TIMEOUT"), true);
+  assert.equal(isServiceErrorCode("SOME_RANDOM_ERROR"), false);
+
+  const grpcError = toGrpcError(new ServiceError("SERVICE_TIMEOUT", "Trip Service timed out"));
+  assert.equal(grpcError.code, grpcStatus.DEADLINE_EXCEEDED);
+  assert.deepEqual(grpcError.metadata.get("error-code"), ["SERVICE_TIMEOUT"]);
 });
