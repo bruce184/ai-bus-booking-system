@@ -1,7 +1,9 @@
+import { fetchWithTimeout } from "@bus/shared/http.js";
+
 import { config } from "./config.js";
 
 export async function graphqlRequest({ query, variables, admin = false, url = config.graphqlUrl }) {
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     method: "POST",
     headers: {
       "content-type": "application/json",

@@ -2,6 +2,8 @@ import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { fetchWithTimeout } from "@bus/shared/http.js";
+
 export const DEV_SERVICE_TARGETS = [
   { name: "Web", type: "http", url: "http://localhost:3000" },
   { name: "GraphQL Gateway", type: "http", url: "http://localhost:4000/graphql" },
@@ -14,9 +16,11 @@ export const DEV_SERVICE_TARGETS = [
 ];
 
 export async function probeHttp(target, timeoutMs = 2_000) {
-  const response = await fetch(target.url, {
-    signal: AbortSignal.timeout(timeoutMs)
-  });
+  const response = await fetchWithTimeout(
+    target.url,
+    {},
+    { timeoutMs }
+  );
   if (response.status >= 500) {
     throw new Error(`HTTP ${response.status}`);
   }

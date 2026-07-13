@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "@bus/shared/http.js";
+
 export const GRAPHQL_ENDPOINT = "/api/graphql";
 
 async function readJson(response) {
@@ -9,7 +11,7 @@ async function readJson(response) {
 }
 
 export async function graphqlRequest(query, variables = {}) {
-  const response = await fetch(GRAPHQL_ENDPOINT, {
+  const response = await fetchWithTimeout(GRAPHQL_ENDPOINT, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query, variables }),
@@ -23,7 +25,7 @@ export async function graphqlRequest(query, variables = {}) {
 }
 
 export async function loginSession({ email, password, portal }) {
-  const response = await fetch("/api/auth/login", {
+  const response = await fetchWithTimeout("/api/auth/login", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email, password, portal })
@@ -36,7 +38,7 @@ export async function loginSession({ email, password, portal }) {
 }
 
 export async function getSession() {
-  const response = await fetch("/api/auth/session", { cache: "no-store" });
+  const response = await fetchWithTimeout("/api/auth/session", { cache: "no-store" });
   const payload = await readJson(response);
   if (response.status === 401) {
     return null;
@@ -48,5 +50,5 @@ export async function getSession() {
 }
 
 export async function clearSession() {
-  await fetch("/api/auth/session", { method: "DELETE" });
+  await fetchWithTimeout("/api/auth/session", { method: "DELETE" });
 }

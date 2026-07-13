@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "@bus/shared/http.js";
+
 export const SESSION_COOKIE = "bus_session";
 
 const LOGIN = `
@@ -22,7 +24,7 @@ export async function callGateway(query, variables = {}, token = "") {
     headers.authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(gatewayEndpoint(), {
+  const response = await fetchWithTimeout(gatewayEndpoint(), {
     method: "POST",
     headers,
     body: JSON.stringify({ query, variables }),

@@ -124,6 +124,13 @@ browser-stored role object.
 
 Frontend must not call internal gRPC services directly.
 
+All repository-owned browser, BFF, service-to-service, MCP, and readiness HTTP
+calls use the shared `@bus/shared/http.js` wrapper. It applies a bounded
+deadline (default 5 seconds, configurable with `HTTP_REQUEST_TIMEOUT_MS`);
+callers may shorten or extend that bound only for a documented operation.
+`check:source` rejects raw runtime `fetch()` calls so one path cannot wait
+forever while another path times out.
+
 ## 5. Core Workflows
 
 ### Trip Search and SEO

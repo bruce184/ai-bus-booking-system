@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "@bus/shared/http.js";
+
 const holdSeatsMutation = `
   mutation HoldSeats($input: HoldSeatsInput!) {
     holdSeats(input: $input) {
@@ -23,7 +25,7 @@ const releaseSeatHoldMutation = `
 `;
 
 export async function holdSeats(graphqlUrl, tripId, seatIds) {
-  const response = await fetch(graphqlUrl, {
+  const response = await fetchWithTimeout(graphqlUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json"
@@ -53,7 +55,7 @@ export async function holdSeats(graphqlUrl, tripId, seatIds) {
 }
 
 export async function releaseSeatHold(graphqlUrl, holdToken) {
-  const response = await fetch(graphqlUrl, {
+  const response = await fetchWithTimeout(graphqlUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json"

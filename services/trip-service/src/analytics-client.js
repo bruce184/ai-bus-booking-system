@@ -3,19 +3,18 @@
 // reads its existing GET /popular-routes projection over HTTP instead of
 // querying that table directly, same transport gateway/analytics/client.js
 // already uses for the admin dashboard.
+import { fetchWithTimeout } from '@bus/shared/http.js';
+
 import { config } from './config.js';
 import { logger } from './logger.js';
-
-const REQUEST_TIMEOUT_MS = 5_000;
 
 export async function fetchPopularRoutes(limit) {
   const url = new URL('/popular-routes', config.analyticsBaseUrl);
   url.searchParams.set('limit', String(limit));
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers: { accept: 'application/json' },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) {
       logger.warn('Analytics Service /popular-routes returned', response.status);

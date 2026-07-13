@@ -1,4 +1,6 @@
 import { fail, isServiceErrorCode } from "@bus/shared/errors.js";
+import { fetchWithTimeout } from "@bus/shared/http.js";
+
 const PAYMENT_SERVICE_TIMEOUT_MS = 10_000;
 
 export function paymentServiceUrl(env = process.env) {
@@ -61,12 +63,11 @@ export async function simulatePaymentWithService({ booking, success }) {
 
   let response;
   try {
-    response = await fetch(`${paymentServiceUrl()}/simulate`, {
+    response = await fetchWithTimeout(`${paymentServiceUrl()}/simulate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(simulatePaymentRequest({ booking, success })),
-      signal: AbortSignal.timeout(PAYMENT_SERVICE_TIMEOUT_MS)
-    });
+      body: JSON.stringify(simulatePaymentRequest({ booking, success }))
+    }, { timeoutMs: PAYMENT_SERVICE_TIMEOUT_MS });
   } catch (error) {
     const transportError = paymentTransportError(error);
     fail(transportError.code, transportError.message);

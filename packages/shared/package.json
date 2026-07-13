@@ -14,7 +14,8 @@
     "./errors.js": "./src/errors.js",
     "./date.js": "./src/date.js",
     "./idempotency.js": "./src/idempotency.js",
-    "./policies.js": "./src/policies.js"
+    "./policies.js": "./src/policies.js",
+    "./http.js": "./src/http.js"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.13.4",

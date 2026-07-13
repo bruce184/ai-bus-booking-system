@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "@bus/shared/http.js";
+
 import { config } from "./config.js";
 import { graphqlRequest } from "./graphqlClient.js";
 
@@ -131,7 +133,7 @@ async function fetchAnalyticsJson(path, params = {}) {
     }
   }
 
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url);
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(body.message ?? "Analytics Service request failed");

@@ -501,6 +501,8 @@ Frontend must:
    payment, and confirmation through short-lived encrypted `HttpOnly` BFF
    context cookies. These values must never appear in URLs, browser history,
    referrer headers, or client-readable persistent storage.
+9. Use `@bus/shared/http.js` for every repository-owned HTTP call so browser,
+   BFF, service, MCP, and readiness paths have a bounded deadline.
 
 ## 13. Contract Change Rule
 

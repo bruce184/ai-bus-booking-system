@@ -211,7 +211,7 @@ Implemented test targets:
 | Web lint | `npm --prefix apps/web run lint` | Next.js/React lint |
 | Web auth/flow unit tests | `npm run test:web:unit` | BFF portal-role, encrypted flow-context, expiry, tamper rejection, and no-sensitive-URL invariants |
 | Web admin/customer E2E | `npm run test:web:e2e` | Uses isolated Compose ports/volume, starts non-reused app servers, and always removes E2E infrastructure in a final cleanup step |
-| Source integrity | `npm run check:source` | Syntax-checks non-Next Node files, resolves all relative imports, and validates the workspace dependency tree; Next JSX is covered by lint/build |
+| Source integrity | `npm run check:source` | Syntax-checks non-Next Node files, resolves relative imports, rejects raw runtime `fetch()` without the shared deadline wrapper, and validates dependencies; Next JSX is covered by lint/build |
 | Full release gate | `npm run release:check` | Runs docs/source/Compose checks, unit and integration suites, then the hermetic web E2E suite |
 
 The E2E wrapper uses a dedicated Compose project, disposable database volume,
@@ -326,6 +326,13 @@ Check:
 - `SEAT_HOLD_TTL_SECONDS`
 - Seat key format in `docs/API_CONTRACT.md`
 - Seat Inventory Service writes to Redis atomically
+
+### HTTP request times out
+
+The shared deadline defaults to 5 seconds. For a deliberately slower local
+environment, set `HTTP_REQUEST_TIMEOUT_MS` (100..120000 ms) consistently
+before starting the affected processes; do not replace the shared wrapper with
+an unbounded `fetch()`.
 
 ### GraphQL and gRPC contracts drift
 

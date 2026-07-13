@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fetchWithTimeout } from "@bus/shared/http.js";
 
 function createDefaultSearch() {
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -28,7 +29,7 @@ export function ChatbotPanel() {
   async function ask(payload) {
     setLoading(true);
     try {
-      const response = await fetch("/api/chatbot", {
+      const response = await fetchWithTimeout("/api/chatbot", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload)

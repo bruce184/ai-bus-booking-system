@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@bus/shared/http.js";
 import TripDetailClient from "./_TripDetailClient";
 
 const TRIP_METADATA = `
@@ -49,7 +50,7 @@ const SERVER_GRAPHQL_ENDPOINT =
   "http://localhost:4000/graphql";
 
 async function fetchTrip(query, tripId) {
-  const response = await fetch(SERVER_GRAPHQL_ENDPOINT, {
+  const response = await fetchWithTimeout(SERVER_GRAPHQL_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, variables: { id: tripId } }),

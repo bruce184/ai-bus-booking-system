@@ -56,6 +56,20 @@ for (const file of files) {
   }
 
   const source = readFileSync(file, "utf8");
+  const isTestSource =
+    normalizedFile.includes("/tests/") ||
+    normalizedFile.includes("/unit/") ||
+    normalizedFile.endsWith(".test.js") ||
+    normalizedFile.endsWith(".test.mjs");
+  if (
+    /\bfetch\s*\(/.test(source) &&
+    normalizedFile !== "packages/shared/src/http.js" &&
+    !isTestSource
+  ) {
+    failures.push(
+      `${file}: unbounded native HTTP call is forbidden; use @bus/shared/http.js`
+    );
+  }
   for (const importPattern of importPatterns) {
     for (const match of source.matchAll(importPattern)) {
       if (!resolvesRelativeImport(file, match[2])) {

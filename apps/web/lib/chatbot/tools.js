@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@bus/shared/http.js";
 import {
   CANCELLATION_POLICY_TEXT,
   CANCELLATION_POLICY_URI,
@@ -82,7 +83,7 @@ function requireFields(input, fields) {
 }
 
 async function graphqlRequest({ query, variables }) {
-  const response = await fetch(GRAPHQL_URL, {
+  const response = await fetchWithTimeout(GRAPHQL_URL, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query, variables }),

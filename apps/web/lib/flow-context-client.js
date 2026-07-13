@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "@bus/shared/http.js";
+
 async function readJson(response) {
   try {
     return await response.json();
@@ -14,7 +16,7 @@ function endpoint(kind) {
 }
 
 export async function getFlowContext(kind) {
-  const response = await fetch(endpoint(kind), {
+  const response = await fetchWithTimeout(endpoint(kind), {
     cache: "no-store",
     credentials: "same-origin"
   });
@@ -29,7 +31,7 @@ export async function getFlowContext(kind) {
 }
 
 export async function storeFlowContext(kind, context) {
-  const response = await fetch(endpoint(kind), {
+  const response = await fetchWithTimeout(endpoint(kind), {
     method: "POST",
     headers: { "content-type": "application/json" },
     credentials: "same-origin",
@@ -42,7 +44,7 @@ export async function storeFlowContext(kind, context) {
 }
 
 export async function clearFlowContext(kind) {
-  const response = await fetch(endpoint(kind), {
+  const response = await fetchWithTimeout(endpoint(kind), {
     method: "DELETE",
     credentials: "same-origin"
   });
