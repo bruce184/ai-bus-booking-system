@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { graphqlRequest } from "../../lib/graphql";
@@ -54,13 +54,19 @@ function formatFullDate(value) {
   });
 }
 
-export default function SearchClient({ initialOrigin, initialDestination, initialDepartureDate, initialResult }) {
+export default function SearchClient({
+  initialOrigin,
+  initialDestination,
+  initialDepartureDate,
+  initialResult,
+  initialError = ""
+}) {
   const router = useRouter();
   const [origin, setOrigin] = useState(initialOrigin);
   const [destination, setDestination] = useState(initialDestination);
   const [departureDate, setDepartureDate] = useState(initialDepartureDate);
   const [result, setResult] = useState(initialResult);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
   const [showSearchForm, setShowSearchForm] = useState(false);
   const latestSearchRequest = useRef(0);
@@ -115,15 +121,12 @@ export default function SearchClient({ initialOrigin, initialDestination, initia
     }
   }, []);
 
-  const performSearch = useCallback(async (originVal = origin, destinationVal = destination, dateVal = departureDate, sortVal = sortBy, minPVal = minPrice, maxPVal = maxPrice) => {
-    await doSearch(originVal, destinationVal, dateVal, sortVal, minPVal, maxPVal);
-  }, [doSearch, origin, destination, departureDate, sortBy, minPrice, maxPrice]);
-
-  async function submit(event) {
+  function submit(event) {
     event.preventDefault();
     setShowSearchForm(false);
+    setLoading(true);
+    setError("");
     router.replace(`/search?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}&date=${departureDate}`);
-    await performSearch();
   }
 
   const handleSwap = () => {
@@ -131,22 +134,6 @@ export default function SearchClient({ initialOrigin, initialDestination, initia
     setOrigin(destination);
     setDestination(temp);
   };
-
-  useEffect(() => {
-    // The server page already fetched the initial result for these exact
-    // params; only fall back to a client-side fetch if that failed. The
-    // timeout defers doSearch's setState calls out of the effect body
-    // itself, matching the pattern used elsewhere in this app (e.g.
-    // trips/[tripId]/_TripDetailClient.jsx's fetch-on-mount effect).
-    if (initialResult) {
-      return undefined;
-    }
-    const timer = setTimeout(() => {
-      void doSearch(origin, destination, departureDate, "earliest", 0, 0);
-    }, 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Compute list of unique operators in the result for filter checkboxes
   const operators = useMemo(() => {

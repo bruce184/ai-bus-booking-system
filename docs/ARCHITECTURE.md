@@ -114,6 +114,12 @@ Frontend must not call internal gRPC services directly.
 6. Analytics Service updates `analytics_daily`; Trip Service reads that
    aggregate projection when serving `ListPopularRoutes`.
 
+The search results Server Component owns the initial `searchTrips` request.
+`generateMetadata` derives route metadata from URL parameters and does not call
+the side-effecting search query. Client form submission navigates to the new
+URL and lets that Server Component issue the single business search; client
+filter/sort interactions issue one explicit query per interaction.
+
 ### Trip Detail
 
 1. Web opens a trip detail page.
