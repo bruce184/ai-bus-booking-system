@@ -1,20 +1,32 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 import { createMcpServer } from "../src/server.js";
 
 async function withServer(run) {
-  const server = createMcpServer();
-  await new Promise((resolve) => server.listen(0, resolve));
-  const { port } = server.address();
+  const app = createMcpServer();
+  const httpServer = await new Promise((resolve) => {
+    const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
+  });
+  const { port } = httpServer.address();
   try {
     await run(`http://127.0.0.1:${port}`);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise((resolve) => httpServer.close(resolve));
   }
 }
 
-test("GET /mcp returns 405, not 404, since there is no SSE stream to open", async () => {
+test("health endpoint reports the MCP service", async () => {
+  await withServer(async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/health`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, service: "mcp-server" });
+  });
+});
+
+test("GET /mcp returns 405 when the stateless server has no SSE stream", async () => {
   await withServer(async (baseUrl) => {
     const response = await fetch(`${baseUrl}/mcp`);
     assert.equal(response.status, 405);
@@ -22,42 +34,24 @@ test("GET /mcp returns 405, not 404, since there is no SSE stream to open", asyn
   });
 });
 
-test("a lifecycle notification (no id) gets 202 with no JSON-RPC error body", async () => {
+test("official SDK client completes MCP initialization and discovery", async () => {
   await withServer(async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/mcp`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })
-    });
-    assert.equal(response.status, 202);
-    assert.equal(await response.text(), "");
-  });
-});
+    const client = new Client({ name: "audit-test-client", version: "1.0.0" });
+    const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`));
 
-test("a batch of only notifications is accepted as one 202", async () => {
-  await withServer(async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/mcp`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify([
-        { jsonrpc: "2.0", method: "notifications/initialized" },
-        { jsonrpc: "2.0", method: "notifications/progress" }
-      ])
-    });
-    assert.equal(response.status, 202);
-  });
-});
+    try {
+      await client.connect(transport);
+      const tools = await client.listTools();
+      const resourceList = await client.listResources();
+      const policy = await client.readResource({ uri: "bus://policy/cancellation" });
 
-test("a normal request with an id still gets its JSON-RPC result", async () => {
-  await withServer(async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/mcp`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })
-    });
-    assert.equal(response.status, 200);
-    const body = await response.json();
-    assert.equal(body.id, 1);
-    assert.ok(Array.isArray(body.result.tools));
+      assert.equal(tools.tools.length, 5);
+      const revenueTool = tools.tools.find((tool) => tool.name === "get_revenue_summary");
+      assert.equal(Object.hasOwn(revenueTool.inputSchema.properties, "adminToken"), false);
+      assert.equal(resourceList.resources.length, 4);
+      assert.match(policy.contents[0].text, /chinh sach huy ve/i);
+    } finally {
+      await client.close();
+    }
   });
 });

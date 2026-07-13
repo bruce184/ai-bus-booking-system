@@ -1,132 +1,127 @@
-import http from "node:http";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { z } from "zod";
+
+import { config } from "./config.js";
 import { resources } from "./policies.js";
 import { callTool, toolDefinitions } from "./tools.js";
 
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = "";
-    req.on("data", (chunk) => {
-      body += chunk;
-    });
-    req.on("end", () => resolve(body));
-    req.on("error", reject);
+const toolSchemas = {
+  search_trips: {
+    origin: z.string().min(1),
+    destination: z.string().min(1),
+    departureDate: z.string().min(1),
+    minAvailableSeats: z.number().nonnegative().optional()
+  },
+  get_trip_detail: { tripId: z.string().min(1) },
+  get_booking_status: {
+    bookingCode: z.string().min(1),
+    email: z.string().email()
+  },
+  get_revenue_summary: {
+    from: z.string().min(1),
+    to: z.string().min(1)
+  },
+  get_popular_routes: { limit: z.number().int().positive().optional() }
+};
+
+export function createProtocolServer() {
+  const server = new McpServer({
+    name: "intercity-bus-booking-mcp",
+    version: "0.1.0"
   });
-}
 
-function send(res, statusCode, body) {
-  res.writeHead(statusCode, { "content-type": "application/json; charset=utf-8" });
-  res.end(JSON.stringify(body));
-}
-
-function result(id, value) {
-  return { jsonrpc: "2.0", id, result: value };
-}
-
-function failure(id, error) {
-  return {
-    jsonrpc: "2.0",
-    id,
-    error: {
-      code: error.code === "FORBIDDEN" ? -32003 : -32000,
-      message: error.message
-    }
-  };
-}
-
-export async function handleRpc(message) {
-  const { id, method, params = {} } = message;
-  // JSON-RPC 2.0: a message with no id is a notification (e.g. the standard
-  // MCP lifecycle call notifications/initialized) - it gets no response at
-  // all, success or failure, not an error reply.
-  const notification = id === undefined || id === null;
-
-  try {
-    let value;
-
-    if (method === "initialize") {
-      value = {
-        protocolVersion: "2024-11-05",
-        serverInfo: { name: "intercity-bus-booking-mcp", version: "0.1.0" },
-        capabilities: { tools: {}, resources: {} }
-      };
-    } else if (method === "tools/list") {
-      value = { tools: toolDefinitions };
-    } else if (method === "tools/call") {
-      value = await callTool(params.name, params.arguments ?? {});
-    } else if (method === "resources/list") {
-      value = {
-        resources: Object.entries(resources).map(([uri, resource]) => ({
-          uri,
-          name: resource.name,
-          mimeType: resource.mimeType
-        }))
-      };
-    } else if (method === "resources/read") {
-      const resource = resources[params.uri];
-      if (!resource) {
-        throw Object.assign(new Error(`Unknown resource: ${params.uri}`), { code: "NOT_FOUND" });
-      }
-      value = {
-        contents: [{ uri: params.uri, mimeType: resource.mimeType, text: resource.text }]
-      };
-    } else if (notification) {
-      return null;
-    } else {
-      throw new Error(`Unsupported method: ${method}`);
-    }
-
-    return notification ? null : result(id, value);
-  } catch (error) {
-    return notification ? null : failure(id, error);
+  for (const definition of toolDefinitions) {
+    server.registerTool(
+      definition.name,
+      {
+        description: definition.description,
+        inputSchema: toolSchemas[definition.name]
+      },
+      (args, extra) => callTool(definition.name, args, { adminToken: extra.authInfo?.token })
+    );
   }
+
+  for (const [uri, resource] of Object.entries(resources)) {
+    server.registerResource(
+      resource.name,
+      uri,
+      { mimeType: resource.mimeType },
+      async () => ({
+        contents: [{ uri, mimeType: resource.mimeType, text: resource.text }]
+      })
+    );
+  }
+
+  return server;
+}
+
+function attachBearerAuth(req, _res, next) {
+  const authorization = req.headers.authorization || "";
+  if (authorization.startsWith("Bearer ")) {
+    req.auth = {
+      token: authorization.slice("Bearer ".length),
+      clientId: "mcp-http-client",
+      scopes: []
+    };
+  }
+  next();
 }
 
 export function createMcpServer() {
-  return http.createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+  const app = createMcpExpressApp({
+    host: config.host,
+    allowedHosts: config.allowedHosts.length ? config.allowedHosts : undefined
+  });
 
-    if (req.method === "GET" && url.pathname === "/health") {
-      send(res, 200, { ok: true, service: "mcp-server" });
-      return;
-    }
+  app.get("/health", (_req, res) => {
+    res.json({ ok: true, service: "mcp-server" });
+  });
 
-    if (req.method === "GET" && url.pathname === "/mcp") {
-      // This transport has no server-initiated SSE stream to open; 405 tells
-      // a standard MCP client to stick to plain POST request/response
-      // instead of failing initialization on a 404.
-      res.writeHead(405, { "content-type": "application/json; charset=utf-8", allow: "POST" });
-      res.end(JSON.stringify({ error: "METHOD_NOT_ALLOWED" }));
-      return;
-    }
-
-    if (req.method !== "POST" || url.pathname !== "/mcp") {
-      send(res, 404, { error: "NOT_FOUND" });
-      return;
-    }
+  app.use("/mcp", attachBearerAuth);
+  app.post("/mcp", async (req, res) => {
+    const protocolServer = createProtocolServer();
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true
+    });
 
     try {
-      const payload = JSON.parse(await readBody(req));
-
-      if (Array.isArray(payload)) {
-        const responses = (await Promise.all(payload.map(handleRpc))).filter((entry) => entry !== null);
-        if (responses.length === 0) {
-          res.writeHead(202);
-          res.end();
-          return;
-        }
-        send(res, 200, responses);
-        return;
-      }
-
-      const response = await handleRpc(payload);
-      if (response === null) {
-        res.writeHead(202);
-        res.end();
-        return;
-      }
-      send(res, 200, response);
+      await protocolServer.connect(transport);
+      await transport.handleRequest(req, res, req.body);
     } catch (error) {
-      send(res, 400, failure(null, error));
+      console.error("[mcp-server] transport request failed", error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: "2.0",
+          id: null,
+          error: { code: -32603, message: "Internal server error" }
+        });
+      }
+    } finally {
+      await transport.close();
+      await protocolServer.close();
     }
   });
+
+  app.get("/mcp", (_req, res) => {
+    res.set("allow", "POST");
+    res.status(405).json({
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32000, message: "Method not allowed" }
+    });
+  });
+
+  app.delete("/mcp", (_req, res) => {
+    res.set("allow", "POST");
+    res.status(405).json({
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32000, message: "Method not allowed" }
+    });
+  });
+
+  return app;
 }

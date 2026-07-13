@@ -72,7 +72,7 @@ needs data another owns, it calls that service's API:
 | Analytics events | Kafka |
 | Seat holds | Redis TTL |
 | Reverse proxy | Nginx |
-| MCP clients to MCP Server | MCP transport selected during implementation |
+| MCP clients to MCP Server | Official MCP SDK v1 stateless Streamable HTTP |
 
 Browser sessions use one `HttpOnly`, `SameSite=Lax` cookie set by the Next.js
 auth route. Browser code never persists JWTs in `localStorage` or a

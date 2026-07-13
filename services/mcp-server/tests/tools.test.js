@@ -49,7 +49,11 @@ test("search_trips validates required fields before calling the gateway", async 
 
 test("get_revenue_summary rejects a wrong admin token", async () => {
   await assert.rejects(
-    callTool("get_revenue_summary", { from: "2026-07-01", to: "2026-07-11", adminToken: "wrong" }),
+    callTool(
+      "get_revenue_summary",
+      { from: "2026-07-01", to: "2026-07-11" },
+      { adminToken: "wrong" }
+    ),
     (error) => error.code === "FORBIDDEN"
   );
 });

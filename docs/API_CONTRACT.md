@@ -382,7 +382,7 @@ MCP tools:
 | `search_trips` | Find trips by origin, destination, date | Public demo data allowed |
 | `get_trip_detail` | Get trip detail | Public demo data allowed |
 | `get_booking_status` | Lookup booking status | Requires booking code and email |
-| `get_revenue_summary` | Admin revenue summary | Admin-only in final implementation |
+| `get_revenue_summary` | Admin revenue summary | Requires `Authorization: Bearer <MCP_ADMIN_TOKEN>` on the MCP HTTP request; the secret is never a tool argument |
 | `get_popular_routes` | Popular route analytics | Public aggregate data allowed |
 
 MCP resources:
@@ -395,6 +395,10 @@ MCP resources:
 | `bus://system/health` | Demo service health |
 
 MCP and chatbot responses must not fabricate trip inventory, booking status, seat state, or revenue.
+
+The MCP endpoint uses the official TypeScript SDK v1 stateless Streamable HTTP
+transport. Standard SDK clients negotiate the protocol version and required
+HTTP headers; the server does not hand-roll lifecycle or JSON-RPC dispatch.
 
 ## 12. Frontend Integration Rules
 

@@ -25,11 +25,16 @@ Booking status lookup must require booking code and email.
 
 MCP tools must call internal service/tool boundaries and must not fabricate trip inventory, booking status, seat state, or revenue.
 
-Admin revenue tools are demo/admin-only and require `MCP_ADMIN_TOKEN`.
+Admin revenue tools are demo/admin-only. Configure `MCP_ADMIN_TOKEN`, then
+send that value as the MCP HTTP `Authorization: Bearer ...` credential; the
+secret is not part of the tool arguments exposed to the model.
 
-Current Module 5 scaffold:
+Current Module 5 implementation:
 
-- Runs an MCP JSON-RPC HTTP endpoint at `http://localhost:4010/mcp`.
-- Supports `initialize`, `tools/list`, `tools/call`, `resources/list`, and `resources/read`.
+- Uses the official MCP TypeScript SDK v1 Streamable HTTP transport at
+  `http://127.0.0.1:4010/mcp` (stateless JSON response mode).
+- Supports SDK-negotiated initialization, tools, resources, notifications,
+  protocol headers, content negotiation, and JSON-RPC validation.
+- Uses the SDK's localhost host-header validation to prevent DNS rebinding.
 - `get_booking_status` validates both booking code and email before calling GraphQL.
-- `get_revenue_summary` requires `MCP_ADMIN_TOKEN` and reads aggregate analytics from the Analytics Service.
+- `get_revenue_summary` requires the configured bearer token and reads aggregate analytics from the Analytics Service.

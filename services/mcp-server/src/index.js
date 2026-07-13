@@ -4,6 +4,6 @@ import { createMcpServer } from "./server.js";
 
 const server = createMcpServer();
 
-server.listen(config.port, () => {
-  console.log(`[mcp-server] MCP HTTP transport listening on ${config.port}/mcp`);
+server.listen(config.port, config.host, () => {
+  console.log(`[mcp-server] MCP Streamable HTTP listening on ${config.host}:${config.port}/mcp`);
 });
