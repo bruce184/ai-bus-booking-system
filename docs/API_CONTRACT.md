@@ -319,6 +319,14 @@ Worker records `(consumerName, eventId)` in its local transaction and queues
 `ticket.issued` through the transactional outbox; it never publishes that
 workflow event after committing ticket state.
 
+Ticket issuance and cancellation are competing transitions from `PAID` and
+must serialize on the same booking row. Ticket Worker locks the booking inside
+its ticket/outbox transaction before loading render context or writing tickets.
+If cancellation wins, the worker observes `CANCELLED`, acknowledges the stale
+`booking.paid` delivery, and creates no ticket, log, or `ticket.issued` event.
+If ticket issuance wins, cancellation subsequently observes `TICKET_ISSUED`
+and is rejected by the booking state machine.
+
 All producers use the canonical JSON envelope:
 
 ```json

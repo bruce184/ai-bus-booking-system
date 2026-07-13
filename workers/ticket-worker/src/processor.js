@@ -55,7 +55,7 @@ async function loadBookingContext(bookingId, runQuery = query) {
 
 export async function issueTickets(
   event,
-  { runQuery = query, runTransaction = transaction } = {}
+  { runTransaction = transaction, loadContext = loadBookingContext } = {}
 ) {
   const bookingId = event.payload?.bookingId;
   if (!bookingId) {
@@ -63,11 +63,35 @@ export async function issueTickets(
   }
 
   const eventId = event.eventId || `legacy:${event.eventName || "booking.paid"}:${bookingId}`;
-  const { booking, passengers } = await loadBookingContext(bookingId, runQuery);
+  let issuedBookingCode = "";
   const outcome = await runTransaction(async (client) => {
     if (!(await claimWorkflowEvent(client, CONSUMER_NAME, eventId))) {
       return { skipped: true, tickets: [] };
     }
+
+    // Cancellation and ticket issuance both start from PAID. Serialize those
+    // competing transitions on the booking row before reading passengers or
+    // writing any ticket data. Whichever transaction obtains this lock first
+    // wins; the other observes the committed non-PAID state and stops.
+    const stateResult = await client.query(
+      "select status from bookings where id = $1 for update",
+      [bookingId]
+    );
+    if (!stateResult.rows[0]) {
+      throw new Error(`Booking ${bookingId} not found`);
+    }
+    if (stateResult.rows[0].status !== "PAID") {
+      return { skipped: true, tickets: [] };
+    }
+
+    // Load the render context through the same transaction connection after
+    // the row lock. A pre-transaction snapshot could become stale while a
+    // concurrent cancellation commits.
+    const { booking, passengers } = await loadContext(
+      bookingId,
+      client.query.bind(client)
+    );
+    issuedBookingCode = booking.booking_code;
 
     const tickets = [];
     for (let index = 0; index < passengers.length; index += 1) {
@@ -105,10 +129,13 @@ export async function issueTickets(
       tickets.push(insert.rows[0]);
     }
 
-    await client.query(
+    const stateUpdate = await client.query(
       "update bookings set status = 'TICKET_ISSUED', updated_at = now() where id = $1 and status = 'PAID'",
       [bookingId]
     );
+    if (stateUpdate.rowCount !== 1) {
+      throw new Error(`Booking ${bookingId} left PAID state during ticket issuance`);
+    }
     await client.query(
       "insert into event_logs (event_type, entity_type, entity_id, payload) values ($1, $2, $3, $4)",
       [
@@ -136,7 +163,7 @@ export async function issueTickets(
   });
 
   if (!outcome.skipped) {
-    console.log(`[ticket-worker] issued ${outcome.tickets.length} ticket(s) for ${booking.booking_code}`);
+    console.log(`[ticket-worker] issued ${outcome.tickets.length} ticket(s) for ${issuedBookingCode}`);
   }
   return outcome;
 }

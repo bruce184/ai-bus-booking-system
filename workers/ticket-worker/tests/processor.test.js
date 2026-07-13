@@ -21,12 +21,8 @@ const passenger = {
   seat_label: "A01"
 };
 
-function contextQuery() {
-  let call = 0;
-  return async () => {
-    call += 1;
-    return call === 1 ? { rows: [booking] } : { rows: [passenger] };
-  };
+async function loadContext() {
+  return { booking, passengers: [passenger] };
 }
 
 test("duplicate booking.paid delivery is skipped before ticket writes", async () => {
@@ -40,7 +36,7 @@ test("duplicate booking.paid delivery is skipped before ticket writes", async ()
 
   const outcome = await issueTickets(
     { eventId: "event-1", eventName: "booking.paid", payload: { bookingId: booking.id } },
-    { runQuery: contextQuery(), runTransaction: (work) => work(client) }
+    { loadContext, runTransaction: (work) => work(client) }
   );
 
   assert.deepEqual(outcome, { skipped: true, tickets: [] });
@@ -55,6 +51,7 @@ test("ticket rows, state, log, and ticket.issued outbox event share one transact
       const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
       statements.push(sql);
       if (sql.startsWith("insert into workflow_processed_events")) return { rowCount: 1, rows: [] };
+      if (sql.startsWith("select status from bookings")) return { rows: [{ status: "PAID" }] };
       if (sql.startsWith("select * from tickets")) return { rows: [] };
       if (sql.startsWith("insert into tickets")) return { rows: [{ id: "ticket-1" }] };
       return { rowCount: 1, rows: [] };
@@ -63,7 +60,7 @@ test("ticket rows, state, log, and ticket.issued outbox event share one transact
 
   const outcome = await issueTickets(
     { eventId: "event-2", eventName: "booking.paid", payload: { bookingId: booking.id } },
-    { runQuery: contextQuery(), runTransaction: (work) => work(client) }
+    { loadContext, runTransaction: (work) => work(client) }
   );
 
   assert.equal(outcome.skipped, false);
@@ -72,4 +69,61 @@ test("ticket rows, state, log, and ticket.issued outbox event share one transact
   assert.equal(statements.some((sql) => sql.startsWith("update bookings")), true);
   assert.equal(statements.some((sql) => sql.startsWith("insert into event_logs")), true);
   assert.equal(statements.some((sql) => sql.startsWith("insert into outbox_events")), true);
+});
+
+
+test("cancellation that wins the row lock prevents every ticket side effect", async () => {
+  const statements = [];
+  const client = {
+    async query(text) {
+      const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
+      statements.push(sql);
+      if (sql.startsWith("insert into workflow_processed_events")) return { rowCount: 1, rows: [] };
+      if (sql.startsWith("select status from bookings")) return { rows: [{ status: "CANCELLED" }] };
+      throw new Error(`Unexpected statement after cancellation won: ${sql}`);
+    }
+  };
+
+  const outcome = await issueTickets(
+    { eventId: "event-cancelled", eventName: "booking.paid", payload: { bookingId: booking.id } },
+    {
+      loadContext: async () => {
+        throw new Error("Cancelled booking context must not be loaded");
+      },
+      runTransaction: (work) => work(client)
+    }
+  );
+
+  assert.deepEqual(outcome, { skipped: true, tickets: [] });
+  assert.equal(statements.length, 2);
+  assert.equal(statements.some((sql) => sql.startsWith("insert into tickets")), false);
+  assert.equal(statements.some((sql) => sql.startsWith("insert into event_logs")), false);
+  assert.equal(statements.some((sql) => sql.startsWith("insert into outbox_events")), false);
+});
+
+test("ticket issuance aborts before log and outbox if the guarded state update loses", async () => {
+  const statements = [];
+  const client = {
+    async query(text) {
+      const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
+      statements.push(sql);
+      if (sql.startsWith("insert into workflow_processed_events")) return { rowCount: 1, rows: [] };
+      if (sql.startsWith("select status from bookings")) return { rows: [{ status: "PAID" }] };
+      if (sql.startsWith("select * from tickets")) return { rows: [] };
+      if (sql.startsWith("insert into tickets")) return { rows: [{ id: "ticket-1" }] };
+      if (sql.startsWith("update bookings")) return { rowCount: 0, rows: [] };
+      return { rowCount: 1, rows: [] };
+    }
+  };
+
+  await assert.rejects(
+    issueTickets(
+      { eventId: "event-state-race", eventName: "booking.paid", payload: { bookingId: booking.id } },
+      { loadContext, runTransaction: (work) => work(client) }
+    ),
+    /left PAID state during ticket issuance/
+  );
+
+  assert.equal(statements.some((sql) => sql.startsWith("insert into event_logs")), false);
+  assert.equal(statements.some((sql) => sql.startsWith("insert into outbox_events")), false);
 });

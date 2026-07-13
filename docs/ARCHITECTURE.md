@@ -287,6 +287,12 @@ advances the booking, writes the log, and queues `ticket.issued` in the
 transactional outbox. A RabbitMQ redelivery therefore neither duplicates the
 ticket transition nor creates another downstream event.
 
+Because both cancellation and ticket issuance start at `PAID`, Ticket Worker
+also locks the booking row in that transaction before reading ticket context.
+This makes the race deterministic: cancellation-first produces no tickets or
+`ticket.issued`; issuance-first moves to `TICKET_ISSUED`, after which the
+cancellation state guard rejects the request.
+
 Email Worker independently claims `(email-worker.notifications, eventId)` in
 `workflow_processed_events` before its simulated delivery log, so RabbitMQ
 redelivery does not log/send the same notification twice.
