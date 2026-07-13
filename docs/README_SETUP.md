@@ -193,6 +193,7 @@ Implemented test targets:
 | Web lint | `npm --prefix apps/web run lint` | Next.js/React lint |
 | Web auth unit tests | `npm run test:web:unit` | BFF portal-role and secure-cookie invariants |
 | Web admin E2E | `npm run test:web:e2e` | Uses Playwright and starts configured dev servers |
+| Source integrity | `npm run check:source` | Syntax-checks non-Next Node files, resolves all relative imports, and validates the workspace dependency tree; Next JSX is covered by lint/build |
 
 ## 9. Local Run Targets
 

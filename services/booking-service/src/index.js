@@ -111,9 +111,9 @@ async function createBookingWithEvents(request) {
 async function cancelBookingWithEvents(request) {
   const booking = await cancelBooking(request);
 
-  // Seat Inventory owns seat state; release the booked seats through its RPC
-  // after the cancellation transaction has committed. A failure here leaves
-  // the seats BOOKED (no overselling) and is logged for manual follow-up.
+  // Seat Inventory owns seat state; release through its RPC after commit for
+  // the fast path. The transactional booking.cancelled workflow event provides
+  // idempotent recovery if this immediate call fails.
   const seatIds = booking.passengers.map((passenger) => passenger.seat_id);
   try {
     await releaseBookedSeats({

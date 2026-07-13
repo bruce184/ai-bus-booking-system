@@ -12,6 +12,7 @@
   ],
   "scripts": {
     "check:docs": "node scripts/check-docs.mjs",
+    "check:source": "node scripts/check-source.mjs",
     "compose:config": "docker compose config",
     "dev": "echo \"Run individual workspaces: dev:web, dev:gateway, dev:trip, dev:booking, dev:analytics, dev:mcp, dev:ticket-worker, dev:email-worker.\"",
     "dev:web": "npm --prefix apps/web run dev",
@@ -56,7 +57,7 @@
     "test:integration": "npm run test:gateway:integration && npm run test:seat:integration",
     "test:e2e": "npm run test:web:e2e",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e",
-    "validate": "npm run check:docs && npm run test:unit && npm run test:integration"
+    "validate": "npm run check:docs && npm run check:source && npm run test:unit && npm run test:integration"
   },
   "devDependencies": {
     "concurrently": "^10.0.3"
