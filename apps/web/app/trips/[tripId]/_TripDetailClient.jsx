@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { storeFlowContext } from "../../../lib/flow-context-client";
 import { GRAPHQL_ENDPOINT, graphqlRequest } from "../../../lib/graphql";
 import { SeatMap } from "../../../src/components/SeatMap.jsx";
 import { TopBar } from "../../../src/components/TopBar.jsx";
@@ -92,11 +93,18 @@ export default function TripDetailClient({ initialDetail, tripId: initialTripId 
     };
   }, [tripId, initialDetail]);
 
-  function handleHoldCreated(hold) {
-    const seats = hold.seats.map((seat) => seat.id).join(",");
-    router.push(
-      `/checkout?tripId=${encodeURIComponent(tripId)}&holdToken=${encodeURIComponent(hold.holdToken)}&seats=${encodeURIComponent(seats)}&expiresAt=${encodeURIComponent(hold.expiresAt)}`
-    );
+  async function handleHoldCreated(hold) {
+    try {
+      await storeFlowContext("checkout", {
+        tripId,
+        holdToken: hold.holdToken,
+        seats: hold.seats.map((seat) => seat.id),
+        expiresAt: hold.expiresAt
+      });
+      router.push("/checkout");
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   return (

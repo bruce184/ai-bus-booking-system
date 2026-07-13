@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import QRCode from "qrcode";
+import { BOOKING_FLOW_COOKIE, readFlowContext } from "../../../lib/server/flow-context";
 import { requestGatewayData } from "../../../lib/server/gateway";
 import PrintTicketButton from "./_PrintTicketButton.jsx";
 import { TopBar } from "../../../src/components/TopBar.jsx";
@@ -47,17 +49,22 @@ function formatFullDate(value) {
   });
 }
 
-export default async function BookingConfirmationPage({ params, searchParams }) {
+export default async function BookingConfirmationPage({ params }) {
   const resolvedParams = await params;
-  const resolvedSearchParams = await searchParams;
   const bookingCode = resolvedParams.bookingCode;
-  const email = resolvedSearchParams.email || "";
+  const cookieStore = await cookies();
+  const flowContext = readFlowContext(
+    "booking",
+    cookieStore.get(BOOKING_FLOW_COOKIE)?.value
+  );
+  const email =
+    flowContext?.bookingCode === bookingCode ? flowContext.email : "";
   let booking;
   let error = "";
 
   try {
     if (!email) {
-      throw new Error("Cần email để tra cứu booking.");
+      throw new Error("Phiên tra cứu không hợp lệ hoặc đã hết hạn. Vui lòng nhập lại mã booking và email.");
     }
     const data = await requestGatewayData(BOOKING_STATUS, { bookingCode, email });
     booking = data.bookingStatus;

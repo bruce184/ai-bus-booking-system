@@ -100,6 +100,8 @@ docs/                        Source-of-truth docs
 ## 6. Environment Setup
 
 Create local `.env` files from `.env.example` for local service runs.
+Set `FLOW_CONTEXT_SECRET` to a distinct random value outside the disposable
+local demo; it encrypts the short-lived checkout/payment/lookup context cookie.
 
 Do not commit real `.env` files.
 
@@ -207,7 +209,7 @@ Implemented test targets:
 | Gateway API / contract smoke | `npm run test:gateway:api` | Requires a gateway already running on `http://localhost:4000/graphql` |
 | Gateway performance | `npm run test:gateway:perf` | Requires Apache JMeter on `PATH` |
 | Web lint | `npm --prefix apps/web run lint` | Next.js/React lint |
-| Web auth unit tests | `npm run test:web:unit` | BFF portal-role and secure-cookie invariants |
+| Web auth/flow unit tests | `npm run test:web:unit` | BFF portal-role, encrypted flow-context, expiry, tamper rejection, and no-sensitive-URL invariants |
 | Web admin/customer E2E | `npm run test:web:e2e` | Uses isolated Compose ports/volume, starts non-reused app servers, and always removes E2E infrastructure in a final cleanup step |
 | Source integrity | `npm run check:source` | Syntax-checks non-Next Node files, resolves all relative imports, and validates the workspace dependency tree; Next JSX is covered by lint/build |
 | Full release gate | `npm run release:check` | Runs docs/source/Compose checks, unit and integration suites, then the hermetic web E2E suite |

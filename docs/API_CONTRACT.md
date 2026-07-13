@@ -497,6 +497,10 @@ Frontend must:
 7. Send browser GraphQL HTTP requests through Next.js `/api/graphql`; store the
    Gateway JWT only in the BFF-managed `HttpOnly` session cookie, never
    `localStorage` or a JavaScript-readable cookie.
+8. Transfer the seat-hold token and booking lookup email between checkout,
+   payment, and confirmation through short-lived encrypted `HttpOnly` BFF
+   context cookies. These values must never appear in URLs, browser history,
+   referrer headers, or client-readable persistent storage.
 
 ## 13. Contract Change Rule
 

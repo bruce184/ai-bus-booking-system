@@ -112,9 +112,15 @@ MVP are:
 
 Browser sessions use one `HttpOnly`, `SameSite=Lax` cookie set by the Next.js
 auth route. Browser code never persists JWTs in `localStorage` or a
-JavaScript-readable cookie. Customer and admin pages use the same GraphQL
-helper and BFF proxy; `/api/auth/session` resolves the current user from the
-Gateway's `me` query instead of trusting a browser-stored role object.
+JavaScript-readable cookie. The checkout/payment/lookup hand-off uses separate
+short-lived, AES-GCM-encrypted `HttpOnly`, `SameSite=Lax` BFF context
+cookies. The hold token and private lookup email therefore do not enter URLs,
+history, referrer headers, or persistent client storage. Context payloads are
+type-validated, bound to their flow kind, expire inside the encrypted envelope,
+and are accepted only from same-origin mutation requests. Customer and admin
+pages use the same GraphQL helper and BFF proxy; `/api/auth/session` resolves
+the current user from the Gateway's `me` query instead of trusting a
+browser-stored role object.
 
 Frontend must not call internal gRPC services directly.
 

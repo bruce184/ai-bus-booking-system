@@ -2,18 +2,28 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { storeFlowContext } from "../../lib/flow-context-client";
 import { TopBar } from "../../src/components/TopBar.jsx";
 
 export default function LookupPage() {
   const router = useRouter();
   const [bookingCode, setBookingCode] = useState("");
   const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
     const code = bookingCode.trim().toUpperCase();
-    router.push(`/booking/${encodeURIComponent(code)}?email=${encodeURIComponent(email.trim())}`);
+    setLoading(true);
+    setError("");
+    try {
+      await storeFlowContext("booking", { bookingCode: code, email: email.trim() });
+      router.push(`/booking/${encodeURIComponent(code)}`);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
   }
 
   return (
@@ -31,9 +41,10 @@ export default function LookupPage() {
             <label>Email liên hệ</label>
             <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="guest@example.com" required />
           </div>
-          <button className="primary" type="submit">
-            Tra cứu vé
+          <button className="primary" disabled={loading} type="submit">
+            {loading ? "Đang tra cứu..." : "Tra cứu vé"}
           </button>
+          {error ? <p className="error">{error}</p> : null}
         </form>
 
         <aside className="summary-panel">

@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getFlowContext } from "../../lib/flow-context-client";
 import { graphqlRequest } from "../../lib/graphql";
 import { TopBar } from "../../src/components/TopBar.jsx";
 
@@ -17,19 +17,47 @@ const SIMULATE_PAYMENT = `
 `;
 
 function PaymentContent() {
-  const params = useSearchParams();
   const router = useRouter();
-  const bookingCode = params.get("bookingCode") || "";
-  const email = params.get("email") || "";
+  const [flowContext, setFlowContext] = useState(null);
+  const [contextLoading, setContextLoading] = useState(true);
+  const bookingCode = flowContext?.bookingCode ?? "";
+  const email = flowContext?.email ?? "";
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getFlowContext("booking")
+      .then((context) => {
+        if (!cancelled) {
+          setFlowContext(context);
+          if (!context) {
+            setError("Phiên thanh toán không hợp lệ hoặc đã hết hạn. Vui lòng tra cứu lại booking.");
+          }
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setContextLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function pay(success) {
     setLoading(true);
     setError("");
     try {
       await graphqlRequest(SIMULATE_PAYMENT, { input: { bookingCode, success, email } });
-      router.push(`/booking/${bookingCode}?email=${encodeURIComponent(email)}`);
+      router.push(`/booking/${encodeURIComponent(bookingCode)}`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -46,10 +74,10 @@ function PaymentContent() {
           <h2>Chọn kết quả giao dịch</h2>
           <p className="muted">Hệ thống sẽ mô phỏng kết quả giao dịch thanh toán trực tuyến để hoàn tất đặt vé.</p>
           <div className="row">
-            <button className="primary" disabled={!bookingCode || !email || loading} onClick={() => pay(true)}>
+            <button className="primary" disabled={contextLoading || !bookingCode || !email || loading} onClick={() => pay(true)}>
               Thanh toán thành công
             </button>
-            <button className="danger" disabled={!bookingCode || !email || loading} onClick={() => pay(false)}>
+            <button className="danger" disabled={contextLoading || !bookingCode || !email || loading} onClick={() => pay(false)}>
               Thanh toán thất bại
             </button>
           </div>
@@ -72,9 +100,5 @@ function PaymentContent() {
 }
 
 export default function PaymentPage() {
-  return (
-    <Suspense fallback={<section className="panel">Đang tải thanh toán...</section>}>
-      <PaymentContent />
-    </Suspense>
-  );
+  return <PaymentContent />;
 }
