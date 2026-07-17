@@ -198,6 +198,38 @@ export default function SearchClient({
 
   return (
     <>
+      {/* Search-page control overrides. The global `input {width:100%;padding}`
+          rule (app/globals.css) otherwise stretches checkboxes and hides native
+          range thumbs; these scoped classes fix that without touching shared css. */}
+      <style>{`
+        .ebx-check {
+          appearance: auto; -webkit-appearance: checkbox;
+          width: 16px; height: 16px; min-height: 0;
+          padding: 0; margin: 0; border: none; background: none; box-shadow: none;
+          accent-color: var(--brand); flex: 0 0 auto; cursor: pointer;
+        }
+        .ebx-sort, .ebx-sort option { color: #1a1a1a; }
+        .ebx-range {
+          -webkit-appearance: none; appearance: none;
+          width: 100%; height: 6px; min-height: 0; padding: 0; margin: 8px 0;
+          border: none; border-radius: 999px; background: var(--line);
+          outline: none; cursor: pointer;
+        }
+        .ebx-range::-webkit-slider-thumb {
+          -webkit-appearance: none; appearance: none;
+          width: 18px; height: 18px; border-radius: 50%;
+          background: var(--brand); border: 2px solid #fff;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); cursor: pointer;
+        }
+        .ebx-range::-moz-range-thumb {
+          width: 18px; height: 18px; border-radius: 50%;
+          background: var(--brand); border: 2px solid #fff;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); cursor: pointer;
+        }
+        .ebx-range::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; }
+        .ebx-range::-moz-range-track { height: 6px; border-radius: 999px; background: var(--line); }
+      `}</style>
+
       <TopBar links={[{ href: "/", label: "Trang chính" }, { href: "/my-bookings", label: "Vé của tôi" }, { href: "/lookup", label: "Tra cứu vé" }]} showUserBadge />
 
       {/* Collapsible Search Row */}
@@ -311,7 +343,7 @@ export default function SearchClient({
                 return [lo, hi];
               })}
               aria-label="Giờ khởi hành từ"
-              style={{ width: "100%", accentColor: "var(--brand)", cursor: "pointer" }}
+              className="ebx-range"
             />
             <input
               type="range"
@@ -324,7 +356,7 @@ export default function SearchClient({
                 return [lo, hi];
               })}
               aria-label="Giờ khởi hành đến"
-              style={{ width: "100%", accentColor: "var(--brand)", cursor: "pointer" }}
+              className="ebx-range"
             />
           </div>
 
@@ -339,9 +371,9 @@ export default function SearchClient({
                   <label key={op} style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", cursor: "pointer" }}>
                     <input
                       type="checkbox"
+                      className="ebx-check"
                       checked={selectedOperators.includes(op)}
                       onChange={() => toggleOperator(op)}
-                      style={{ width: "16px", height: "16px", accentColor: "var(--brand)" }}
                     />
                     {op}
                   </label>
@@ -358,9 +390,9 @@ export default function SearchClient({
                 <label key={type} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <input
                     type="checkbox"
+                    className="ebx-check"
                     checked={selectedVehicleTypes.includes(type)}
                     onChange={() => setSelectedVehicleTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])}
-                    style={{ accentColor: "var(--brand)" }}
                   />
                   {type}
                 </label>
@@ -394,6 +426,7 @@ export default function SearchClient({
               <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", flexWrap: "wrap" }}>
                 <span className="muted">Sắp xếp:</span>
                 <select
+                  className="ebx-sort"
                   value={sortBy}
                   onChange={(e) => { setSortBy(e.target.value); doSearch(origin, destination, departureDate, e.target.value, minPrice, maxPrice); }}
                   style={{ minHeight: "30px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
@@ -412,7 +445,7 @@ export default function SearchClient({
                   step="1000"
                   onChange={(e) => setMinPrice(Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
                   onBlur={() => doSearch(origin, destination, departureDate, sortBy, minPrice, maxPrice)}
-                  style={{ width: "70px", minHeight: "30px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
+                  style={{ width: "130px", minHeight: "30px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
                 />
                 <span className="muted">-</span>
                 <input
@@ -423,7 +456,7 @@ export default function SearchClient({
                   step="1000"
                   onChange={(e) => setMaxPrice(Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
                   onBlur={() => doSearch(origin, destination, departureDate, sortBy, minPrice, maxPrice)}
-                  style={{ width: "70px", minHeight: "30px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
+                  style={{ width: "130px", minHeight: "30px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
                 />
               </div>
             </div>
