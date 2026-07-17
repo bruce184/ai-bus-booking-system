@@ -1,4 +1,6 @@
 import { toGrpcError } from "@bus/shared/errors.js";
+import { readCorrelationId } from "@bus/shared/grpc.js";
+import { runWithCorrelationId } from "@bus/shared/correlation.js";
 import {
   blockSeats,
   confirmSeats,
@@ -15,7 +17,8 @@ import {
 function handle(work) {
   return async (call, callback) => {
     try {
-      callback(null, await work(call.request));
+      const result = await runWithCorrelationId(readCorrelationId(call), () => work(call.request));
+      callback(null, result);
     } catch (error) {
       callback(toGrpcError(error));
     }

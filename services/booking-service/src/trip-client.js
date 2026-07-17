@@ -1,5 +1,6 @@
 import { fail } from "@bus/shared/errors.js";
-import { createInsecureClient, grpc, loadProto } from "@bus/shared/grpc.js";
+import { correlationMetadata, createInsecureClient, grpc, loadProto } from "@bus/shared/grpc.js";
+import { getCorrelationId } from "@bus/shared/correlation.js";
 
 let tripClient;
 const TRIP_SERVICE_TIMEOUT_MS = 10_000;
@@ -37,17 +38,20 @@ export function mapTripServiceError(error) {
 
 function getTripDetail(tripId) {
   return new Promise((resolve, reject) => {
-    client().GetTripDetail(
-      { trip_id: tripId },
-      { deadline: Date.now() + TRIP_SERVICE_TIMEOUT_MS },
-      (error, value) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(value);
+    const callback = (error, value) => {
+      if (error) {
+        reject(error);
+        return;
       }
-    );
+      resolve(value);
+    };
+    const options = { deadline: Date.now() + TRIP_SERVICE_TIMEOUT_MS };
+
+    if (getCorrelationId()) {
+      client().GetTripDetail({ trip_id: tripId }, correlationMetadata(), options, callback);
+    } else {
+      client().GetTripDetail({ trip_id: tripId }, options, callback);
+    }
   });
 }
 

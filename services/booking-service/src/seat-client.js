@@ -1,5 +1,6 @@
 import { fail, isServiceErrorCode } from "@bus/shared/errors.js";
-import { createInsecureClient, grpc, loadProto } from "@bus/shared/grpc.js";
+import { correlationMetadata, createInsecureClient, grpc, loadProto } from "@bus/shared/grpc.js";
+import { getCorrelationId } from "@bus/shared/correlation.js";
 
 let seatClient;
 
@@ -113,17 +114,20 @@ function mapSeatInventoryErrorMessage(error, code) {
 async function callSeatInventory(method, request) {
   try {
     return await new Promise((resolve, reject) => {
-      client()[method](
-        request,
-        { deadline: Date.now() + SEAT_INVENTORY_TIMEOUT_MS },
-        (error, response) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve(response);
+      const callback = (error, response) => {
+        if (error) {
+          reject(error);
+          return;
         }
-      );
+        resolve(response);
+      };
+      const options = { deadline: Date.now() + SEAT_INVENTORY_TIMEOUT_MS };
+
+      if (getCorrelationId()) {
+        client()[method](request, correlationMetadata(), options, callback);
+      } else {
+        client()[method](request, options, callback);
+      }
     });
   } catch (error) {
     const code = mapSeatInventoryErrorCode(error);

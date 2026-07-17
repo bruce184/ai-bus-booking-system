@@ -1,4 +1,5 @@
-import { createInsecureClient, grpc, loadProto } from "@bus/shared/grpc.js";
+import { correlationMetadata, createInsecureClient, grpc, loadProto } from "@bus/shared/grpc.js";
+import { getCorrelationId } from "@bus/shared/correlation.js";
 import { ServiceError } from "@bus/shared/errors.js";
 
 import { config } from "./config.js";
@@ -31,17 +32,20 @@ export async function fetchTripStatus(tripId) {
   let response;
   try {
     response = await new Promise((resolve, reject) => {
-      client().GetTripDetail(
-        { trip_id: tripId },
-        { deadline: Date.now() + config.grpcCallTimeoutMs },
-        (error, value) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve(value);
+      const callback = (error, value) => {
+        if (error) {
+          reject(error);
+          return;
         }
-      );
+        resolve(value);
+      };
+      const options = { deadline: Date.now() + config.grpcCallTimeoutMs };
+
+      if (getCorrelationId()) {
+        client().GetTripDetail({ trip_id: tripId }, correlationMetadata(), options, callback);
+      } else {
+        client().GetTripDetail({ trip_id: tripId }, options, callback);
+      }
     });
   } catch (error) {
     throw mapTripServiceError(error);

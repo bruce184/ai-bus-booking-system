@@ -7,6 +7,8 @@
 // call-site signature (`throw notFound(msg)`) so no caller needed to change.
 import grpc from '@grpc/grpc-js';
 import { ServiceError, toGrpcError } from '@bus/shared/errors.js';
+import { readCorrelationId } from '@bus/shared/grpc.js';
+import { runWithCorrelationId } from '@bus/shared/correlation.js';
 
 export { ServiceError };
 
@@ -37,7 +39,7 @@ export function mapDatabaseError(error) {
 export function wrap(name, handler, logger) {
   return async (call, callback) => {
     try {
-      const result = await handler(call);
+      const result = await runWithCorrelationId(readCorrelationId(call), () => handler(call));
       callback(null, result);
     } catch (err) {
       const serviceError = err instanceof ServiceError

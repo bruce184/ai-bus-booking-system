@@ -1,6 +1,8 @@
 import { fail, toGrpcError } from "@bus/shared/errors.js";
-import { grpc, loadProto } from "@bus/shared/grpc.js";
+import { grpc, loadProto, readCorrelationId } from "@bus/shared/grpc.js";
+import { runWithCorrelationId } from "@bus/shared/correlation.js";
 import { dispatchOutboxEvents } from "@bus/shared/outbox.js";
+import { startHealthServer } from "@bus/shared/health.js";
 import { startTripCompletedConsumer } from "./consumers/tripCompletedConsumer.js";
 import { simulatePaymentWithService } from "./payment-client.js";
 import { confirmSeats, releaseBookedSeats, releaseSeatHold, validateSeatHold } from "./seat-client.js";
@@ -25,7 +27,8 @@ import {
 
 async function handle(call, callback, work) {
   try {
-    callback(null, await work(call.request));
+    const result = await runWithCorrelationId(readCorrelationId(call), () => work(call.request));
+    callback(null, result);
   } catch (error) {
     console.error("[booking-service]", error);
     callback(toGrpcError(error));
@@ -168,6 +171,10 @@ server.bindAsync(address, grpc.ServerCredentials.createInsecure(), (error, port)
   server.start();
   console.log(`[booking-service] gRPC listening on ${address} (port ${port})`);
 });
+
+const healthPort = Number(process.env.BOOKING_SERVICE_HEALTH_PORT || 50153);
+startHealthServer(healthPort, "booking-service");
+console.log(`[booking-service] health check on port ${healthPort}`);
 
 async function runExpirationJob() {
   try {

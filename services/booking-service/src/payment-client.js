@@ -1,5 +1,6 @@
 import { fail, isServiceErrorCode } from "@bus/shared/errors.js";
 import { fetchWithTimeout } from "@bus/shared/http.js";
+import { CORRELATION_METADATA_KEY, getCorrelationId } from "@bus/shared/correlation.js";
 
 const PAYMENT_SERVICE_TIMEOUT_MS = 10_000;
 
@@ -61,11 +62,15 @@ export async function simulatePaymentWithService({ booking, success }) {
     };
   }
 
+  const correlationId = getCorrelationId();
   let response;
   try {
     response = await fetchWithTimeout(`${paymentServiceUrl()}/simulate`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(correlationId ? { [CORRELATION_METADATA_KEY]: correlationId } : {})
+      },
       body: JSON.stringify(simulatePaymentRequest({ booking, success }))
     }, { timeoutMs: PAYMENT_SERVICE_TIMEOUT_MS });
   } catch (error) {
