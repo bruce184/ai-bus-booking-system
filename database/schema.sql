@@ -185,7 +185,8 @@ create table if not exists outbox_events (
   payload jsonb not null default '{}'::jsonb,
   occurred_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
-  published_at timestamptz
+  published_at timestamptz,
+  correlation_id uuid
 );
 
 -- Keep schema.sql re-runnable against volumes created before service-boundary
@@ -215,6 +216,12 @@ alter table outbox_events alter column event_id set default gen_random_uuid();
 alter table outbox_events alter column event_id set not null;
 alter table outbox_events alter column occurred_at set default now();
 alter table outbox_events alter column occurred_at set not null;
+
+-- Correlation id ties one end-to-end user request together across services'
+-- logs (week02 gRPC metadata, week04 event correlationId). Nullable: it's
+-- best-effort tracing, not a business invariant, so older/untraced rows and
+-- events published outside a traced call stay valid.
+alter table outbox_events add column if not exists correlation_id uuid;
 
 drop index if exists idx_outbox_events_event_id;
 create unique index idx_outbox_events_event_id

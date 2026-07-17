@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import amqp from "amqplib";
 import { Kafka } from "kafkajs";
+import { getCorrelationId, runWithCorrelationId } from "./correlation.js";
 
 const rabbitUrl = process.env.RABBITMQ_URL || "amqp://localhost:5672";
 const workflowExchange = process.env.RABBITMQ_WORKFLOW_EXCHANGE || "bus.workflow";
@@ -70,7 +71,8 @@ export function createEventEnvelope(eventName, payload, metadata = {}) {
     eventId: metadata.eventId || randomUUID(),
     eventName,
     payload,
-    occurredAt: metadata.occurredAt || new Date().toISOString()
+    occurredAt: metadata.occurredAt || new Date().toISOString(),
+    correlationId: metadata.correlationId ?? getCorrelationId()
   };
 }
 
@@ -179,7 +181,7 @@ async function configureWorkflowConsumer(channel, queueName, routingKeys, onMess
 
     try {
       const event = JSON.parse(message.content.toString("utf8"));
-      await onMessage(event);
+      await runWithCorrelationId(event.correlationId, () => onMessage(event));
       channel.ack(message);
     } catch (error) {
       console.error(`[${queueName}] failed to process message`, error);

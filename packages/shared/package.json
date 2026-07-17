@@ -8,7 +8,9 @@
   },
   "exports": {
     "./db.js": "./src/db.js",
+    "./correlation.js": "./src/correlation.js",
     "./events.js": "./src/events.js",
+    "./health.js": "./src/health.js",
     "./outbox.js": "./src/outbox.js",
     "./grpc.js": "./src/grpc.js",
     "./errors.js": "./src/errors.js",

@@ -1,20 +1,36 @@
 import { pool } from "./db.js";
+import { getCorrelationId } from "./correlation.js";
 import { publishKafkaEvent, publishWorkflowEvent } from "./events.js";
 
 // Transactional outbox (Week 4 slide 37): call this inside the same
 // transaction as the business write. `client` is the pg client the caller's
 // transaction() gave it, so the insert commits or rolls back atomically with
 // the state change it describes.
+//
+// correlationId defaults to the request/message currently in scope (set by
+// the gRPC handler or workflow consumer wrapper that led here) so callers
+// don't need to thread it through explicitly - it survives the gap between
+// this write and the poller's later dispatch only because it's persisted here.
 export async function writeOutboxEvent(
   client,
-  { aggregateType, aggregateId, eventName, target, routingKey, payload, eventId, occurredAt }
+  {
+    aggregateType,
+    aggregateId,
+    eventName,
+    target,
+    routingKey,
+    payload,
+    eventId,
+    occurredAt,
+    correlationId = getCorrelationId()
+  }
 ) {
   await client.query(
     `
       insert into outbox_events (
-        aggregate_type, aggregate_id, event_name, target, routing_key, payload, event_id, occurred_at
+        aggregate_type, aggregate_id, event_name, target, routing_key, payload, event_id, occurred_at, correlation_id
       )
-      values ($1, $2, $3, $4, $5, $6, coalesce($7, gen_random_uuid()), coalesce($8, now()))
+      values ($1, $2, $3, $4, $5, $6, coalesce($7, gen_random_uuid()), coalesce($8, now()), $9)
     `,
     [
       aggregateType,
@@ -24,7 +40,8 @@ export async function writeOutboxEvent(
       routingKey,
       JSON.stringify(payload),
       eventId || null,
-      occurredAt || null
+      occurredAt || null,
+      correlationId || null
     ]
   );
 }
@@ -74,12 +91,14 @@ export async function dispatchOutboxEvents(
           await publishWorkflow(row.event_name, row.payload, {
             eventId: row.event_id,
             occurredAt: row.occurred_at,
-            routingKey: row.routing_key
+            routingKey: row.routing_key,
+            correlationId: row.correlation_id ?? null
           });
         } else if (row.target === "KAFKA") {
           await publishKafka(row.routing_key, row.event_name, row.payload, {
             eventId: row.event_id,
-            occurredAt: row.occurred_at
+            occurredAt: row.occurred_at,
+            correlationId: row.correlation_id ?? null
           });
         } else {
           throw new Error(`Unsupported outbox target: ${row.target}`);

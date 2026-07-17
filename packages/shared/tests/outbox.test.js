@@ -48,7 +48,8 @@ test("dispatcher claims only owned aggregate rows with skip-locked semantics", a
     {
       eventId: "event-1",
       occurredAt: "2026-07-13T01:02:03.000Z",
-      routingKey: "booking.paid"
+      routingKey: "booking.paid",
+      correlationId: null
     }
   ]]);
   assert.equal(
