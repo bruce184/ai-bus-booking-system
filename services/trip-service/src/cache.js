@@ -5,7 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import Redis from 'ioredis';
 import { config } from './config.js';
 import { logger } from './logger.js';
-import { failedPrecondition } from './errors.js';
+import { ServiceError } from './errors.js';
 
 const SEARCH_PREFIX = 'trip:search:';
 const SEAT_MAINTENANCE_PREFIX = 'seat-maintenance:';
@@ -190,10 +190,15 @@ export async function withTripSeatMaintenanceClient(redisClient, tripId, work) {
   }
 }
 
+// SERVICE_TIMEOUT (not FAILED_PRECONDITION): Redis coordination being
+// unreachable is transient downstream trouble, not a rejected business
+// precondition - see docs/API_CONTRACT.md's "Redis uncertainty fails closed
+// with SERVICE_TIMEOUT" note.
 export async function withTripSeatMaintenance(tripId, work) {
   if (!enabled || !client) {
-    throw failedPrecondition(
-      'SERVICE_TIMEOUT: Seat hold store unavailable; vehicle change was not applied',
+    throw new ServiceError(
+      'SERVICE_TIMEOUT',
+      'Seat hold store unavailable; vehicle change was not applied',
     );
   }
 
@@ -202,8 +207,9 @@ export async function withTripSeatMaintenance(tripId, work) {
   } catch (error) {
     if (!(error instanceof SeatMaintenanceStoreError)) throw error;
     logger.warn('Seat-maintenance coordination failed', error.message);
-    throw failedPrecondition(
-      'SERVICE_TIMEOUT: Seat hold store unavailable; vehicle change was not applied',
+    throw new ServiceError(
+      'SERVICE_TIMEOUT',
+      'Seat hold store unavailable; vehicle change was not applied',
     );
   }
 }
