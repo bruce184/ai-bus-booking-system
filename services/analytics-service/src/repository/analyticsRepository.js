@@ -83,13 +83,27 @@ export async function applyPaidBookingDelta(client, {
  * origin/destination search strings. Trip Service owns trips/routes/
  * locations (database-per-service - docs/ARCHITECTURE.md section 11), so
  * this calls its GetTripDetail RPC instead of joining those tables directly.
+ *
+ * booking.paid and booking.cancelled each resolve this independently (there
+ * is no per-booking record of which label the original credit used), so a
+ * one-off Trip Service blip here can misroute a cancellation's reversal to
+ * a different analytics_daily row than the one that received the credit.
+ * One short retry closes most of that window.
+ * ponytail: retry-then-"Unknown Route", not a stored per-booking label -
+ * upgrade to persisting the label at payment time if this ever needs to be
+ * exact rather than best-effort.
  */
 export async function getRouteLabelForTrip(tripId) {
   try {
     return await getTripRouteLabel(tripId);
-  } catch (error) {
-    console.warn(`[analytics-service] Trip Service lookup failed for ${tripId}: ${error.message}`);
-    return null;
+  } catch (firstError) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    try {
+      return await getTripRouteLabel(tripId);
+    } catch (secondError) {
+      console.warn(`[analytics-service] Trip Service lookup failed for ${tripId}: ${secondError.message}`);
+      return null;
+    }
   }
 }
 
@@ -99,17 +113,19 @@ export async function getRouteLabelForTrip(tripId) {
  * exact daily aggregate row that received the payment. Booking Service owns
  * bookings/booking_passengers/event_logs, so this calls its internal
  * GetBookingMetrics RPC instead of joining those tables directly.
+ *
+ * A `booking.cancelled` event only ever fires for a booking that was PAID
+ * (booking-service's canCancel gate), so a real, successful call always
+ * finds a paid_at - there is no legitimate "never paid" case here, only a
+ * failed RPC. Let that propagate instead of swallowing it to a zeroed
+ * result: consumer.js marks the event processed in the same DB transaction
+ * as the handler, so swallowing here would commit the event as done while
+ * silently skipping the revenue/ticket reversal forever. Throwing rolls
+ * that transaction back and Kafka redelivers, same as any other handler
+ * failure.
  */
 export async function getBookingCancellationMetrics(bookingId) {
-  try {
-    return await fetchBookingMetrics(bookingId);
-  } catch (error) {
-    console.warn(`[analytics-service] Booking Service lookup failed for ${bookingId}: ${error.message}`);
-    // Matches the "no booking.paid event log" shape handleBookingCancelled
-    // already treats as skip-the-reversal, rather than losing the whole
-    // Kafka message to an unrelated network blip.
-    return { totalAmount: 0, ticketCount: 0, paidAt: null };
-  }
+  return fetchBookingMetrics(bookingId);
 }
 
 export async function getRevenueSummary({ from, to }) {
