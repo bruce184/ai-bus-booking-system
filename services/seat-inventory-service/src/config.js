@@ -22,6 +22,7 @@ function readNumber(name, fallback) {
 export const config = {
   grpcHost: process.env.SEAT_INVENTORY_SERVICE_HOST ?? "0.0.0.0",
   grpcPort: readNumber("SEAT_INVENTORY_SERVICE_PORT", 50052),
+  healthPort: readNumber("SEAT_INVENTORY_SERVICE_HEALTH_PORT", 50152),
   grpcCallTimeoutMs: readNumber("GRPC_CALL_TIMEOUT_MS", 5_000),
   tripServiceAddress:
     process.env.TRIP_SERVICE_GRPC_ADDRESS ??

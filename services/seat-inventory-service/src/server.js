@@ -1,4 +1,5 @@
 import grpc from "@grpc/grpc-js";
+import { startHealthServer } from "@bus/shared/health.js";
 import { config } from "./config.js";
 import { closePostgres } from "./db/postgres.js";
 import { seatInventoryHandlers } from "./grpc/seatInventoryHandlers.js";
@@ -32,6 +33,9 @@ server.bindAsync(address, grpc.ServerCredentials.createInsecure(), (error, port)
   console.log(`Seat Inventory Service listening on ${address} (bound port ${port})`);
 });
 
+const healthServer = startHealthServer(config.healthPort, "seat-inventory-service");
+console.log(`Seat Inventory Service health check on port ${config.healthPort}`);
+
 function shutdown(signal) {
   console.log(`Received ${signal}, shutting down Seat Inventory Service`);
   server.tryShutdown(async (error) => {
@@ -41,6 +45,7 @@ function shutdown(signal) {
       process.exit(1);
     }
 
+    healthServer.close();
     await Promise.all([
       closePostgres(),
       closeRedis(),

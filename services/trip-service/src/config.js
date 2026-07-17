@@ -16,6 +16,7 @@ dotenv.config({ path: path.join(repoRoot, '.env') });
 export const config = {
   port: Number(process.env.TRIP_SERVICE_PORT || 50051),
   host: process.env.TRIP_SERVICE_HOST || '0.0.0.0',
+  healthPort: Number(process.env.TRIP_SERVICE_HEALTH_PORT || 50151),
   databaseUrl:
     process.env.DATABASE_URL ||
     'postgresql://bus_app:change_me_local_only@localhost:5432/bus_booking',
