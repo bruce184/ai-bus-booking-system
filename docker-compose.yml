@@ -60,9 +60,17 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:${KAFKA_PORT:-9092}
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     ports:
-      - "${KAFKA_PORT:-9092}:9092"
+      # The broker binds the advertised-listener port above, not a fixed
+      # 9092 (cp-kafka derives KAFKA_LISTENERS from KAFKA_ADVERTISED_LISTENERS
+      # when unset) - map host:host, not host:9092, or an overridden
+      # KAFKA_PORT forwards to a container port nothing is listening on.
+      - "${KAFKA_PORT:-9092}:${KAFKA_PORT:-9092}"
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      # Must match KAFKA_ADVERTISED_LISTENERS' port above, not a hardcoded
+      # 9092 - the broker actually binds the advertised port, so overriding
+      # KAFKA_PORT (e.g. the isolated e2e stack) previously left this probing
+      # a port nothing was listening on, permanently unhealthy.
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:${KAFKA_PORT:-9092} --list >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 20
