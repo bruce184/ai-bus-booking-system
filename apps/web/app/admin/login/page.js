@@ -128,7 +128,7 @@ export default function AdminLogin() {
           </button>
         </form>
 
-        <div style={{ marginTop: '25px', textAlign: 'center', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+        <div style={{ marginTop: '25px', textAlign: 'center', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
           <p>Demo Accounts:</p>
           <p style={{ marginTop: '4px' }}>admin@example.com / admin123 (ADMIN)</p>
           <p>staff@example.com / staff123 (STAFF)</p>

@@ -215,3 +215,75 @@ label {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
 }
+
+/*
+ * Admin theme scope.
+ * The root layout loads styles.css (customer LIGHT theme) AFTER this file, so
+ * its bare element selectors (body/input/label/button/h*) and the .shell width
+ * wrapper leak into the dark admin pages: light text on dark bg, white inputs,
+ * squished layout. Every admin route is wrapped in .admin-app (see admin/
+ * layout.js); these class-scoped rules out-specify the leaking element rules
+ * and re-assert the dark theme, regardless of stylesheet load order.
+ */
+.admin-app {
+  min-height: 100vh;
+  background-color: var(--bg-main);
+  color: var(--color-text-primary);
+  /* Break out of the customer .shell container (max-width 1120px + padding)
+     that the root layout wraps around all pages, so admin is full-bleed. */
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-top: -28px;
+  margin-bottom: -56px;
+}
+
+.admin-app h1,
+.admin-app h2,
+.admin-app h3,
+.admin-app h4,
+.admin-app h5,
+.admin-app h6 {
+  color: var(--color-text-primary);
+}
+
+.admin-app p {
+  color: inherit;
+}
+
+.admin-app label {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.admin-app input,
+.admin-app select,
+.admin-app textarea {
+  min-height: 0;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+}
+
+.admin-app input::placeholder,
+.admin-app textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.admin-app input:focus,
+.admin-app select:focus,
+.admin-app textarea:focus {
+  border-color: var(--border-focus);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* The customer bare-<button> element rule leaks a 42px min-height in; the admin
+   .btn classes already out-specify its colors/border. Only neutralize the size. */
+.admin-app button {
+  min-height: 0;
+}
+
+.admin-app a {
+  color: inherit;
+}

@@ -63,12 +63,10 @@ export default function AdminLayout({ children }) {
 
   if (loading) {
     return (
-      <div style={{
+      <div className="admin-app" style={{
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        backgroundColor: 'var(--bg-main)'
+        justifyContent: 'center'
       }}>
         <div className="spinner"></div>
       </div>
@@ -76,7 +74,7 @@ export default function AdminLayout({ children }) {
   }
 
   if (pathname === '/admin/login') {
-    return <>{children}</>;
+    return <div className="admin-app">{children}</div>;
   }
 
   const adminMenuItems = [
@@ -93,7 +91,7 @@ export default function AdminLayout({ children }) {
     : adminMenuItems;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-main)' }}>
+    <div className="admin-app" style={{ display: 'flex' }}>
       {/* Sidebar */}
       <aside style={{
         width: '260px',

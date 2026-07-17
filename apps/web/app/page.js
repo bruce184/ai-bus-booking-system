@@ -218,7 +218,7 @@ export default function HomePage() {
       <ChatbotPanel />
 
       {/* Grid Panels (Illustrations) */}
-      <section className="grid animate-fade-in">
+      <section className="grid animate-fade-in" style={{ marginBottom: "48px" }}>
         <div className="panel has-illustration">
           <h2>Quy trình hoạt động</h2>
           <ol className="step-list" style={{ marginTop: "20px" }}>
