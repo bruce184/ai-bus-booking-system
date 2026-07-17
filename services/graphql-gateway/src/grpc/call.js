@@ -15,7 +15,7 @@ const breakers = new WeakMap();
 function getBreaker(client) {
   let breaker = breakers.get(client);
   if (!breaker) {
-    breaker = { state: "closed", failures: 0, openedAt: 0 };
+    breaker = { state: "closed", failures: 0, openedAt: 0, halfOpenInFlight: false };
     breakers.set(client, breaker);
   }
   return breaker;
@@ -30,6 +30,7 @@ function isConnectivityFailure(code) {
 
 function recordFailure(breaker, failureThreshold) {
   breaker.failures += 1;
+  breaker.halfOpenInFlight = false;
   if (breaker.state === "half-open" || breaker.failures >= failureThreshold) {
     breaker.state = "open";
     breaker.openedAt = Date.now();
@@ -39,6 +40,7 @@ function recordFailure(breaker, failureThreshold) {
 function recordSuccess(breaker) {
   breaker.state = "closed";
   breaker.failures = 0;
+  breaker.halfOpenInFlight = false;
 }
 
 function normalizeErrorCode(value) {
@@ -120,6 +122,13 @@ export async function callGrpc(
       throw gatewayError("Downstream service is temporarily unavailable.", "SERVICE_TIMEOUT");
     }
     breaker.state = "half-open";
+    breaker.halfOpenInFlight = true;
+  } else if (breaker.state === "half-open" && breaker.halfOpenInFlight) {
+    // A single trial call is already probing the downstream; every other
+    // concurrent request keeps failing fast instead of piling onto a
+    // service that's still recovering. recordSuccess/recordFailure below
+    // always clears the flag once that trial resolves.
+    throw gatewayError("Downstream service is temporarily unavailable.", "SERVICE_TIMEOUT");
   }
 
   // Deadline so a hung downstream service fails fast instead of blocking the gateway.
