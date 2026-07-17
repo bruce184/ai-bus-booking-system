@@ -23,19 +23,30 @@ export const policyResources = {
 };
 
 export async function executeSearchTrips(input = {}) {
+  console.log("===== SEARCH INPUT =====");
+  console.log(input);
+
   requireFields(input, ["origin", "destination", "departureDate"]);
 
   try {
-    return await graphqlRequest({
+    const result = await graphqlRequest({
       query:
         "query SearchTrips($input: SearchTripsInput!) { searchTrips(input: $input) { trips { id operatorName departureTime arrivalTime price availableSeats } suggestedDates seoTitle cacheHit } }",
       variables: { input }
     });
+
+    console.log("===== SEARCH RESULT =====");
+    console.log(JSON.stringify(result, null, 2));
+
+    return result;
   } catch (error) {
+    console.error("===== SEARCH ERROR =====");
+    console.error(error);
+
     return {
       error: "TRIP_DATA_UNAVAILABLE",
       message: error.message,
-      rule: "Do not invent trip inventory. Tell the user the trip service data is unavailable."
+      rule: "Do not invent trip inventory."
     };
   }
 }

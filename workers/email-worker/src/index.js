@@ -9,6 +9,6 @@ await createWorkflowConsumer(
 );
 console.log("[email-worker] waiting for notification events");
 
-const healthPort = Number(process.env.EMAIL_WORKER_HEALTH_PORT || 50162);
+const healthPort = Number(process.env.EMAIL_WORKER_HEALTH_PORT || 62055);
 startHealthServer(healthPort, "email-worker");
 console.log(`[email-worker] health check on port ${healthPort}`);
