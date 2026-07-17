@@ -140,6 +140,19 @@ records. Payment and Analytics health responses must report `ok: true`.
 MCP `/health` and `bus://system/health` intentionally describe only the MCP
 process; they do not claim that downstream services are healthy.
 
+Trip, Booking, and Seat Inventory Services and both workers separately expose
+a bare `GET /health` (`ok: true`, `packages/shared/src/health.js`) on their
+own `*_HEALTH_PORT` - a container liveness probe for the Dockerfiles under
+`services/*` and `workers/*`, deliberately not the semantic check the READY
+banner performs above.
+
+Every gRPC call and event this Gateway/service chain makes carries a
+correlation id (`packages/shared/src/correlation.js`, an `AsyncLocalStorage`
+scope seeded at the Gateway's HTTP edge from an inbound `x-correlation-id`
+header or a fresh one) so one end-to-end request can be traced across
+service logs and the eventual event/outbox publish, without every call site
+threading an extra parameter.
+
 ## 5. Core Workflows
 
 ### Trip Search and SEO
