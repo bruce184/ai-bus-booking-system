@@ -1,5 +1,10 @@
 import { fetchWithTimeout } from "@bus/shared/http.js";
 
+// Shared with lib/server/flow-context.js's normalizeFlowContext("checkout", ...)
+// validation - kept here (not the server-only file) so client components like
+// SeatMap can enforce the same cap before ever creating a Redis hold.
+export const MAX_CHECKOUT_SEATS = 10;
+
 async function readJson(response) {
   try {
     return await response.json();

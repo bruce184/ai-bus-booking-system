@@ -6,6 +6,7 @@ import {
 } from "../graphql/seatOperations.js";
 import { subscribeSeatStateChanged } from "../graphql/wsClient.js";
 import { CountdownRing } from "./ui/CountdownRing.jsx";
+import { MAX_CHECKOUT_SEATS } from "../../lib/flow-context-client.js";
 
 const HOLD_TTL_SECONDS = 300;
 
@@ -152,9 +153,18 @@ export function SeatMap({ graphqlUrl, tripId, seats, price = 220000, onHoldCreat
       return;
     }
 
+    const alreadySelected = selectedSeatIds.includes(seat.id);
+    if (!alreadySelected && selectedSeatIds.length >= MAX_CHECKOUT_SEATS) {
+      // Checkout's flow-context store rejects a hold over this size (see
+      // lib/server/flow-context.js); block it here instead of creating a
+      // hold that can never reach checkout.
+      setError(`Chỉ được chọn tối đa ${MAX_CHECKOUT_SEATS} ghế trong một lần đặt.`);
+      return;
+    }
+
     setError(null);
     setSelectedSeatIds((current) =>
-      current.includes(seat.id)
+      alreadySelected
         ? current.filter((seatId) => seatId !== seat.id)
         : [...current, seat.id]
     );
