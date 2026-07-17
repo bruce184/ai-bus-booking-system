@@ -31,6 +31,10 @@ async function main() {
   const app = express();
   const httpServer = createServer(app);
 
+  app.get("/health", (_req, res) => {
+    res.json({ ok: true, service: "graphql-gateway", scope: "process", dependenciesChecked: false });
+  });
+
   const wsServer = new WebSocketServer({
     server: httpServer,
     path: "/graphql",
