@@ -76,11 +76,16 @@ export function buildE2EPlan(env = process.env) {
 
 function executeCommand(command, args, env) {
   return new Promise((resolve, reject) => {
+    // Windows can't exec a .cmd file directly (it's not a native PE binary);
+    // it needs the command interpreter. Node's spawn(shell:false) throws
+    // EINVAL for npm.cmd here rather than auto-detecting this, unlike a real
+    // .exe (docker) which runs fine either way.
+    const needsShell = process.platform === "win32" && /\.cmd$/i.test(command);
     const child = spawn(command, args, {
       cwd: repoRoot,
       env,
       stdio: "inherit",
-      shell: false
+      shell: needsShell
     });
     activeChild = child;
     child.once("error", reject);
