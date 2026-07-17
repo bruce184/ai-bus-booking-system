@@ -14,6 +14,8 @@ export function startHealthServer(port, service) {
     res.writeHead(404, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "NOT_FOUND" }));
   });
-  server.listen(port);
+  // Bind to loopback to avoid platform/network binding permission issues
+  // (Windows frequently blocks binding to 0.0.0.0 for this use-case).
+  server.listen(port, "127.0.0.1");
   return server;
 }

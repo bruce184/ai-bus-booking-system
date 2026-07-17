@@ -11,6 +11,7 @@
     "workers/*"
   ],
   "scripts": {
+    "verify:all": "npm run check:docs && npm run test:unit && npm run test:gateway:integration && npm run test:analytics:integration && npm run test:seat:integration && npm run test:seat:race && npm run test:web:e2e && npm --prefix apps/web run lint",
     "check:docs": "node scripts/check-docs.mjs",
     "check:source": "node scripts/check-source.mjs",
     "compose:config": "docker compose config",
@@ -68,5 +69,8 @@
   },
   "devDependencies": {
     "concurrently": "^10.0.3"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^4.0.18"
   }
 }

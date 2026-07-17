@@ -1,5 +1,5 @@
 import { generateText, stepCountIs, tool } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { google } from "@ai-sdk/google";
 import { z } from "zod";
 
 import {
@@ -14,42 +14,55 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
 
   try {
-    if (body.message || Array.isArray(body.messages)) {
-      return Response.json(await handleAiSdkChat(body));
-    }
-
-    if (body.intent === "policy") {
-      const policy = readPolicyResource(body.policy);
-      return Response.json({
-        answer: formatPolicyAnswer(policy),
-        source: policy.source,
-        data: policy
-      });
-    }
-
-    if (body.intent === "searchTrips") {
-      const data = await executeSearchTrips(body.input ?? {});
-      return Response.json({
-        answer: formatToolAnswer("searchTrips", data),
-        data
-      });
-    }
-
-    if (body.intent === "getBookingStatus") {
-      const input = body.input ?? {};
-      if (!input.bookingCode || !input.email) {
+    // Nếu gọi kiểu "direct tool actions" (intent) thì không cần OPENAI.
+    // Chỉ khi request có message (model chat) mới bắt buộc OPENAI.
+    if (body.intent) {
+      // Route tool actions first: ensures UI buttons work even when OPENAI_API_KEY is missing.
+      if (body.intent === "policy") {
+        const policy = readPolicyResource(body.policy);
         return Response.json({
-          answer: "Booking lookup requires both booking code and email.",
-          error: "BOOKING_LOOKUP_REQUIRES_CODE_AND_EMAIL"
+          answer: formatPolicyAnswer(policy),
+          source: policy.source,
+          data: policy
         });
       }
 
-      const data = await executeGetBookingStatus(input);
+      if (body.intent === "searchTrips") {
+        const data = await executeSearchTrips(body.input ?? {});
+        return Response.json({
+          answer: formatToolAnswer("searchTrips", data),
+          data
+        });
+      }
+
+      if (body.intent === "getBookingStatus") {
+        const input = body.input ?? {};
+        if (!input.bookingCode || !input.email) {
+          return Response.json({
+            answer: "Booking lookup requires both booking code and email.",
+            error: "BOOKING_LOOKUP_REQUIRES_CODE_AND_EMAIL"
+          });
+        }
+
+        const data = await executeGetBookingStatus(input);
+        return Response.json({
+          answer: formatToolAnswer("getBookingStatus", data),
+          data
+        });
+      }
+
       return Response.json({
-        answer: formatToolAnswer("getBookingStatus", data),
-        data
+        answer:
+          "I can use searchTrips, getBookingStatus, cancellation policy, or check-in policy."
       });
     }
+
+    // Model chat (message/messages) path: AI provider optional.
+    if (body.message || Array.isArray(body.messages)) {
+      return Response.json(await handleAiSdkChat(body, body.correlationId));
+    }
+
+
 
     return Response.json({
       answer:
@@ -66,23 +79,81 @@ export async function POST(request) {
   }
 }
 
-async function handleAiSdkChat(body) {
-  if (!process.env.OPENAI_API_KEY) {
+
+async function handleAiSdkChat(body, correlationId) {
+  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    console.error("[chatbot] AI_PROVIDER_UNCONFIGURED", {
+      correlationId,
+      model: process.env.GOOGLE_MODEL ?? "gemini-2.5-flash"
+    });
+    
+
     return {
       answer:
-        "OPENAI_API_KEY is not configured. Use the direct tool actions or configure a local AI key for model tool calling.",
+        "Thiếu GOOGLE_GENERATIVE_AI_API_KEY. Vui lòng dùng các nút: “Tìm chuyến”, “Hủy vé”, “Check-in”, hoặc “Tra cứu booking” (chế độ gọi tool trực tiếp).",
       error: "AI_PROVIDER_UNCONFIGURED"
     };
   }
 
-  const { text, toolCalls, toolResults } = await generateText({
-    model: openai(process.env.OPENAI_MODEL || "gpt-4o-mini"),
-    system:
-      "You are EcoBus AI for an intercity bus booking demo. Use tools for trip inventory, booking status, and policy answers. Never invent seat availability, payment state, revenue, or private booking details. Booking status requires both booking code and email. Cite policy resource URIs when answering policy questions. Booking guide when asked: search trips on the home page, open a trip to pick seats on the seat map (held 5 minutes), fill passenger info at checkout (guest or logged in), simulate payment, then receive the e-ticket and look it up anytime with booking code + email.",
+
+  const modelName = process.env.GOOGLE_MODEL ?? "gemini-2.5-flash";
+  const startedAt = Date.now();
+  try {
+    const { text, toolCalls, toolResults } = await generateText({
+      model: google(modelName),
+
+      system: `
+You are EcoBus AI for an intercity bus booking demo.  
+
+
+Always use tools whenever possible.
+
+Available tools:
+
+- searchTrips
+- getBookingStatus
+- getPolicyResource
+
+Rules:
+
+- Never invent trips.
+- Never invent booking status.
+- Never invent payment status.
+- Never invent seat availability.
+- Booking lookup requires BOTH bookingCode and email.
+- Use policy tool for cancellation/check-in questions.
+- Respond in Vietnamese unless the user explicitly asks another language.
+
+When calling searchTrips:
+
+Normalize locations:
+
+- hcm
+- tphcm
+- hồ chí minh
+- ho chi minh
+- sài gòn
+- sai gon
+
+=> TP.HCM
+
+Normalize:
+
+- dalat
+- đà lạt
+
+=> Da Lat
+
+If the user asks for 18/7 and no year is provided, use 2026-07-18.
+
+Always use YYYY-MM-DD.
+`,
+
     messages: normalizeMessages(body),
+
     tools: {
       searchTrips: tool({
-        description: "Search public demo trips through the GraphQL Gateway.",
+        description: "Search public demo trips.",
         inputSchema: z.object({
           origin: z.string(),
           destination: z.string(),
@@ -91,30 +162,57 @@ async function handleAiSdkChat(body) {
         }),
         execute: executeSearchTrips
       }),
+
       getBookingStatus: tool({
-        description: "Lookup private booking status. Requires booking code and email.",
+        description: "Lookup booking status.",
         inputSchema: z.object({
           bookingCode: z.string(),
           email: z.string().email()
         }),
         execute: executeGetBookingStatus
       }),
+
       getPolicyResource: tool({
-        description: "Read cancellation or check-in policy source text.",
+        description: "Read EcoBus policy.",
         inputSchema: z.object({
-          policy: z.enum(["cancellation", "checkin"])
+          policy: z.enum([
+            "cancellation",
+            "checkin"
+          ])
         }),
-        execute: ({ policy }) => readPolicyResource(policy)
+        execute: ({ policy }) =>
+          readPolicyResource(policy)
       })
     },
-    stopWhen: stepCountIs(4)
+
+    stopWhen: stepCountIs(5)
   });
+
+  const trips =
+    toolResults?.find(
+      (t) => t.toolName === "searchTrips"
+    )?.result?.searchTrips?.trips ?? [];
 
   return {
     answer: text,
+    trips,
     toolCalls,
     toolResults
   };
+  } catch (error) {
+    const latencyMs = Date.now() - startedAt;
+    console.error("[chatbot] AI_TIMEOUT_OR_ERROR", {
+      correlationId,
+      model: modelName,
+      latencyMs,
+      name: error?.name,
+      code: error?.code,
+      message: error?.message,
+      stack: error?.stack
+    });
+
+    throw error;
+  }
 }
 
 function normalizeMessages(body) {

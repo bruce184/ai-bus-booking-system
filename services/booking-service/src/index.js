@@ -172,7 +172,7 @@ server.bindAsync(address, grpc.ServerCredentials.createInsecure(), (error, port)
   console.log(`[booking-service] gRPC listening on ${address} (port ${port})`);
 });
 
-const healthPort = Number(process.env.BOOKING_SERVICE_HEALTH_PORT || 50153);
+const healthPort = Number(process.env.BOOKING_SERVICE_HEALTH_PORT || 62053);
 startHealthServer(healthPort, "booking-service");
 console.log(`[booking-service] health check on port ${healthPort}`);
 
