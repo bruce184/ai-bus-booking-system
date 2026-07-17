@@ -211,23 +211,27 @@ export default function SearchClient({
         .ebx-sort, .ebx-sort option { color: #1a1a1a; }
         .ebx-range {
           -webkit-appearance: none; appearance: none;
-          width: 100%; height: 6px; min-height: 0; padding: 0; margin: 8px 0;
+          width: 100%; height: 6px; min-height: 0; padding: 0; margin: 11px 0;
           border: none; border-radius: 999px; background: var(--line);
           outline: none; cursor: pointer;
+        }
+        .ebx-range::-webkit-slider-runnable-track {
+          height: 6px; border-radius: 999px; background: var(--line);
         }
         .ebx-range::-webkit-slider-thumb {
           -webkit-appearance: none; appearance: none;
           width: 18px; height: 18px; border-radius: 50%;
           background: var(--brand); border: 2px solid #fff;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); cursor: pointer;
+          /* Center the 18px thumb on the 6px track: (6 - 18) / 2 = -6px. */
+          margin-top: -6px;
         }
+        .ebx-range::-moz-range-track { height: 6px; border-radius: 999px; background: var(--line); }
         .ebx-range::-moz-range-thumb {
           width: 18px; height: 18px; border-radius: 50%;
           background: var(--brand); border: 2px solid #fff;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); cursor: pointer;
         }
-        .ebx-range::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; }
-        .ebx-range::-moz-range-track { height: 6px; border-radius: 999px; background: var(--line); }
       `}</style>
 
       <TopBar links={[{ href: "/", label: "Trang chính" }, { href: "/my-bookings", label: "Vé của tôi" }, { href: "/lookup", label: "Tra cứu vé" }]} showUserBadge />
@@ -423,20 +427,20 @@ export default function SearchClient({
               <span style={{ fontSize: "14px", fontWeight: "700", color: "var(--text)" }}>
                 {filteredTrips.length} chuyến xe phù hợp
               </span>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px", fontSize: "13px", flexWrap: "wrap" }}>
                 <span className="muted">Sắp xếp:</span>
                 <select
                   className="ebx-sort"
                   value={sortBy}
                   onChange={(e) => { setSortBy(e.target.value); doSearch(origin, destination, departureDate, e.target.value, minPrice, maxPrice); }}
-                  style={{ minHeight: "30px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
+                  style={{ minWidth: "210px", minHeight: "32px", fontSize: "13px", padding: "0 10px", border: "1px solid var(--line)", borderRadius: "4px" }}
                 >
                   <option value="earliest">Giờ khởi hành sớm nhất</option>
                   <option value="price-asc">Giá vé tăng dần</option>
                   <option value="price-desc">Giá vé giảm dần</option>
                   <option value="duration">Thời gian di chuyển ngắn nhất</option>
                 </select>
-                <span className="muted" style={{ marginLeft: "12px" }}>Giá:</span>
+                <span className="muted" style={{ marginLeft: "24px" }}>Giá:</span>
                 <input
                   type="number"
                   placeholder="Min"
@@ -467,8 +471,8 @@ export default function SearchClient({
             <div className="panel" style={{ textAlign: "center", padding: "40px" }}>Đang tải danh sách chuyến xe...</div>
           ) : null}
 
-          {/* Empty list notice */}
-          {!loading && filteredTrips.length === 0 ? (
+          {/* Empty list notice (suppressed when a validation error is shown) */}
+          {!loading && !error && filteredTrips.length === 0 ? (
             <div className="panel notice" style={{ padding: "32px" }}>
               Không tìm thấy chuyến xe phù hợp với bộ lọc hiện tại.
               {result?.suggestedDates?.length ? (
