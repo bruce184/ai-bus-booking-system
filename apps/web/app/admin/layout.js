@@ -40,7 +40,12 @@ export default function AdminLayout({ children }) {
           setUser(verifiedUser);
         }
       } catch {
-        await handleLogout();
+        // getSession() only returns null/a user for a definitive answer (401
+        // means the session route already invalidated the cookie); it throws
+        // for a transient failure (gateway down, network blip), which the
+        // session route deliberately does NOT clear the cookie for. Do not
+        // force-logout a possibly-still-valid admin/staff session for that -
+        // the next navigation's verifyToken retries.
       } finally {
         setLoading(false);
       }
