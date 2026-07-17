@@ -23,7 +23,13 @@ test("flow contexts are encrypted, bound to their kind, and reject tampering", (
   assert.deepEqual(readFlowContext("booking", token, { secret, now }), context);
   assert.equal(readFlowContext("checkout", token, { secret, now }), null);
 
-  const tampered = `${token.slice(0, -1)}${token.endsWith("A") ? "B" : "A"}`;
+  // Flip a character away from the very end: the last character of a
+  // base64url segment can carry unused padding bits (when the encoded byte
+  // length isn't a multiple of 3), so swapping it doesn't always change the
+  // decoded bytes - flaky depending on the random IV's resulting ciphertext
+  // length. A middle character is always a full 6-bit group.
+  const mid = Math.floor(token.length / 2);
+  const tampered = `${token.slice(0, mid)}${token[mid] === "A" ? "B" : "A"}${token.slice(mid + 1)}`;
   assert.equal(readFlowContext("booking", tampered, { secret, now }), null);
 });
 
