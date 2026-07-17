@@ -66,7 +66,7 @@ export function ChatbotPanel() {
           "content-type": "application/json",
         },
         body: JSON.stringify({ ...payload, correlationId }),
-      });
+      }, { timeoutMs: 60_000 }); // LLM call (Gemini + tool loop) needs more than the 5s default
 
 
       const body = await response.json();
