@@ -228,9 +228,13 @@ Ticket content must include:
 | `NOT_FOUND` | Resource missing or inaccessible |
 | `SEAT_NOT_AVAILABLE` | Seat is held/booked/blocked |
 | `HOLD_EXPIRED` | Seat hold token expired |
+| `TRIP_NOT_ACTIVE` | Trip is not ACTIVE (seat hold/check-in attempted while LOCKED/DEPARTED/etc.) |
 | `BOOKING_STATE_INVALID` | Invalid booking transition |
+| `FAILED_PRECONDITION` | A catalog/admin operation's precondition was not met |
 | `PAYMENT_FAILED` | Simulated payment failed |
 | `SERVICE_TIMEOUT` | Downstream gRPC/HTTP service exceeded its configured deadline |
+| `SERVICE_UNAVAILABLE` | Downstream gRPC/HTTP service is unreachable |
+| `SEAT_HOLD_ROLLBACK_FAILED` | A hold rollback after a failed HoldSeats attempt could not be applied (the hold still expires by Redis TTL) |
 | `INTERNAL_ERROR` | Unexpected server/service error |
 
 Private resources should return `NOT_FOUND` when the caller should not know they exist.
