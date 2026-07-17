@@ -97,6 +97,18 @@ export default defineConfig({
       timeout: 120_000
     },
     {
+      // Consumes booking.paid off RabbitMQ and issues tickets/QR payloads;
+      // without it the booking confirmation page never shows more than the
+      // "đang phát hành vé" notice. Health port matches .env.example's
+      // TICKET_WORKER_HEALTH_PORT default (50161) - untouched by the e2e
+      // port overrides above since it doesn't collide with anything else.
+      command: "npm --prefix ../../workers/ticket-worker run start",
+      url: "http://localhost:50161/health",
+      env: commonEnv,
+      reuseExistingServer: false,
+      timeout: 120_000
+    },
+    {
       command: `npm run dev -- --port ${webPort}`,
       url: webUrl,
       env: {
