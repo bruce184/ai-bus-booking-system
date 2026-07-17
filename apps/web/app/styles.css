@@ -43,6 +43,11 @@ body {
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 22px;
+  padding: 12px 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
 }
 
 .topbar-user-badge {
@@ -1382,5 +1387,106 @@ input:focus {
   .chatbot-ai-prompt {
     grid-template-columns: 1fr;
   }
+}
+
+/* Nút Đăng nhập / Đăng xuất trên navbar — hộp xanh theme, chữ trắng.
+   Đặt tên đầy đủ .nav .nav-auth-btn để thắng .nav a và <button> mặc định. */
+.nav .nav-auth-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.nav .nav-auth-btn:hover {
+  background: var(--brand-dark);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* Hộp thoại xác nhận (đăng xuất, …) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(9, 63, 44, 0.4);
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 400px;
+  display: grid;
+  gap: 8px;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(9, 63, 44, 0.25);
+}
+
+.modal-card h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.modal-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.modal-btn {
+  min-height: 42px;
+  padding: 0 20px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.modal-btn.primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #ffffff;
+}
+
+.modal-btn.primary:hover {
+  background: var(--brand-dark);
+  transform: translateY(-1px);
+}
+
+.modal-btn.ghost {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.modal-btn.ghost:hover {
+  border-color: var(--brand);
+  color: var(--brand-dark);
 }
 

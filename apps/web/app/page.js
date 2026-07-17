@@ -19,6 +19,7 @@ export default function HomePage() {
   const [to, setTo] = useState("Da Lat");
   const [date, setDate] = useState(getDefaultDate);
   const [user, setUser] = useState(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -43,13 +44,14 @@ export default function HomePage() {
     setTo(temp);
   };
 
-  const handleLogout = async () => {
+  const confirmLogout = async () => {
     try {
       await clearSession();
     } catch {
       // Đăng xuất là thao tác cục bộ; nếu gọi API lỗi vẫn xóa trạng thái trên UI.
     }
     setUser(null);
+    setShowLogoutConfirm(false);
   };
 
   return (
@@ -70,23 +72,13 @@ export default function HomePage() {
           {user ? (
             <button
               type="button"
-              onClick={handleLogout}
-              style={{
-                background: "none",
-                border: "none",
-                padding: 0,
-                minHeight: "auto",
-                color: "var(--text)",
-                font: "inherit",
-                fontWeight: 600,
-                fontSize: "15px",
-                cursor: "pointer"
-              }}
+              className="nav-auth-btn"
+              onClick={() => setShowLogoutConfirm(true)}
             >
               Đăng xuất
             </button>
           ) : (
-            <Link href="/login">Đăng nhập</Link>
+            <Link className="nav-auth-btn" href="/login">Đăng nhập</Link>
           )}
           <div style={{
             width: "36px",
@@ -113,6 +105,33 @@ export default function HomePage() {
           </div>
         </nav>
       </header>
+
+      {showLogoutConfirm ? (
+        <div
+          className="modal-overlay"
+          role="presentation"
+          onClick={() => setShowLogoutConfirm(false)}
+        >
+          <div
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logout-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="logout-title">Đăng xuất</h3>
+            <p>Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?</p>
+            <div className="modal-actions">
+              <button type="button" className="modal-btn ghost" onClick={() => setShowLogoutConfirm(false)}>
+                Hủy
+              </button>
+              <button type="button" className="modal-btn primary" onClick={confirmLogout}>
+                Đăng xuất
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Hero Section */}
       <section className="hero animate-fade-in">

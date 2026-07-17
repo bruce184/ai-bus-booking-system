@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { clearSession, getSession, graphqlRequest } from "../../lib/graphql";
+import { getSession, graphqlRequest } from "../../lib/graphql";
 import { storeFlowContext } from "../../lib/flow-context-client";
 import { TopBar } from "../../src/components/TopBar.jsx";
 
@@ -95,11 +95,6 @@ export default function MyBookingsPage() {
     };
   }, [reload]);
 
-  async function logout() {
-    await clearSession();
-    router.push("/search");
-  }
-
   async function viewBookingDetail(booking) {
     setMessage("");
     try {
@@ -169,11 +164,7 @@ export default function MyBookingsPage() {
             {state.user ? `Đang đăng nhập: ${state.user.email}` : "Đăng nhập để xem các booking gắn với tài khoản của bạn."}
           </p>
         )}
-      >
-        {state.phase === "ready" ? (
-          <button onClick={logout} type="button">Đăng xuất</button>
-        ) : null}
-      </TopBar>
+      />
 
       {state.phase === "loading" ? <section className="panel">Đang tải lịch sử đặt vé...</section> : null}
 
