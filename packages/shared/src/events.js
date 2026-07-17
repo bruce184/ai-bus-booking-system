@@ -98,7 +98,8 @@ export async function publishWorkflowEvent(eventName, payload, metadata = {}) {
     return;
   }
 
-  const channel = await rabbitChannel();
+  const channelPromise = rabbitChannel();
+  const channel = await channelPromise;
   try {
     await new Promise((resolve, reject) => {
       channel.publish(
@@ -111,8 +112,11 @@ export async function publishWorkflowEvent(eventName, payload, metadata = {}) {
     });
   } catch (error) {
     // Do not retain a publisher that failed a confirm. The outbox keeps the
-    // row unpublished and the next dispatch builds a fresh channel.
-    rabbitChannelPromise = null;
+    // row unpublished and the next dispatch builds a fresh channel. Clear by
+    // identity (like the connection/channel "close" handlers above) so this
+    // can't wipe out a different, already-reconnected healthy channel that a
+    // concurrent publish call installed in the meantime.
+    clearRabbitPublisher(channelPromise);
     await channel.close().catch(() => {});
     throw error;
   }
@@ -146,14 +150,24 @@ export async function publishKafkaEvent(topic, eventName, payload, metadata = {}
 
 async function configureWorkflowConsumer(channel, queueName, routingKeys, onMessage) {
   const deadLetterQueueName = `${queueName}.dlq`;
+  // A "#" binding on the shared DLX would match every consumer's dead-lettered
+  // messages, not just this queue's - two consumers sharing a routing key
+  // (e.g. ticket-worker and email-worker both on booking.paid) would each see
+  // the other's failures in their own DLQ. Overriding the dead-letter routing
+  // key to something unique per queue keeps each DLQ isolated regardless of
+  // routing-key overlap on the main exchange.
+  const deadLetterRoutingKey = `dlq.${queueName}`;
   await channel.assertExchange(workflowExchange, "topic", { durable: true });
   await channel.assertExchange(workflowDeadLetterExchange, "topic", { durable: true });
   await channel.assertQueue(deadLetterQueueName, { durable: true });
-  await channel.bindQueue(deadLetterQueueName, workflowDeadLetterExchange, "#");
+  await channel.bindQueue(deadLetterQueueName, workflowDeadLetterExchange, deadLetterRoutingKey);
 
   const queue = await channel.assertQueue(queueName, {
     durable: true,
-    arguments: { "x-dead-letter-exchange": workflowDeadLetterExchange }
+    arguments: {
+      "x-dead-letter-exchange": workflowDeadLetterExchange,
+      "x-dead-letter-routing-key": deadLetterRoutingKey
+    }
   });
   for (const routingKey of routingKeys) {
     await channel.bindQueue(queue.queue, workflowExchange, routingKey);

@@ -161,3 +161,40 @@ test("workflow consumer reconnects and restores durable bindings after broker cl
   assert.equal(secondChannel.closed, true);
   assert.equal(secondConnection.closed, true);
 });
+
+test("each workflow consumer's dead-letter queue binds a unique routing key, not a catch-all", async () => {
+  const channel = {
+    bindings: [],
+    queueArgs: {},
+    on() {},
+    async assertExchange() {},
+    async assertQueue(name, options) {
+      if (options) this.queueArgs[name] = options;
+      return { queue: name };
+    },
+    async bindQueue(queue, exchange, key) {
+      this.bindings.push({ queue, exchange, key });
+    },
+    async prefetch() {},
+    async consume() {}
+  };
+  const connection = {
+    on() {},
+    createChannel: async () => channel
+  };
+
+  await createWorkflowConsumer(
+    "ticket-worker.booking-paid",
+    ["booking.paid"],
+    async () => {},
+    { connect: async () => connection }
+  );
+
+  const dlqBinding = channel.bindings.find(({ exchange }) => exchange === "bus.workflow.dlx");
+  assert.ok(dlqBinding, "expected a binding on the dead-letter exchange");
+  assert.notEqual(dlqBinding.key, "#");
+  assert.equal(dlqBinding.key, "dlq.ticket-worker.booking-paid");
+
+  const mainQueueArgs = channel.queueArgs["ticket-worker.booking-paid"];
+  assert.equal(mainQueueArgs.arguments["x-dead-letter-routing-key"], dlqBinding.key);
+});
