@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { clearSession, getSession, graphqlRequest } from "../../lib/graphql";
+import { storeFlowContext } from "../../lib/flow-context-client";
 import { TopBar } from "../../src/components/TopBar.jsx";
 
 const MY_BOOKINGS = `
@@ -97,6 +98,19 @@ export default function MyBookingsPage() {
   async function logout() {
     await clearSession();
     router.push("/search");
+  }
+
+  async function viewBookingDetail(booking) {
+    setMessage("");
+    try {
+      // Same encrypted, httpOnly flow-context cookie lookup/payment/checkout
+      // already use, rather than putting the email in the URL (query strings
+      // land in browser history and server access logs).
+      await storeFlowContext("booking", { bookingCode: booking.bookingCode, email: booking.contactEmail });
+      router.push(`/booking/${encodeURIComponent(booking.bookingCode)}`);
+    } catch (err) {
+      setMessage(`Không thể mở chi tiết: ${err.message}`);
+    }
   }
 
   async function handleCancel(booking) {
@@ -206,12 +220,9 @@ export default function MyBookingsPage() {
                       {booking.totalAmount.toLocaleString("vi-VN")} VND
                     </p>
                     <div className="row" style={{ gap: "8px" }}>
-                      <Link
-                        className="button"
-                        href={`/booking/${booking.bookingCode}?email=${encodeURIComponent(booking.contactEmail)}`}
-                      >
+                      <button className="button" onClick={() => viewBookingDetail(booking)} type="button">
                         Xem chi tiết
-                      </Link>
+                      </button>
                       {booking.status === "PAID" ? (
                         <button
                           className="button danger"

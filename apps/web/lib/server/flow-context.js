@@ -4,6 +4,7 @@ import {
   createHash,
   randomBytes
 } from "node:crypto";
+import { MAX_CHECKOUT_SEATS } from "../flow-context-client.js";
 
 export const CHECKOUT_FLOW_COOKIE = "bus_checkout_context";
 export const BOOKING_FLOW_COOKIE = "bus_booking_context";
@@ -57,7 +58,7 @@ export function normalizeFlowContext(kind, value, now = Date.now()) {
       !validText(value.tripId, 128) ||
       !validText(value.holdToken, 512) ||
       seats.length === 0 ||
-      seats.length > 10 ||
+      seats.length > MAX_CHECKOUT_SEATS ||
       seats.some((seat) => !validText(seat, 32)) ||
       !Number.isFinite(expiresAtMs) ||
       expiresAtMs <= now ||
