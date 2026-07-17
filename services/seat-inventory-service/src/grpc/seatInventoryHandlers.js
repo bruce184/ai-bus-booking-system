@@ -1,5 +1,4 @@
-import grpc from "@grpc/grpc-js";
-import { notImplemented, serviceError } from "../errors.js";
+import { toGrpcError } from "@bus/shared/errors.js";
 import {
   blockSeats,
   confirmSeats,
@@ -10,103 +9,25 @@ import {
   validateHold
 } from "../services/seatMapService.js";
 
-const handleGetSeatMap = async (call, callback) => {
-  try {
-    callback(null, await getSeatMap(call.request));
-  } catch (error) {
-    if (error && "code" in error) {
-      callback(error);
-      return;
+// Single conversion point (matches booking-service's src/index.js `handle`):
+// every thrown ServiceError becomes a proper gRPC error via toGrpcError, and
+// anything else becomes a generic INTERNAL instead of crashing the server.
+function handle(work) {
+  return async (call, callback) => {
+    try {
+      callback(null, await work(call.request));
+    } catch (error) {
+      callback(toGrpcError(error));
     }
-
-    callback(serviceError(grpc.status.INTERNAL, "Failed to get seat map"));
-  }
-};
-
-const handleHoldSeats = async (call, callback) => {
-  try {
-    callback(null, await holdSeats(call.request));
-  } catch (error) {
-    if (error && "code" in error) {
-      callback(error);
-      return;
-    }
-
-    callback(serviceError(grpc.status.INTERNAL, "Failed to hold seats"));
-  }
-};
-
-const handleReleaseHold = async (call, callback) => {
-  try {
-    callback(null, await releaseHold(call.request));
-  } catch (error) {
-    if (error && "code" in error) {
-      callback(error);
-      return;
-    }
-
-    callback(serviceError(grpc.status.INTERNAL, "Failed to release hold"));
-  }
-};
-
-const handleValidateHold = async (call, callback) => {
-  try {
-    callback(null, await validateHold(call.request));
-  } catch (error) {
-    if (error && "code" in error) {
-      callback(error);
-      return;
-    }
-
-    callback(serviceError(grpc.status.INTERNAL, "Failed to validate hold"));
-  }
-};
-
-const handleConfirmSeats = async (call, callback) => {
-  try {
-    callback(null, await confirmSeats(call.request));
-  } catch (error) {
-    if (error && "code" in error) {
-      callback(error);
-      return;
-    }
-
-    callback(serviceError(grpc.status.INTERNAL, "Failed to confirm seats"));
-  }
-};
-
-const handleReleaseBookedSeats = async (call, callback) => {
-  try {
-    callback(null, await releaseBookedSeats(call.request));
-  } catch (error) {
-    if (error && "code" in error) {
-      callback(error);
-      return;
-    }
-
-    callback(serviceError(grpc.status.INTERNAL, "Failed to release booked seats"));
-  }
-};
-
-const handleBlockSeats = async (call, callback) => {
-  try {
-    callback(null, await blockSeats(call.request));
-  } catch (error) {
-    if (error && "code" in error) {
-      callback(error);
-      return;
-    }
-
-    callback(serviceError(grpc.status.INTERNAL, "Failed to block seats"));
-  }
-};
+  };
+}
 
 export const seatInventoryHandlers = {
-  getSeatMap: handleGetSeatMap,
-  holdSeats: handleHoldSeats,
-  releaseHold: handleReleaseHold,
-  validateHold: handleValidateHold,
-  confirmSeats: handleConfirmSeats,
-  releaseBookedSeats: handleReleaseBookedSeats,
-  blockSeats: handleBlockSeats
+  getSeatMap: handle(getSeatMap),
+  holdSeats: handle(holdSeats),
+  releaseHold: handle(releaseHold),
+  validateHold: handle(validateHold),
+  confirmSeats: handle(confirmSeats),
+  releaseBookedSeats: handle(releaseBookedSeats),
+  blockSeats: handle(blockSeats)
 };

@@ -1,7 +1,8 @@
 import { createInsecureClient, grpc, loadProto } from "@bus/shared/grpc.js";
+import { ServiceError } from "@bus/shared/errors.js";
 
 import { config } from "./config.js";
-import { serviceError } from "./errors.js";
+import { fail } from "./errors.js";
 
 let tripClient;
 
@@ -18,12 +19,12 @@ function client() {
 
 export function mapTripServiceError(error) {
   if (error?.code === grpc.status.NOT_FOUND) {
-    return serviceError(grpc.status.NOT_FOUND, "Trip not found");
+    return new ServiceError("NOT_FOUND", "Trip not found");
   }
   if (error?.code === grpc.status.DEADLINE_EXCEEDED) {
-    return serviceError(grpc.status.DEADLINE_EXCEEDED, "Trip Service timed out");
+    return new ServiceError("SERVICE_TIMEOUT", "Trip Service timed out");
   }
-  return serviceError(grpc.status.UNAVAILABLE, "Trip Service is unavailable");
+  return new ServiceError("SERVICE_UNAVAILABLE", "Trip Service is unavailable");
 }
 
 export async function fetchTripStatus(tripId) {
@@ -48,10 +49,7 @@ export async function fetchTripStatus(tripId) {
 
   const status = response?.trip?.status;
   if (!status) {
-    throw serviceError(
-      grpc.status.INTERNAL,
-      "Trip Service returned an invalid trip status"
-    );
+    fail("INTERNAL_ERROR", "Trip Service returned an invalid trip status");
   }
   return status;
 }

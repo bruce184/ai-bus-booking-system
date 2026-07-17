@@ -7,11 +7,11 @@ import {
   wrap
 } from "../src/errors.js";
 
-test("known PostgreSQL input constraints map to stable gRPC statuses", () => {
-  assert.equal(mapDatabaseError({ code: "23505" }).grpcCode, grpc.status.INVALID_ARGUMENT);
-  assert.equal(mapDatabaseError({ code: "23514" }).grpcCode, grpc.status.INVALID_ARGUMENT);
-  assert.equal(mapDatabaseError({ code: "22P02" }).grpcCode, grpc.status.INVALID_ARGUMENT);
-  assert.equal(mapDatabaseError({ code: "23503" }).grpcCode, grpc.status.FAILED_PRECONDITION);
+test("known PostgreSQL input constraints map to stable domain error codes", () => {
+  assert.equal(mapDatabaseError({ code: "23505" }).code, "VALIDATION_ERROR");
+  assert.equal(mapDatabaseError({ code: "23514" }).code, "VALIDATION_ERROR");
+  assert.equal(mapDatabaseError({ code: "22P02" }).code, "VALIDATION_ERROR");
+  assert.equal(mapDatabaseError({ code: "23503" }).code, "FAILED_PRECONDITION");
   assert.equal(mapDatabaseError({ code: "08006" }), null);
 });
 

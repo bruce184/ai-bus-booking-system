@@ -4,17 +4,17 @@ import grpc from "@grpc/grpc-js";
 
 import { mapTripServiceError } from "../src/trip-client.js";
 
-test("Trip Service lookup failures preserve actionable gRPC status", () => {
+test("Trip Service lookup failures preserve actionable domain error codes", () => {
   assert.equal(
     mapTripServiceError({ code: grpc.status.NOT_FOUND }).code,
-    grpc.status.NOT_FOUND
+    "NOT_FOUND"
   );
   assert.equal(
     mapTripServiceError({ code: grpc.status.DEADLINE_EXCEEDED }).code,
-    grpc.status.DEADLINE_EXCEEDED
+    "SERVICE_TIMEOUT"
   );
   assert.equal(
     mapTripServiceError(new Error("connection refused")).code,
-    grpc.status.UNAVAILABLE
+    "SERVICE_UNAVAILABLE"
   );
 });

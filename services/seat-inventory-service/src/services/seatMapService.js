@@ -1,7 +1,6 @@
-import grpc from "@grpc/grpc-js";
 import { randomUUID } from "node:crypto";
 import { config } from "../config.js";
-import { serviceError } from "../errors.js";
+import { fail } from "../errors.js";
 import {
   blockTripSeats,
   confirmTripSeats,
@@ -68,10 +67,7 @@ function toSeatResponse(seat, heldSeatIds) {
 export async function requireActiveTrip(tripId, getTripStatus = fetchTripStatus) {
   const status = await getTripStatus(tripId);
   if (status !== "ACTIVE") {
-    throw serviceError(
-      grpc.status.FAILED_PRECONDITION,
-      `TRIP_NOT_ACTIVE: Trip ${tripId} is ${status || "UNKNOWN"}`
-    );
+    fail("TRIP_NOT_ACTIVE", `Trip ${tripId} is ${status || "UNKNOWN"}`);
   }
   return status;
 }
@@ -80,13 +76,13 @@ export async function getSeatMap(request) {
   const tripId = getTripId(request).trim();
 
   if (!tripId) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "trip_id is required");
+    fail("VALIDATION_ERROR", "trip_id is required");
   }
 
   const seats = await listTripSeats(tripId);
 
   if (seats.length === 0) {
-    throw serviceError(grpc.status.NOT_FOUND, "No seats found for trip");
+    fail("NOT_FOUND", "No seats found for trip");
   }
 
   const heldSeatIds = await getHeldSeatIds(tripId, seats);
@@ -110,11 +106,11 @@ export async function holdSeats(
   const requesterId = getRequesterId(request).trim() || "guest";
 
   if (!tripId) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "trip_id is required");
+    fail("VALIDATION_ERROR", "trip_id is required");
   }
 
   if (seatIds.length === 0) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "seat_ids must contain at least one seat");
+    fail("VALIDATION_ERROR", "seat_ids must contain at least one seat");
   }
 
   await requireActiveTrip(tripId, getTripStatus);
@@ -124,16 +120,13 @@ export async function holdSeats(
   const missingSeatId = seatIds.find((seatId) => !foundSeatIds.has(seatId));
 
   if (missingSeatId) {
-    throw serviceError(grpc.status.NOT_FOUND, `Seat ${missingSeatId} was not found for trip`);
+    fail("NOT_FOUND", `Seat ${missingSeatId} was not found for trip`);
   }
 
   const blockedSeat = seats.find((seat) => seat.status === "BLOCKED" || seat.status === "BOOKED");
 
   if (blockedSeat) {
-    throw serviceError(
-      grpc.status.FAILED_PRECONDITION,
-      `SEAT_NOT_AVAILABLE: Seat ${blockedSeat.id} is ${blockedSeat.status}`
-    );
+    fail("SEAT_NOT_AVAILABLE", `Seat ${blockedSeat.id} is ${blockedSeat.status}`);
   }
 
   const holdToken = randomUUID();
@@ -146,17 +139,11 @@ export async function holdSeats(
   );
 
   if (holdResult.maintenanceConflict) {
-    throw serviceError(
-      grpc.status.FAILED_PRECONDITION,
-      "SEAT_NOT_AVAILABLE: Trip seat sale is temporarily locked"
-    );
+    fail("SEAT_NOT_AVAILABLE", "Trip seat sale is temporarily locked");
   }
 
   if (holdResult.conflictSeatId) {
-    throw serviceError(
-      grpc.status.FAILED_PRECONDITION,
-      `SEAT_NOT_AVAILABLE: Seat ${holdResult.conflictSeatId} is already held`
-    );
+    fail("SEAT_NOT_AVAILABLE", `Seat ${holdResult.conflictSeatId} is already held`);
   }
 
   try {
@@ -170,16 +157,10 @@ export async function holdSeats(
     );
 
     if (disappearedSeatId) {
-      throw serviceError(
-        grpc.status.NOT_FOUND,
-        `Seat ${disappearedSeatId} was not found for trip`
-      );
+      fail("NOT_FOUND", `Seat ${disappearedSeatId} was not found for trip`);
     }
     if (persistentlyUnavailable) {
-      throw serviceError(
-        grpc.status.FAILED_PRECONDITION,
-        `SEAT_NOT_AVAILABLE: Seat ${persistentlyUnavailable.id} is ${persistentlyUnavailable.status}`
-      );
+      fail("SEAT_NOT_AVAILABLE", `Seat ${persistentlyUnavailable.id} is ${persistentlyUnavailable.status}`);
     }
 
     await requireActiveTrip(tripId, getTripStatus);
@@ -197,10 +178,7 @@ export async function holdSeats(
     try {
       await discardHold(holdToken);
     } catch {
-      throw serviceError(
-        grpc.status.UNAVAILABLE,
-        "SEAT_HOLD_ROLLBACK_FAILED: Invalid hold will expire by Redis TTL"
-      );
+      fail("SEAT_HOLD_ROLLBACK_FAILED", "Invalid hold will expire by Redis TTL");
     }
     throw error;
   }
@@ -209,7 +187,7 @@ export async function releaseHold(request) {
   const holdToken = getHoldToken(request).trim();
 
   if (!holdToken) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "hold_token is required");
+    fail("VALIDATION_ERROR", "hold_token is required");
   }
 
   const details = await getHoldDetails(holdToken);
@@ -228,24 +206,21 @@ export async function validateHold(request) {
   const holdToken = getHoldToken(request).trim();
 
   if (!tripId) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "trip_id is required");
+    fail("VALIDATION_ERROR", "trip_id is required");
   }
 
   if (seatIds.length === 0) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "seat_ids must contain at least one seat");
+    fail("VALIDATION_ERROR", "seat_ids must contain at least one seat");
   }
 
   if (!holdToken) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "hold_token is required");
+    fail("VALIDATION_ERROR", "hold_token is required");
   }
 
   const heldSeats = await holdTokenCoversSeats(tripId, seatIds, holdToken);
 
   if (!heldSeats.valid) {
-    throw serviceError(
-      grpc.status.FAILED_PRECONDITION,
-      `HOLD_EXPIRED: Hold token does not cover seat ${heldSeats.missingSeatId ?? "unknown"}`
-    );
+    fail("HOLD_EXPIRED", `Hold token does not cover seat ${heldSeats.missingSeatId ?? "unknown"}`);
   }
 
   const currentSeats = await listTripSeatsByIds(tripId, seatIds);
@@ -253,16 +228,13 @@ export async function validateHold(request) {
   const missingSeatId = seatIds.find((seatId) => !foundSeatIds.has(seatId));
 
   if (missingSeatId) {
-    throw serviceError(grpc.status.NOT_FOUND, `Seat ${missingSeatId} was not found for trip`);
+    fail("NOT_FOUND", `Seat ${missingSeatId} was not found for trip`);
   }
 
   const unavailableSeat = currentSeats.find((seat) => seat.status === "BOOKED" || seat.status === "BLOCKED");
 
   if (unavailableSeat) {
-    throw serviceError(
-      grpc.status.FAILED_PRECONDITION,
-      `SEAT_NOT_AVAILABLE: Seat ${unavailableSeat.id} is ${unavailableSeat.status}`
-    );
+    fail("SEAT_NOT_AVAILABLE", `Seat ${unavailableSeat.id} is ${unavailableSeat.status}`);
   }
 
   return {
@@ -279,39 +251,33 @@ export async function confirmSeats(request) {
   const bookingId = getBookingId(request).trim();
 
   if (!tripId) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "trip_id is required");
+    fail("VALIDATION_ERROR", "trip_id is required");
   }
 
   if (seatIds.length === 0) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "seat_ids must contain at least one seat");
+    fail("VALIDATION_ERROR", "seat_ids must contain at least one seat");
   }
 
   if (!holdToken) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "hold_token is required");
+    fail("VALIDATION_ERROR", "hold_token is required");
   }
 
   if (!bookingId) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "booking_id is required");
+    fail("VALIDATION_ERROR", "booking_id is required");
   }
 
   const confirmation = await confirmTripSeats(tripId, seatIds, bookingId, async () => {
     const heldSeats = await holdTokenCoversSeats(tripId, seatIds, holdToken);
     if (!heldSeats.valid) {
-      throw serviceError(
-        grpc.status.FAILED_PRECONDITION,
-        `HOLD_EXPIRED: Hold token does not cover seat ${heldSeats.missingSeatId ?? "unknown"}`
-      );
+      fail("HOLD_EXPIRED", `Hold token does not cover seat ${heldSeats.missingSeatId ?? "unknown"}`);
     }
   });
 
   if (confirmation.outcome === "MISSING") {
-    throw serviceError(grpc.status.NOT_FOUND, `Seat ${confirmation.seatId} was not found for trip`);
+    fail("NOT_FOUND", `Seat ${confirmation.seatId} was not found for trip`);
   }
   if (confirmation.outcome === "UNAVAILABLE") {
-    throw serviceError(
-      grpc.status.FAILED_PRECONDITION,
-      `SEAT_NOT_AVAILABLE: Seat ${confirmation.seatId} is ${confirmation.seatStatus}`
-    );
+    fail("SEAT_NOT_AVAILABLE", `Seat ${confirmation.seatId} is ${confirmation.seatStatus}`);
   }
 
   if (!confirmation.alreadyConfirmed) {
@@ -338,15 +304,15 @@ export async function releaseBookedSeats(request) {
   const bookingId = getBookingId(request).trim();
 
   if (!tripId) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "trip_id is required");
+    fail("VALIDATION_ERROR", "trip_id is required");
   }
 
   if (seatIds.length === 0) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "seat_ids must contain at least one seat");
+    fail("VALIDATION_ERROR", "seat_ids must contain at least one seat");
   }
 
   if (!bookingId) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "booking_id is required");
+    fail("VALIDATION_ERROR", "booking_id is required");
   }
 
   // Only seats still BOOKED by this booking are released; anything else
@@ -365,26 +331,23 @@ export async function blockSeats(request) {
   const adminUserId = getAdminUserId(request).trim();
 
   if (!tripId) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "trip_id is required");
+    fail("VALIDATION_ERROR", "trip_id is required");
   }
 
   if (seatIds.length === 0) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "seat_ids must contain at least one seat");
+    fail("VALIDATION_ERROR", "seat_ids must contain at least one seat");
   }
 
   if (!adminUserId) {
-    throw serviceError(grpc.status.INVALID_ARGUMENT, "admin_user_id is required");
+    fail("VALIDATION_ERROR", "admin_user_id is required");
   }
 
   const blocking = await blockTripSeats(tripId, seatIds, reason);
   if (blocking.outcome === "MISSING") {
-    throw serviceError(grpc.status.NOT_FOUND, `Seat ${blocking.seatId} was not found for trip`);
+    fail("NOT_FOUND", `Seat ${blocking.seatId} was not found for trip`);
   }
   if (blocking.outcome === "UNAVAILABLE") {
-    throw serviceError(
-      grpc.status.FAILED_PRECONDITION,
-      `SEAT_NOT_AVAILABLE: Seat ${blocking.seatId} is ${blocking.seatStatus}`
-    );
+    fail("SEAT_NOT_AVAILABLE", `Seat ${blocking.seatId} is ${blocking.seatStatus}`);
   }
 
   try {

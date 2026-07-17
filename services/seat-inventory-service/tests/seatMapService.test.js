@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import grpc from "@grpc/grpc-js";
 
 import { holdSeats } from "../src/services/seatMapService.js";
 
@@ -47,9 +46,7 @@ test("hold creation rejects a trip that is not ACTIVE before touching Redis", as
         }
       })
     ),
-    (error) =>
-      error.code === grpc.status.FAILED_PRECONDITION &&
-      /TRIP_NOT_ACTIVE.*LOCKED/.test(error.details)
+    (error) => error.code === "TRIP_NOT_ACTIVE" && /LOCKED/.test(error.message)
   );
   assert.equal(createCalled, false);
 });
@@ -69,9 +66,7 @@ test("hold creation rechecks trip state and discards a racing invalid hold", asy
         }
       })
     ),
-    (error) =>
-      error.code === grpc.status.FAILED_PRECONDITION &&
-      /TRIP_NOT_ACTIVE.*DEPARTED/.test(error.details)
+    (error) => error.code === "TRIP_NOT_ACTIVE" && /DEPARTED/.test(error.message)
   );
 
   assert.equal(discarded, 1);
