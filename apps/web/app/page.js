@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChatbotPanel } from "../components/ChatbotPanel";
 import { businessDate } from "../lib/date";
+import { clearSession, getSession } from "../lib/graphql";
 import { LocationInput } from "../src/components/LocationInput.jsx";
 
 function getDefaultDate() {
@@ -17,6 +18,19 @@ export default function HomePage() {
   const [from, setFrom] = useState("TP.HCM");
   const [to, setTo] = useState("Da Lat");
   const [date, setDate] = useState(getDefaultDate);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    void getSession()
+      .then((session) => {
+        if (active) setUser(session);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -27,6 +41,15 @@ export default function HomePage() {
     const temp = from;
     setFrom(to);
     setTo(temp);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await clearSession();
+    } catch {
+      // Đăng xuất là thao tác cục bộ; nếu gọi API lỗi vẫn xóa trạng thái trên UI.
+    }
+    setUser(null);
   };
 
   return (
@@ -43,24 +66,50 @@ export default function HomePage() {
         <nav className="nav">
           <Link href="/search">Tìm chuyến</Link>
           <Link href="/my-bookings">Vé của tôi</Link>
-          <Link href="/login">Đăng nhập</Link>
           <Link href="/lookup">Tra cứu vé</Link>
+          {user ? (
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                minHeight: "auto",
+                color: "var(--text)",
+                font: "inherit",
+                fontWeight: 600,
+                fontSize: "15px",
+                cursor: "pointer"
+              }}
+            >
+              Đăng xuất
+            </button>
+          ) : (
+            <Link href="/login">Đăng nhập</Link>
+          )}
           <div style={{
             width: "36px",
             height: "36px",
             borderRadius: "50%",
-            backgroundColor: "var(--surface-soft)",
+            backgroundColor: user ? "var(--brand)" : "var(--surface-soft)",
             border: "1px solid var(--line)",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "var(--muted)",
+            color: user ? "#ffffff" : "var(--muted)",
+            fontWeight: 700,
+            fontSize: "14px",
             marginLeft: "8px"
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
+          }} title={user?.fullName || undefined}>
+            {user ? (
+              (user.fullName || user.email || "?").charAt(0).toUpperCase()
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            )}
           </div>
         </nav>
       </header>

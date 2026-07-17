@@ -778,12 +778,13 @@ input:focus {
   position: relative;
   overflow: hidden;
   padding-right: 180px !important;
+  min-height: 400px;
 }
 
 .panel-illustration {
   position: absolute;
   right: 8px;
-  bottom: -20px;
+  bottom: 12px;
   width: 150px;
   height: auto;
   pointer-events: none;
