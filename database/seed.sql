@@ -318,13 +318,20 @@ select x.id::uuid, r.id, v.id,
        timezone('Asia/Ho_Chi_Minh', current_date + (x.dep_day::text || ' day')::interval + x.dep_time::time),
        timezone('Asia/Ho_Chi_Minh', current_date + (x.arr_day::text || ' day')::interval + x.arr_time::time),
        x.price, 'ACTIVE'
+-- The four TP.HCM -> Da Lat trips are clustered on the SAME reference day
+-- (current_date + 2) so a single search shows a rich list: all 3 operators,
+-- all 3 vehicle types, departures spread morning/afternoon/evening/night,
+-- prices 240k..360k, and mixed seat availability (see the seat-state block
+-- below). Other routes/days stay spread out to exercise "search another
+-- date" and the "no trips -> suggest nearest date" path.
 from (values
-  ('00000000-0000-4000-8004-000000000101', 'TP.HCM', 'Da Lat', 'PT-SLEEPER-34-01', 1, '21:00', 2, '00:30', 280000),
-  ('00000000-0000-4000-8004-000000000102', 'TP.HCM', 'Da Lat', 'TB-LIMO-22-01',    2, '20:00', 2, '23:30', 320000),
-  ('00000000-0000-4000-8004-000000000103', 'TP.HCM', 'Da Lat', 'KH-SEAT-29-01',    3, '07:00', 3, '13:00', 250000),
-  ('00000000-0000-4000-8004-000000000104', 'TP.HCM', 'Da Lat', 'PT-SLEEPER-34-01', 5, '22:00', 6, '04:30', 270000),
+  ('00000000-0000-4000-8004-000000000101', 'TP.HCM', 'Da Lat', 'PT-SLEEPER-34-01', 2, '06:00', 2, '12:30', 280000),
+  ('00000000-0000-4000-8004-000000000102', 'TP.HCM', 'Da Lat', 'TB-LIMO-22-01',    2, '13:00', 2, '20:00', 360000),
+  ('00000000-0000-4000-8004-000000000109', 'TP.HCM', 'Da Lat', 'PT-SLEEPER-34-01', 2, '16:00', 2, '23:30', 300000),
+  ('00000000-0000-4000-8004-000000000103', 'TP.HCM', 'Da Lat', 'KH-SEAT-29-01',    2, '22:00', 3, '04:00', 240000),
+  ('00000000-0000-4000-8004-000000000104', 'TP.HCM', 'Da Lat', 'PT-SLEEPER-34-01', 4, '21:00', 5, '04:30', 290000),
   ('00000000-0000-4000-8004-000000000105', 'TP.HCM', 'Nha Trang', 'TB-LIMO-22-01', 2, '06:00', 2, '14:00', 350000),
-  ('00000000-0000-4000-8004-000000000106', 'TP.HCM', 'Nha Trang', 'KH-SEAT-29-01', 4, '08:00', 4, '16:00', 300000),
+  ('00000000-0000-4000-8004-000000000106', 'TP.HCM', 'Nha Trang', 'KH-SEAT-29-01', 3, '08:00', 3, '16:00', 300000),
   ('00000000-0000-4000-8004-000000000107', 'TP.HCM', 'Can Tho', 'KH-SEAT-29-01',   2, '09:00', 2, '13:00', 180000),
   ('00000000-0000-4000-8004-000000000108', 'Da Lat', 'TP.HCM', 'PT-SLEEPER-34-01', 3, '13:00', 3, '19:30', 280000)
 ) as x(id, origin, destination, vcode, dep_day, dep_time, arr_day, arr_time, price)
@@ -361,7 +368,11 @@ where not exists (
 -- never expire; exercise HELD live via the holdSeats mutation instead.
 -- Updates keyed by (trip_id, seat_label) keep the file rerunnable.
 
--- Trip 101 (PT sleeper 34, TP.HCM -> Da Lat): partially filled seat map.
+-- All three occupancy states land on the same-day TP.HCM -> Da Lat cluster so
+-- the seat map, "seats left" count, "còn ghế trống" filter, and sold-out UI
+-- are all exercisable from ONE search. Trip 103 is left fully AVAILABLE.
+
+-- Trip 101 (PT sleeper 34, 06:00): partially filled -> 24 of 34 available.
 update trip_seats set status = 'BOOKED', booking_id = null
 where trip_id = '00000000-0000-4000-8004-000000000101'
   and seat_label in ('A01', 'A02', 'A03', 'A05', 'A08', 'B01', 'B02', 'B07');
@@ -370,11 +381,11 @@ update trip_seats set status = 'BLOCKED', block_reason = 'Maintenance demo block
 where trip_id = '00000000-0000-4000-8004-000000000101'
   and seat_label in ('A10', 'B17');
 
--- Trip 105 (TB limo 22, TP.HCM -> Nha Trang): almost full, only 2 seats left.
+-- Trip 102 (TB limo 22, 13:00): almost full, only 2 seats left.
 update trip_seats set status = 'BOOKED', booking_id = null
-where trip_id = '00000000-0000-4000-8004-000000000105'
+where trip_id = '00000000-0000-4000-8004-000000000102'
   and seat_label not in ('L21', 'L22');
 
--- Trip 107 (KH seat 29, TP.HCM -> Can Tho): fully sold out (0 available).
+-- Trip 109 (PT sleeper 34, 16:00): fully sold out (0 available).
 update trip_seats set status = 'BOOKED', booking_id = null
-where trip_id = '00000000-0000-4000-8004-000000000107';
+where trip_id = '00000000-0000-4000-8004-000000000109';
