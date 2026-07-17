@@ -39,8 +39,11 @@ test.describe('Customer Booking Flow E2E (Sec 3.1-3.3)', () => {
     await expect(seat).toHaveAttribute('aria-pressed', 'true');
     await page.locator('button.seat-hold-button').click();
 
-    // Hold succeeded -> checkout page with countdown.
-    await expect(page).toHaveURL(/\/checkout\?tripId=/, { timeout: 15000 });
+    // Hold succeeded -> checkout page with countdown. tripId/holdToken travel
+    // via the encrypted flow-context cookie (storeFlowContext in
+    // _TripDetailClient.jsx), not a URL query param - see
+    // apps/web/app/checkout/page.js reading flowContext.tripId.
+    await expect(page).toHaveURL(/\/checkout$/, { timeout: 15000 });
 
     // Module 3: guest checkout with passenger info.
     await page.locator('input[type="email"]').first().fill(contactEmail);
@@ -48,8 +51,10 @@ test.describe('Customer Booking Flow E2E (Sec 3.1-3.3)', () => {
     await page.locator('input[placeholder="0900000000"]').first().fill('0900000001');
     await page.locator('button[type="submit"]').click();
 
-    // Simulated payment.
-    await expect(page).toHaveURL(/\/payment\?bookingCode=/, { timeout: 15000 });
+    // Simulated payment. bookingCode/email travel via the flow-context
+    // cookie too (checkout/page.js's storeFlowContext), not a URL query
+    // param - see apps/web/app/payment/page.js reading flowContext.bookingCode.
+    await expect(page).toHaveURL(/\/payment$/, { timeout: 15000 });
     await page.getByRole('button', { name: 'Thanh toán thành công' }).click();
 
     // Confirmation page: success banner + booking code (shown in both the
@@ -77,7 +82,7 @@ test.describe('Customer Booking Flow E2E (Sec 3.1-3.3)', () => {
     await pageB.getByRole('button', { name: seatLabel, exact: true }).click();
 
     await pageA.locator('button.seat-hold-button').click();
-    await expect(pageA).toHaveURL(/\/checkout\?tripId=/, { timeout: 15000 });
+    await expect(pageA).toHaveURL(/\/checkout$/, { timeout: 15000 });
 
     // Realtime subscription: B thấy ghế chuyển HELD ngay khi A giữ thành công,
     // lựa chọn của B bị bỏ và không thể giữ ghế đó nữa.
