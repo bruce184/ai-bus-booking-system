@@ -99,4 +99,24 @@ test.describe('Admin & Staff Portal Business Logic E2E Tests', () => {
     const bookingRow = page.locator('tr').filter({ hasText: demoFixtures.bookingCode });
     await expect(bookingRow.getByText('CHECKED_IN', { exact: true })).toBeVisible();
   });
+
+  test('Revenue Dashboard loads real seeded analytics for the default date range (Sec 9)', async ({ page }) => {
+    await page.goto('/admin/login');
+    await page.locator('#email').fill('admin@example.com');
+    await page.locator('#password').fill('admin123');
+    await page.locator('button[type="submit"]').click();
+    await expect(page).toHaveURL(/\/admin\/dashboard/);
+
+    // The dashboard's default date range (2026-06-18..2026-06-24) matches
+    // database/seed.sql's analytics_daily rows, so the auto-fetch on mount
+    // already has real data to show without touching the date inputs.
+    await expect(page.locator('.toast')).toContainText('Analytics refreshed successfully!', { timeout: 15000 });
+    await expect(page.getByText('Route Sales Performance')).toBeVisible();
+    await expect(page.getByText('TP.HCM ➔ Da Lat').first()).toBeVisible();
+    await expect(page.getByText('Popular Route Searches')).toBeVisible();
+    await expect(page.getByText('Chưa có dữ liệu')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Update' }).click();
+    await expect(page.locator('.toast')).toContainText('Analytics refreshed successfully!');
+  });
 });
