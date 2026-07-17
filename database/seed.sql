@@ -348,3 +348,33 @@ join vehicle_seats vs on vs.vehicle_id = t.vehicle_id
 where not exists (
   select 1 from trip_seats ts where ts.trip_id = t.id and ts.seat_label = vs.seat_label
 );
+
+-- Demo seat states on UPCOMING trips (Trip Service / khoa).
+-- The B-3 block only paints HELD/BOOKED/BLOCKED on the past (June) trips,
+-- which never appear in search. These statements put a realistic occupancy
+-- mix on the current_date-relative trips so the seat map, the "seats left"
+-- count, the "còn ghế trống" filter, and the sold-out UI all have data.
+-- booking_id stays null on BOOKED seats: for these demo trips the seat state
+-- is the source of truth (trip_seats.booking_id is a cross-service reference
+-- Booking Service sets at runtime, not a physical FK -- schema.sql line 103).
+-- HELD is intentionally NOT seeded: a persistent HELD with no Redis TTL would
+-- never expire; exercise HELD live via the holdSeats mutation instead.
+-- Updates keyed by (trip_id, seat_label) keep the file rerunnable.
+
+-- Trip 101 (PT sleeper 34, TP.HCM -> Da Lat): partially filled seat map.
+update trip_seats set status = 'BOOKED', booking_id = null
+where trip_id = '00000000-0000-4000-8004-000000000101'
+  and seat_label in ('A01', 'A02', 'A03', 'A05', 'A08', 'B01', 'B02', 'B07');
+
+update trip_seats set status = 'BLOCKED', block_reason = 'Maintenance demo block'
+where trip_id = '00000000-0000-4000-8004-000000000101'
+  and seat_label in ('A10', 'B17');
+
+-- Trip 105 (TB limo 22, TP.HCM -> Nha Trang): almost full, only 2 seats left.
+update trip_seats set status = 'BOOKED', booking_id = null
+where trip_id = '00000000-0000-4000-8004-000000000105'
+  and seat_label not in ('L21', 'L22');
+
+-- Trip 107 (KH seat 29, TP.HCM -> Can Tho): fully sold out (0 available).
+update trip_seats set status = 'BOOKED', booking_id = null
+where trip_id = '00000000-0000-4000-8004-000000000107';

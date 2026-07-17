@@ -19,7 +19,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="vi" className={beVietnam.variable}>
-      <body>
+      <body suppressHydrationWarning>
         <main className="shell">{children}</main>
       </body>
     </html>

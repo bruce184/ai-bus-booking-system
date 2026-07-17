@@ -7,12 +7,9 @@ import { graphqlRequest } from "../../lib/graphql";
 import { TopBar } from "../../src/components/TopBar.jsx";
 import { LocationInput } from "../../src/components/LocationInput.jsx";
 
-const TIME_SLOTS = {
-  early: { label: "Sáng sớm (0h-6h)", from: 0, to: 6 },
-  morning: { label: "Buổi sáng (6h-12h)", from: 6, to: 12 },
-  afternoon: { label: "Buổi chiều (12h-18h)", from: 12, to: 18 },
-  evening: { label: "Buổi tối (18h-24h)", from: 18, to: 24 }
-};
+// Departure-hour filter bounds (0h..24h). 24 means "end of day / no upper cap".
+const HOUR_MIN = 0;
+const HOUR_MAX = 24;
 
 const SEARCH_TRIPS = `
   query SearchTrips($input: SearchTripsInput!) {
@@ -73,7 +70,7 @@ export default function SearchClient({
 
   // Filter & sort states (client-side + server-side)
   const [selectedOperators, setSelectedOperators] = useState([]);
-  const [selectedTimeSlots, setSelectedTimeSlots] = useState([]);
+  const [hourRange, setHourRange] = useState([HOUR_MIN, HOUR_MAX]);
   const [selectedVehicleTypes, setSelectedVehicleTypes] = useState([]);
   const [minSeats, setMinSeats] = useState(0);
   const [minPrice, setMinPrice] = useState(0);
@@ -165,10 +162,10 @@ export default function SearchClient({
       });
     }
 
-    if (selectedTimeSlots.length > 0) {
+    if (hourRange[0] > HOUR_MIN || hourRange[1] < HOUR_MAX) {
       list = list.filter(t => {
         const hour = new Date(t.departureTime).getHours();
-        return selectedTimeSlots.some(slot => hour >= TIME_SLOTS[slot].from && hour < TIME_SLOTS[slot].to);
+        return hour >= hourRange[0] && hour <= hourRange[1];
       });
     }
 
@@ -181,7 +178,7 @@ export default function SearchClient({
     }
 
     return list;
-  }, [result, selectedOperators, minPrice, maxPrice, selectedTimeSlots, selectedVehicleTypes, minSeats]);
+  }, [result, selectedOperators, minPrice, maxPrice, hourRange, selectedVehicleTypes, minSeats]);
 
   const toggleOperator = (op) => {
     setSelectedOperators(prev =>
@@ -193,7 +190,7 @@ export default function SearchClient({
     setSelectedOperators([]);
     setMinPrice(0);
     setMaxPrice(0);
-    setSelectedTimeSlots([]);
+    setHourRange([HOUR_MIN, HOUR_MAX]);
     setSelectedVehicleTypes([]);
     setMinSeats(0);
     void doSearch(origin, destination, departureDate, sortBy, 0, 0);
@@ -296,18 +293,39 @@ export default function SearchClient({
             ) : null}
           </div>
 
-          {/* Departure Hours Filter Mock */}
+          {/* Departure hour range filter (two draggable thumbs: from / to) */}
           <div style={{ marginBottom: "24px" }}>
             <h4 style={{ fontSize: "14px", fontWeight: "700", marginBottom: "10px", color: "var(--text)" }}>Giờ khởi hành</h4>
-            <div style={{ fontSize: "12px", color: "var(--muted)" }}>Khoảng thời gian:</div>
-            <div style={{ display: "flex", justifyContent: "space-between", margin: "6px 0 10px", fontSize: "12px", fontWeight: "600" }}>
-              <span>00:00</span>
-              <span>23:59</span>
+            <div style={{ display: "flex", justifyContent: "space-between", margin: "6px 0 8px", fontSize: "13px", fontWeight: "600", color: "var(--text)" }}>
+              <span>Từ {String(hourRange[0]).padStart(2, "0")}:00</span>
+              <span>Đến {hourRange[1] >= HOUR_MAX ? "23:59" : `${String(hourRange[1]).padStart(2, "0")}:00`}</span>
             </div>
-            <div style={{ height: "4px", background: "var(--brand)", borderRadius: "2px", position: "relative" }}>
-              <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: "white", border: "2px solid var(--brand)", position: "absolute", left: 0, top: "-4px" }} />
-              <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: "white", border: "2px solid var(--brand)", position: "absolute", right: 0, top: "-4px" }} />
-            </div>
+            <input
+              type="range"
+              min={HOUR_MIN}
+              max={HOUR_MAX}
+              step={1}
+              value={hourRange[0]}
+              onChange={(e) => setHourRange(([, hi]) => {
+                const lo = Math.min(Number(e.target.value), hi);
+                return [lo, hi];
+              })}
+              aria-label="Giờ khởi hành từ"
+              style={{ width: "100%", accentColor: "var(--brand)", cursor: "pointer" }}
+            />
+            <input
+              type="range"
+              min={HOUR_MIN}
+              max={HOUR_MAX}
+              step={1}
+              value={hourRange[1]}
+              onChange={(e) => setHourRange(([lo]) => {
+                const hi = Math.max(Number(e.target.value), lo);
+                return [lo, hi];
+              })}
+              aria-label="Giờ khởi hành đến"
+              style={{ width: "100%", accentColor: "var(--brand)", cursor: "pointer" }}
+            />
           </div>
 
           {/* Operator Checkboxes */}
@@ -329,24 +347,6 @@ export default function SearchClient({
                   </label>
                 ))
               )}
-            </div>
-          </div>
-
-          {/* Khung giờ đi */}
-          <div style={{ marginBottom: "24px" }}>
-            <h4 style={{ fontSize: "14px", fontWeight: "700", marginBottom: "12px", color: "var(--text)" }}>Khung giờ đi</h4>
-            <div style={{ display: "grid", gap: "10px", fontSize: "14px" }}>
-              {Object.entries(TIME_SLOTS).map(([key, slot]) => (
-                <label key={key} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedTimeSlots.includes(key)}
-                    onChange={() => setSelectedTimeSlots(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])}
-                    style={{ accentColor: "var(--brand)" }}
-                  />
-                  {slot.label}
-                </label>
-              ))}
             </div>
           </div>
 
