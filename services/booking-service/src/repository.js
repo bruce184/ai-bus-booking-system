@@ -3,7 +3,7 @@ import { compactBusinessDate } from "@bus/shared/date.js";
 import { query, transaction } from "@bus/shared/db.js";
 import { fail } from "@bus/shared/errors.js";
 import { writeOutboxEvent } from "@bus/shared/outbox.js";
-import { fetchTripSnapshot } from "./trip-client.js";
+import { fetchTripPresentation, fetchTripSnapshot } from "./trip-client.js";
 import {
   canCancel,
   canCancelBeforeDeparture,
@@ -84,16 +84,6 @@ export function isPaymentSettledStatus(status) {
   return ["PAID", "TICKET_ISSUED", "CHECKED_IN", "COMPLETED"].includes(status);
 }
 
-function ticketRouteColumns() {
-  return `
-    coalesce(origin.name || ' -> ' || destination.name, '') as route_label,
-    coalesce(pickup.name, origin.name, '') as pickup_point,
-    coalesce(dropoff.name, destination.name, '') as dropoff_point,
-    t.departure_time::text as departure_time,
-    coalesce(v.vehicle_code, v.license_plate, '') as vehicle_code
-  `;
-}
-
 function mapPassenger(row) {
   return {
     full_name: row.full_name,
@@ -104,18 +94,18 @@ function mapPassenger(row) {
   };
 }
 
-function mapTicket(row, booking) {
+function mapTicket(row, booking, presentation) {
   return {
     id: row.id,
     ticket_code: row.ticket_code,
     booking_code: booking.booking_code,
     passenger_name: row.passenger_name,
-    route_label: row.route_label || "",
-    pickup_point: row.pickup_point || "",
-    dropoff_point: row.dropoff_point || "",
-    departure_time: row.departure_time || "",
+    route_label: presentation?.routeLabel || "",
+    pickup_point: presentation?.pickupPoint || "",
+    dropoff_point: presentation?.dropoffPoint || "",
+    departure_time: presentation?.departureTime || "",
     seat_id: row.seat_label,
-    vehicle_code: row.vehicle_code || "",
+    vehicle_code: presentation?.vehicleCode || "",
     qr_payload: row.qr_payload,
     checkin_policy: row.checkin_policy_snapshot || "",
     html: row.ticket_html || "",
@@ -139,37 +129,19 @@ export async function fetchBookingById(id, client = { query }) {
   );
   const ticketResult = await client.query(
     `
-      select tk.*, bp.full_name as passenger_name, bp.seat_label,
-             ${ticketRouteColumns()}
+      select tk.*, bp.full_name as passenger_name, bp.seat_label
       from tickets tk
       join booking_passengers bp on bp.id = tk.passenger_id
-      join bookings b on b.id = tk.booking_id
-      join trips t on t.id = b.trip_id
-      join routes r on r.id = t.route_id
-      join locations origin on origin.id = r.origin_location_id
-      join locations destination on destination.id = r.destination_location_id
-      join vehicles v on v.id = t.vehicle_id
-      left join lateral (
-        select l.name
-        from route_stops rs
-        join locations l on l.id = rs.location_id
-        where rs.route_id = r.id and rs.stop_type = 'PICKUP'
-        order by rs.stop_order
-        limit 1
-      ) pickup on true
-      left join lateral (
-        select l.name
-        from route_stops rs
-        join locations l on l.id = rs.location_id
-        where rs.route_id = r.id and rs.stop_type = 'DROPOFF'
-        order by rs.stop_order
-        limit 1
-      ) dropoff on true
       where tk.booking_id = $1
       order by bp.seat_label
     `,
     [booking.id]
   );
+
+  // Trip Service owns trips/routes/locations/vehicles (database-per-service -
+  // docs/ARCHITECTURE.md section 11); one GetTripDetail call per booking
+  // (not per ticket) fills the route/pickup/dropoff/vehicle display text.
+  const presentation = ticketResult.rows.length ? await fetchTripPresentation(booking.trip_id) : null;
 
   return {
     id: booking.id,
@@ -182,7 +154,7 @@ export async function fetchBookingById(id, client = { query }) {
     contact_phone: booking.contact_phone || "",
     total_amount: Number(booking.total_amount),
     passengers: passengerResult.rows.map(mapPassenger),
-    tickets: ticketResult.rows.map((row) => mapTicket(row, booking))
+    tickets: ticketResult.rows.map((row) => mapTicket(row, booking, presentation))
   };
 }
 
@@ -816,13 +788,13 @@ export async function listEventLogs({ event_type, entity_type, limit = 20, offse
   };
 }
 
-export async function savePassengerProfile(input) {
+export async function savePassengerProfile(input, { runQuery = query } = {}) {
   if (!input.customer_user_id || !input.full_name) {
     fail("VALIDATION_ERROR", "customer_user_id and full_name are required");
   }
 
   const id = input.id || randomUUID();
-  const result = await query(
+  const result = await runQuery(
     `
       insert into saved_passengers (id, customer_user_id, full_name, phone, email, document_number)
       values ($1, $2, $3, $4, $5, $6)
@@ -831,6 +803,7 @@ export async function savePassengerProfile(input) {
           phone = excluded.phone,
           email = excluded.email,
           document_number = excluded.document_number
+      where saved_passengers.customer_user_id = excluded.customer_user_id
       returning *
     `,
     [
@@ -842,6 +815,11 @@ export async function savePassengerProfile(input) {
       input.document_number || null
     ]
   );
+  // Matches deletePassengerProfile's ownership scope: an id belonging to
+  // another customer is rejected instead of silently overwriting their row.
+  if (!result.rows[0]) {
+    fail("FORBIDDEN", "Passenger profile belongs to another customer");
+  }
   return { passenger: result.rows[0] };
 }
 
@@ -892,7 +870,7 @@ export async function getBookingMetrics({ booking_id }) {
       from bookings b
       left join booking_passengers bp on bp.booking_id = b.id
       where b.id = $1
-      group by b.total_amount
+      group by b.id
     `,
     [booking_id]
   );

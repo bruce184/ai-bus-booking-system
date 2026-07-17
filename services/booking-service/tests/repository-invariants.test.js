@@ -9,8 +9,34 @@ import {
   createBooking,
   expirePendingBookings,
   isPaymentSettledStatus,
+  savePassengerProfile,
   settleBookingPayment
 } from "../src/repository.js";
+
+test("savePassengerProfile rejects an id that belongs to another customer", async () => {
+  await assert.rejects(
+    savePassengerProfile(
+      { customer_user_id: "customer-a", full_name: "Nguyen Van A", id: "someone-elses-row" },
+      // The `where saved_passengers.customer_user_id = excluded.customer_user_id`
+      // guard filters the row out instead of updating it, so the query
+      // returns no row for a cross-customer id.
+      { runQuery: async () => ({ rows: [] }) }
+    ),
+    (error) => error.code === "FORBIDDEN"
+  );
+});
+
+test("savePassengerProfile succeeds for the owning customer", async () => {
+  const saved = await savePassengerProfile(
+    { customer_user_id: "customer-a", full_name: "Nguyen Van A" },
+    {
+      runQuery: async () => ({
+        rows: [{ id: "new-id", customer_user_id: "customer-a", full_name: "Nguyen Van A" }]
+      })
+    }
+  );
+  assert.equal(saved.passenger.customer_user_id, "customer-a");
+});
 
 test("booking codes use the Asia/Ho_Chi_Minh business date", () => {
   const afterLocalMidnight = new Date("2026-07-13T17:30:00.000Z");
