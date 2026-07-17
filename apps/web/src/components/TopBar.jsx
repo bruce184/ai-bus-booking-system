@@ -73,9 +73,9 @@ export function TopBar({ links = DEFAULT_TOPBAR_LINKS, subtitle = null, showUser
           ) : (
             <Link className="nav-auth-btn" href="/login">Đăng nhập</Link>
           )}
-          {showUserBadge ? (
+          {showUserBadge || user ? (
             <div
-              className="topbar-user-badge"
+              className={`topbar-user-badge${user ? " is-authed" : ""}`}
               aria-hidden={user ? undefined : "true"}
               title={user?.fullName || undefined}
             >

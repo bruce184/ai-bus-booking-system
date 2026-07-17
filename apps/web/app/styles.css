@@ -61,6 +61,14 @@ body {
   justify-content: center;
   color: var(--muted);
   margin-left: var(--sp-2);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* Đã đăng nhập: nền xanh brand + chữ trắng (giống avatar ở trang chủ). */
+.topbar-user-badge.is-authed {
+  background-color: var(--brand);
+  color: #ffffff;
 }
 
 .brand-block {
