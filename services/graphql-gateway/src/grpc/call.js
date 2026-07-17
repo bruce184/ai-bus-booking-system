@@ -1,5 +1,7 @@
 import { status as grpcStatus } from "@grpc/grpc-js";
 import { isServiceErrorCode } from "@bus/shared/errors.js";
+import { correlationMetadata } from "@bus/shared/grpc.js";
+import { getCorrelationId } from "@bus/shared/correlation.js";
 import { gatewayError } from "../auth/errors.js";
 
 const DEFAULT_CALL_TIMEOUT_MS = Number(process.env.GRPC_CALL_TIMEOUT_MS || 5000);
@@ -135,7 +137,7 @@ export async function callGrpc(
   const options = { deadline: new Date(Date.now() + timeoutMs) };
 
   return new Promise((resolve, reject) => {
-    method.call(client, request, options, (error, response) => {
+    const callback = (error, response) => {
       if (error) {
         if (isConnectivityFailure(error.code)) {
           recordFailure(breaker, circuitFailureThreshold);
@@ -148,6 +150,15 @@ export async function callGrpc(
 
       recordSuccess(breaker);
       resolve(response);
-    });
+    };
+
+    // Only attach an explicit Metadata argument when there's an active
+    // correlation id to carry - keeps the plain 3-arg call shape (and its
+    // simpler test doubles) for calls made outside any request scope.
+    if (getCorrelationId()) {
+      method.call(client, request, correlationMetadata(), options, callback);
+    } else {
+      method.call(client, request, options, callback);
+    }
   });
 }

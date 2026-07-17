@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { getCorrelationId } from "@bus/shared/correlation.js";
 import { verifyDemoJwt } from "../auth/jwt.js";
 import { createLoaders } from "./loaders.js";
 
@@ -15,7 +16,7 @@ export function createContextFactory(config, grpc) {
     const authToken = readBearerToken(req.headers.authorization);
 
     return {
-      requestId: randomUUID(),
+      requestId: getCorrelationId() || randomUUID(),
       authToken,
       user: authToken ? verifyDemoJwt(authToken, config) : null,
       config,
