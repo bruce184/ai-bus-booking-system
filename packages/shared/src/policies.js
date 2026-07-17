@@ -5,7 +5,7 @@ export const CANCELLATION_CUTOFF_HOURS = 24;
 export const CANCELLATION_REFUND_PERCENT = 80;
 
 export const CANCELLATION_POLICY_TEXT =
-  "Khach co the huy ve khi booking dang PAID va con it nhat 24 gio truoc gio khoi hanh; he thong hoan 80% gia ve. Trong vong 24 gio truoc khoi hanh, booking khong du dieu kien huy va khong duoc hoan. Day la chinh sach demo.";
+  "Khách có thể hủy vé khi booking đang PAID và còn ít nhất 24 giờ trước giờ khởi hành; hệ thống hoàn 80% giá vé. Trong vòng 24 giờ trước khởi hành, booking không đủ điều kiện hủy và không được hoàn. Đây là chính sách demo.";
 
 export const CHECKIN_POLICY_TEXT =
-  "Hanh khach can co mat tai diem don truoc gio khoi hanh 30 phut va cung cap ma dat cho, ma ve, hoac QR demo de nhan vien xac nhan. Day la chinh sach demo.";
+  "Hành khách cần có mặt tại điểm đón trước giờ khởi hành 30 phút và cung cấp mã đặt chỗ, mã vé, hoặc QR demo để nhân viên xác nhận. Đây là chính sách demo.";

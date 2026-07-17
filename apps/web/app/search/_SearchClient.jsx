@@ -209,6 +209,17 @@ export default function SearchClient({
           accent-color: var(--brand); flex: 0 0 auto; cursor: pointer;
         }
         .ebx-sort, .ebx-sort option { color: #1a1a1a; }
+        /* Number inputs: keep the step spinner always visible, taller, and
+           tucked inside the box so it does not overflow the rounded border. */
+        .ebx-num { padding-right: 4px; }
+        .ebx-num::-webkit-outer-spin-button,
+        .ebx-num::-webkit-inner-spin-button {
+          -webkit-appearance: inner-spin-button;
+          opacity: 1;
+          height: 34px;
+          margin: 0 0 0 4px;
+          cursor: pointer;
+        }
         .ebx-range {
           -webkit-appearance: none; appearance: none;
           width: 100%; height: 6px; min-height: 0; padding: 0; margin: 11px 0;
@@ -449,7 +460,8 @@ export default function SearchClient({
                   step="1000"
                   onChange={(e) => setMinPrice(Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
                   onBlur={() => doSearch(origin, destination, departureDate, sortBy, minPrice, maxPrice)}
-                  style={{ width: "130px", minHeight: "30px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
+                  className="ebx-num"
+                  style={{ width: "130px", minHeight: "36px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
                 />
                 <span className="muted">-</span>
                 <input
@@ -460,7 +472,8 @@ export default function SearchClient({
                   step="1000"
                   onChange={(e) => setMaxPrice(Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
                   onBlur={() => doSearch(origin, destination, departureDate, sortBy, minPrice, maxPrice)}
-                  style={{ width: "130px", minHeight: "30px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
+                  className="ebx-num"
+                  style={{ width: "130px", minHeight: "36px", fontSize: "13px", padding: "0 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
                 />
               </div>
             </div>

@@ -258,9 +258,21 @@ export function SeatMap({ graphqlUrl, tripId, seats, price = 220000, onHoldCreat
 
       {error ? <p className="seat-map-error" style={{ marginTop: "16px" }}>{error}</p> : null}
 
-      {/* Mockup Sticky Selected Status Footer */}
-      <div className="seat-map-footer">
-        <div>
+      {/* Selected-seats summary footer */}
+      <div
+        className="seat-map-footer"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "16px",
+          marginTop: "20px",
+          paddingTop: "16px",
+          borderTop: "1px solid var(--line)"
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
           <span style={{ fontSize: "12px", color: "var(--muted)" }}>
             Đã chọn {selectedSeatIds.length} ghế
           </span>
@@ -268,21 +280,24 @@ export function SeatMap({ graphqlUrl, tripId, seats, price = 220000, onHoldCreat
             {selectedSeatsLabels.join(", ") || "Chưa chọn"}
           </strong>
         </div>
-        <div style={{ textAlign: "right", marginRight: "16px" }}>
-          <span style={{ fontSize: "12px", color: "var(--muted)" }}>Tổng tiền</span>
-          <strong style={{ fontSize: "20px", color: "var(--brand-dark)" }}>
-            {(selectedSeatIds.length * price).toLocaleString("vi-VN")}đ
-          </strong>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "20px", marginLeft: "auto" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px", textAlign: "right" }}>
+            <span style={{ fontSize: "12px", color: "var(--muted)" }}>Tổng tiền</span>
+            <strong style={{ fontSize: "20px", color: "var(--brand-dark)" }}>
+              {(selectedSeatIds.length * price).toLocaleString("vi-VN")}đ
+            </strong>
+          </div>
+          <button
+            className="seat-hold-button primary"
+            disabled={isHolding || selectedSeatIds.length === 0}
+            onClick={handleHoldSeats}
+            type="button"
+            style={{ minWidth: "140px", height: "44px" }}
+          >
+            {isHolding ? "Đang xử lý..." : "Tiếp tục"}
+          </button>
         </div>
-        <button
-          className="seat-hold-button primary"
-          disabled={isHolding || selectedSeatIds.length === 0}
-          onClick={handleHoldSeats}
-          type="button"
-          style={{ minWidth: "120px", height: "42px" }}
-        >
-          {isHolding ? "Đang xử lý..." : "Tiếp tục"}
-        </button>
       </div>
     </section>
   );
