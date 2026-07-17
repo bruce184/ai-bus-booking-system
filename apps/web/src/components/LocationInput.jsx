@@ -21,20 +21,31 @@ export function LocationInput({ id, value, onChange, placeholder = "Nhập tỉn
   const listId = useId();
   const [suggestions, setSuggestions] = useState([]);
   const debounceRef = useRef(null);
+  const latestRequestRef = useRef(0);
 
   useEffect(() => {
     const keyword = value.trim();
+    // Bump synchronously so an in-flight request for a previous keystroke is
+    // recognized as stale as soon as this one starts, regardless of which
+    // response actually arrives first over the network.
+    const requestId = ++latestRequestRef.current;
 
     debounceRef.current = window.setTimeout(async () => {
       if (keyword.length < 1) {
-        setSuggestions([]);
+        if (requestId === latestRequestRef.current) {
+          setSuggestions([]);
+        }
         return;
       }
       try {
         const data = await graphqlRequest(AUTOCOMPLETE, { keyword });
-        setSuggestions(data.autocompleteLocations ?? []);
+        if (requestId === latestRequestRef.current) {
+          setSuggestions(data.autocompleteLocations ?? []);
+        }
       } catch {
-        setSuggestions([]);
+        if (requestId === latestRequestRef.current) {
+          setSuggestions([]);
+        }
       }
     }, 200);
 
