@@ -18,34 +18,46 @@ export function holdKey(tripId, seatId) {
   return `hold:${tripId}:${seatId}`;
 }
 
+export function seatMaintenanceKey(tripId) {
+  return `seat-maintenance:${tripId}`;
+}
+
 function holdTokenKey(holdToken) {
   return `hold-token:${holdToken}`;
 }
 
 const holdSeatsScript = `
-  for i, key in ipairs(KEYS) do
-    if redis.call("EXISTS", key) == 1 then
-      return {0, ARGV[5 + i]}
+  if redis.call("EXISTS", KEYS[1]) == 1 then
+    return {-1, ""}
+  end
+
+  for i = 2, #KEYS do
+    local seatIndex = i - 1
+    if redis.call("EXISTS", KEYS[i]) == 1 then
+      return {0, ARGV[5 + seatIndex]}
     end
   end
 
-  for i, key in ipairs(KEYS) do
+  local indexedKeys = {}
+  for i = 2, #KEYS do
+    local seatIndex = i - 1
     local payload = cjson.encode({
       holdToken = ARGV[2],
       expiresAt = ARGV[3],
       tripId = ARGV[4],
       requesterId = ARGV[5],
-      seatId = ARGV[5 + i]
+      seatId = ARGV[5 + seatIndex]
     })
 
-    local ok = redis.call("SET", key, payload, "EX", tonumber(ARGV[1]), "NX")
+    local ok = redis.call("SET", KEYS[i], payload, "EX", tonumber(ARGV[1]), "NX")
 
     if not ok then
-      return {0, ARGV[5 + i]}
+      return {0, ARGV[5 + seatIndex]}
     end
+    table.insert(indexedKeys, KEYS[i])
   end
 
-  redis.call("SET", "hold-token:" .. ARGV[2], cjson.encode(KEYS), "EX", tonumber(ARGV[1]))
+  redis.call("SET", "hold-token:" .. ARGV[2], cjson.encode(indexedKeys), "EX", tonumber(ARGV[1]))
 
   return {1, ""}
 `;
@@ -69,13 +81,20 @@ export async function getHeldSeatIds(tripId, seats) {
   return heldSeatIds;
 }
 
-export async function holdSeatsAtomically(tripId, seatIds, requesterId, holdToken, ttlSeconds) {
-  const client = getRedis();
+export async function holdSeatsAtomically(
+  tripId,
+  seatIds,
+  requesterId,
+  holdToken,
+  ttlSeconds,
+  { client = getRedis() } = {}
+) {
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
   const keys = seatIds.map((seatId) => holdKey(tripId, seatId));
   const result = await client.eval(
     holdSeatsScript,
-    keys.length,
+    keys.length + 1,
+    seatMaintenanceKey(tripId),
     ...keys,
     String(ttlSeconds),
     holdToken,
@@ -84,6 +103,14 @@ export async function holdSeatsAtomically(tripId, seatIds, requesterId, holdToke
     requesterId,
     ...seatIds
   );
+
+  if (Number(result[0]) === -1) {
+    return {
+      holdToken,
+      expiresAt,
+      maintenanceConflict: true
+    };
+  }
 
   if (Number(result[0]) !== 1) {
     return {

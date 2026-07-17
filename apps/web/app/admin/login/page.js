@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { queryGraphQL } from '../../graphql.js';
+import { getSession, loginSession } from '../../../lib/graphql.js';
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -12,20 +12,18 @@ export default function AdminLogin() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Redirect if already logged in
-    const token = localStorage.getItem('admin_token');
-    const userJson = localStorage.getItem('admin_user');
-    if (token && userJson) {
-      try {
-        const user = JSON.parse(userJson);
+    let active = true;
+    void getSession()
+      .then((user) => {
+        if (!active || !user) return;
         if (user.role === 'ADMIN' || user.role === 'STAFF') {
-          router.push('/admin/dashboard');
+          router.push(user.role === 'STAFF' ? '/admin/bookings' : '/admin/dashboard');
         }
-      } catch (e) {
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_user');
-      }
-    }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   const handleSubmit = async (e) => {
@@ -33,39 +31,10 @@ export default function AdminLogin() {
     setLoading(true);
     setError(null);
 
-    const loginMutation = `
-      mutation Login($input: LoginInput!) {
-        login(input: $input) {
-          token
-          expiresAt
-          user {
-            id
-            email
-            fullName
-            role
-          }
-        }
-      }
-    `;
-
     try {
-      const data = await queryGraphQL(loginMutation, {
-        input: {
-          email,
-          password,
-        },
-      });
+      const user = await loginSession({ email, password, portal: 'admin' });
 
-      const { token, user } = data.login;
-
-      if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
-        throw new Error('Access denied. Admin or Staff role required.');
-      }
-
-      localStorage.setItem('admin_token', token);
-      localStorage.setItem('admin_user', JSON.stringify(user));
-
-      router.push('/admin/dashboard');
+      router.push(user.role === 'STAFF' ? '/admin/bookings' : '/admin/dashboard');
     } catch (err) {
       setError(err.message || 'Failed to login. Please try again.');
     } finally {

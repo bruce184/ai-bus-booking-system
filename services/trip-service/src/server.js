@@ -28,6 +28,7 @@ export function buildServer() {
     AutocompleteLocations: search.autocompleteLocations,
     SearchTrips: search.searchTrips,
     GetTripDetail: search.getTripDetail,
+    GetTripsByIds: search.getTripsByIds,
     ListPopularRoutes: search.listPopularRoutes,
     CreateRoute: admin.createRoute,
     UpdateRoute: admin.updateRoute,

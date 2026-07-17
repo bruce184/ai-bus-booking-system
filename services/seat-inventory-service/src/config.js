@@ -22,14 +22,17 @@ function readNumber(name, fallback) {
 export const config = {
   grpcHost: process.env.SEAT_INVENTORY_SERVICE_HOST ?? "0.0.0.0",
   grpcPort: readNumber("SEAT_INVENTORY_SERVICE_PORT", 50052),
+  healthPort: readNumber("SEAT_INVENTORY_SERVICE_HEALTH_PORT", 50152),
+  grpcCallTimeoutMs: readNumber("GRPC_CALL_TIMEOUT_MS", 5_000),
+  tripServiceAddress:
+    process.env.TRIP_SERVICE_GRPC_ADDRESS ??
+    process.env.TRIP_SERVICE_GRPC_URL ??
+    "localhost:50051",
   seatHoldTtlSeconds: readNumber("SEAT_HOLD_TTL_SECONDS", 300),
   databaseUrl:
     process.env.DATABASE_URL ??
     "postgresql://bus_app:change_me_local_only@localhost:5432/bus_booking",
   redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379",
-  rabbitmqUrl: process.env.RABBITMQ_URL ?? "amqp://guest:guest@localhost:5672",
-  workflowExchange: process.env.RABBITMQ_WORKFLOW_EXCHANGE ?? "bus.workflow",
   bookingExpiredQueue:
-    process.env.RABBITMQ_BOOKING_EXPIRED_QUEUE ?? "seat-inventory.booking-expired",
-  bookingExpiredRoutingKey: "booking.expired"
+    process.env.RABBITMQ_BOOKING_EXPIRED_QUEUE ?? "seat-inventory.booking-expired"
 };

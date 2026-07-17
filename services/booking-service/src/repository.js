@@ -1,22 +1,87 @@
 import { randomUUID } from "node:crypto";
+import { compactBusinessDate } from "@bus/shared/date.js";
 import { query, transaction } from "@bus/shared/db.js";
 import { fail } from "@bus/shared/errors.js";
-import { canCancel, canCheckIn, canCheckInTripState } from "./status.js";
+import { writeOutboxEvent } from "@bus/shared/outbox.js";
+import { fetchTripPresentation, fetchTripSnapshot } from "./trip-client.js";
+import {
+  canCancel,
+  canCancelBeforeDeparture,
+  canCheckIn,
+  canCheckInTripState,
+  checkInTripStateError
+} from "./status.js";
 
-function bookingCode() {
-  const now = new Date();
-  const ymd = now.toISOString().slice(0, 10).replaceAll("-", "");
+export function bookingCode(now = new Date()) {
+  const ymd = compactBusinessDate(now);
   return `BK${ymd}${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
-function ticketRouteColumns() {
-  return `
-    coalesce(origin.name || ' -> ' || destination.name, '') as route_label,
-    coalesce(pickup.name, origin.name, '') as pickup_point,
-    coalesce(dropoff.name, destination.name, '') as dropoff_point,
-    t.departure_time::text as departure_time,
-    coalesce(v.vehicle_code, v.license_plate, '') as vehicle_code
-  `;
+function normalizedText(value) {
+  return String(value ?? "").trim();
+}
+
+function normalizedEmail(value) {
+  return normalizedText(value).toLowerCase();
+}
+
+function normalizedPassenger(passenger, fallbackEmail = "") {
+  return {
+    fullName: normalizedText(passenger.full_name),
+    phone: normalizedText(passenger.phone),
+    email: normalizedEmail(passenger.email || fallbackEmail),
+    documentNumber: normalizedText(passenger.document_number),
+    seatId: normalizedText(passenger.seat_id)
+  };
+}
+
+function normalizedPassengers(passengers, fallbackEmail = "") {
+  return passengers
+    .map((passenger) => normalizedPassenger(passenger, fallbackEmail))
+    .sort((left, right) => left.seatId.localeCompare(right.seatId));
+}
+
+function validateCreateBookingInput(input) {
+  const passengers = input.passengers || [];
+  if (!input.trip_id || !input.hold_token || !input.contact_email || passengers.length === 0) {
+    fail("VALIDATION_ERROR", "trip_id, hold_token, contact_email and passengers are required");
+  }
+
+  const normalized = normalizedPassengers(passengers, input.contact_email);
+  if (normalized.some((passenger) => !passenger.fullName || !passenger.seatId)) {
+    fail("VALIDATION_ERROR", "Each passenger must have full_name and seat_id");
+  }
+
+  const seatIds = normalized.map((passenger) => passenger.seatId);
+  if (new Set(seatIds).size !== seatIds.length) {
+    fail("VALIDATION_ERROR", "Each passenger must have one unique seat_id");
+  }
+
+  return { passengers, seatIds };
+}
+
+export function bookingRequestMatches(booking, input) {
+  const existingPassengers = normalizedPassengers(booking.passengers || [], booking.contact_email);
+  const requestedPassengers = normalizedPassengers(input.passengers || [], input.contact_email);
+
+  return (
+    normalizedText(booking.trip_id) === normalizedText(input.trip_id) &&
+    normalizedText(booking.hold_token) === normalizedText(input.hold_token) &&
+    normalizedText(booking.customer_user_id) === normalizedText(input.customer_user_id) &&
+    normalizedEmail(booking.contact_email) === normalizedEmail(input.contact_email) &&
+    normalizedText(booking.contact_phone) === normalizedText(input.contact_phone) &&
+    JSON.stringify(existingPassengers) === JSON.stringify(requestedPassengers)
+  );
+}
+
+function assertHoldTokenBindingMatches(booking, input) {
+  if (!bookingRequestMatches(booking, input)) {
+    fail("BOOKING_STATE_INVALID", "Hold token is already bound to another booking request");
+  }
+}
+
+export function isPaymentSettledStatus(status) {
+  return ["PAID", "TICKET_ISSUED", "CHECKED_IN", "COMPLETED"].includes(status);
 }
 
 function mapPassenger(row) {
@@ -29,18 +94,18 @@ function mapPassenger(row) {
   };
 }
 
-function mapTicket(row, booking) {
+function mapTicket(row, booking, presentation) {
   return {
     id: row.id,
     ticket_code: row.ticket_code,
     booking_code: booking.booking_code,
     passenger_name: row.passenger_name,
-    route_label: row.route_label || "",
-    pickup_point: row.pickup_point || "",
-    dropoff_point: row.dropoff_point || "",
-    departure_time: row.departure_time || "",
+    route_label: presentation?.routeLabel || "",
+    pickup_point: presentation?.pickupPoint || "",
+    dropoff_point: presentation?.dropoffPoint || "",
+    departure_time: presentation?.departureTime || "",
     seat_id: row.seat_label,
-    vehicle_code: row.vehicle_code || "",
+    vehicle_code: presentation?.vehicleCode || "",
     qr_payload: row.qr_payload,
     checkin_policy: row.checkin_policy_snapshot || "",
     html: row.ticket_html || "",
@@ -64,37 +129,19 @@ export async function fetchBookingById(id, client = { query }) {
   );
   const ticketResult = await client.query(
     `
-      select tk.*, bp.full_name as passenger_name, bp.seat_label,
-             ${ticketRouteColumns()}
+      select tk.*, bp.full_name as passenger_name, bp.seat_label
       from tickets tk
       join booking_passengers bp on bp.id = tk.passenger_id
-      join bookings b on b.id = tk.booking_id
-      join trips t on t.id = b.trip_id
-      join routes r on r.id = t.route_id
-      join locations origin on origin.id = r.origin_location_id
-      join locations destination on destination.id = r.destination_location_id
-      join vehicles v on v.id = t.vehicle_id
-      left join lateral (
-        select l.name
-        from route_stops rs
-        join locations l on l.id = rs.location_id
-        where rs.route_id = r.id and rs.stop_type = 'PICKUP'
-        order by rs.stop_order
-        limit 1
-      ) pickup on true
-      left join lateral (
-        select l.name
-        from route_stops rs
-        join locations l on l.id = rs.location_id
-        where rs.route_id = r.id and rs.stop_type = 'DROPOFF'
-        order by rs.stop_order
-        limit 1
-      ) dropoff on true
       where tk.booking_id = $1
       order by bp.seat_label
     `,
     [booking.id]
   );
+
+  // Trip Service owns trips/routes/locations/vehicles (database-per-service -
+  // docs/ARCHITECTURE.md section 11); one GetTripDetail call per booking
+  // (not per ticket) fills the route/pickup/dropoff/vehicle display text.
+  const presentation = ticketResult.rows.length ? await fetchTripPresentation(booking.trip_id) : null;
 
   return {
     id: booking.id,
@@ -102,11 +149,12 @@ export async function fetchBookingById(id, client = { query }) {
     status: booking.status,
     trip_id: booking.trip_id,
     hold_token: booking.hold_token || "",
+    customer_user_id: booking.customer_user_id || "",
     contact_email: booking.contact_email,
     contact_phone: booking.contact_phone || "",
     total_amount: Number(booking.total_amount),
     passengers: passengerResult.rows.map(mapPassenger),
-    tickets: ticketResult.rows.map((row) => mapTicket(row, booking))
+    tickets: ticketResult.rows.map((row) => mapTicket(row, booking, presentation))
   };
 }
 
@@ -132,33 +180,71 @@ export async function getBookingStatus({ booking_code, email }) {
   return fetchBookingById(result.rows[0].id);
 }
 
-export async function createBooking(input) {
-  const passengers = input.passengers || [];
-  if (!input.trip_id || !input.hold_token || !input.contact_email || passengers.length === 0) {
-    fail("VALIDATION_ERROR", "trip_id, hold_token, contact_email and passengers are required");
+export async function findBookingByHoldToken(input) {
+  validateCreateBookingInput(input);
+  const result = await query(
+    "select id from bookings where hold_token = $1 order by created_at, id limit 2",
+    [input.hold_token]
+  );
+
+  if (result.rows.length > 1) {
+    fail("INTERNAL_ERROR", "Hold token is bound to multiple bookings");
+  }
+  if (!result.rows[0]) {
+    return null;
   }
 
-  const seatIds = passengers.map((passenger) => passenger.seat_id).filter(Boolean);
-  if (seatIds.length !== passengers.length || new Set(seatIds).size !== seatIds.length) {
-    fail("VALIDATION_ERROR", "Each passenger must have one unique seat_id");
-  }
+  const booking = await fetchBookingById(result.rows[0].id);
+  assertHoldTokenBindingMatches(booking, input);
+  return booking;
+}
 
-  return transaction(async (client) => {
-    const tripResult = await client.query(
-      "select price, status from trips where id = $1 for share",
+export async function createBooking(
+  input,
+  { runTransaction = transaction, getTripSnapshot = fetchTripSnapshot } = {}
+) {
+  const { passengers, seatIds } = validateCreateBookingInput(input);
+
+  return runTransaction(async (client) => {
+    // Booking creation and trip deletion share this transaction-scoped lock.
+    // The Trip Service takes the same key before checking logical booking
+    // references, so either creation commits first and blocks deletion, or
+    // deletion commits first and this fresh Trip Service lookup fails.
+    await client.query(
+      "select pg_advisory_xact_lock(hashtext('trip-lifecycle'), hashtext($1))",
       [input.trip_id]
     );
-    const trip = tripResult.rows[0];
-    if (!trip) {
-      fail("NOT_FOUND", "Trip not found");
-    }
+
+    // trip_id is unauthenticated client input and Trip Service owns that data.
+    // Fetch after acquiring the lifecycle lock: a snapshot fetched earlier
+    // could become stale while an admin concurrently deletes the trip.
+    const trip = await getTripSnapshot(input.trip_id);
     if (trip.status !== "ACTIVE") {
       fail("BOOKING_STATE_INVALID", "Trip is not active");
+    }
+
+    await client.query(
+      "select pg_advisory_xact_lock(hashtext('booking-hold'), hashtext($1))",
+      [input.hold_token]
+    );
+
+    const existingResult = await client.query(
+      "select id from bookings where hold_token = $1 order by created_at, id for update",
+      [input.hold_token]
+    );
+    if (existingResult.rows.length > 1) {
+      fail("INTERNAL_ERROR", "Hold token is bound to multiple bookings");
+    }
+    if (existingResult.rows[0]) {
+      const existing = await fetchBookingById(existingResult.rows[0].id, client);
+      assertHoldTokenBindingMatches(existing, input);
+      return { booking: existing, created: false };
     }
 
     const total = Number(trip.price) * passengers.length;
     let inserted;
     for (let attempt = 0; attempt < 3; attempt += 1) {
+      await client.query("savepoint booking_code_attempt");
       try {
         const result = await client.query(
           `
@@ -179,8 +265,10 @@ export async function createBooking(input) {
           ]
         );
         inserted = result.rows[0];
+        await client.query("release savepoint booking_code_attempt");
         break;
       } catch (error) {
+        await client.query("rollback to savepoint booking_code_attempt");
         if (error.code !== "23505" || attempt === 2) {
           throw error;
         }
@@ -215,13 +303,65 @@ export async function createBooking(input) {
         JSON.stringify({ bookingCode: inserted.booking_code, tripId: input.trip_id, seatIds })
       ]
     );
+    await writeOutboxEvent(client, {
+      aggregateType: "booking",
+      aggregateId: inserted.id,
+      eventName: "booking.created",
+      target: "KAFKA",
+      routingKey: "booking-events",
+      payload: {
+        bookingId: inserted.id,
+        bookingCode: inserted.booking_code,
+        tripId: inserted.trip_id,
+        totalAmount: Number(inserted.total_amount),
+        passengerCount: passengers.length
+      }
+    });
 
-    return fetchBookingById(inserted.id, client);
+    return {
+      booking: await fetchBookingById(inserted.id, client),
+      created: true
+    };
   });
 }
 
-export async function markBookingPaid({ bookingId }) {
-  return transaction(async (client) => {
+export async function settleBookingPayment(
+  { bookingCode, email, success, processPayment },
+  { runTransaction = transaction } = {}
+) {
+  return runTransaction(async (client) => {
+    // FOR NO KEY UPDATE (not FOR UPDATE): Seat Inventory sets
+    // trip_seats.booking_id while this transaction is still open, and that
+    // FK check takes FOR KEY SHARE on this row. FOR UPDATE would block it
+    // until the gRPC deadline; NO KEY UPDATE still serializes settlements.
+    const locked = await client.query(
+      `
+        select id
+        from bookings
+        where booking_code = $1
+        for no key update
+      `,
+      [bookingCode]
+    );
+    if (!locked.rows[0]) {
+      fail("NOT_FOUND", "Booking not found");
+    }
+
+    const booking = await fetchBookingById(locked.rows[0].id, client);
+    // Same bookingCode+email pairing GetBookingStatus/CancelBooking require:
+    // whoever is on the payment page must know both, not just the code.
+    if (normalizedEmail(booking.contact_email) !== normalizedEmail(email)) {
+      fail("NOT_FOUND", "Booking not found");
+    }
+    if (success && isPaymentSettledStatus(booking.status)) {
+      return { booking, transitioned: false };
+    }
+    if (booking.status !== "PENDING_PAYMENT") {
+      fail("BOOKING_STATE_INVALID", `Cannot pay booking in ${booking.status} status`);
+    }
+
+    await processPayment(booking);
+
     const update = await client.query(
       `
         update bookings
@@ -229,35 +369,91 @@ export async function markBookingPaid({ bookingId }) {
         where id = $1 and status = 'PENDING_PAYMENT'
         returning id
       `,
-      [bookingId]
+      [booking.id]
     );
     if (!update.rows[0]) {
-      const existing = await fetchBookingById(bookingId, client);
-      if (!existing) {
-        fail("NOT_FOUND", "Booking not found");
-      }
-      return existing;
+      fail("BOOKING_STATE_INVALID", "Booking payment state changed during settlement");
     }
 
     await client.query(
       "insert into event_logs (event_type, entity_type, entity_id, payload) values ($1, $2, $3, $4)",
-      ["booking.paid", "booking", bookingId, JSON.stringify({ bookingId })]
+      ["booking.paid", "booking", booking.id, JSON.stringify({ bookingId: booking.id })]
     );
-    return fetchBookingById(bookingId, client);
+
+    const paidBooking = await fetchBookingById(booking.id, client);
+    const paidEventPayload = {
+      bookingId: paidBooking.id,
+      bookingCode: paidBooking.booking_code,
+      tripId: paidBooking.trip_id,
+      contactEmail: paidBooking.contact_email,
+      totalAmount: paidBooking.total_amount,
+      seatIds: paidBooking.passengers.map((passenger) => passenger.seat_id)
+    };
+    const paidEventId = randomUUID();
+    const paidOccurredAt = new Date().toISOString();
+    // ticket-worker and email-worker consume this from RabbitMQ; analytics
+    // consumes the Kafka copy. Same payload, two brokers, one transaction.
+    await writeOutboxEvent(client, {
+      aggregateType: "booking",
+      aggregateId: paidBooking.id,
+      eventName: "booking.paid",
+      target: "RABBITMQ",
+      routingKey: "booking.paid",
+      payload: paidEventPayload,
+      eventId: paidEventId,
+      occurredAt: paidOccurredAt
+    });
+    await writeOutboxEvent(client, {
+      aggregateType: "booking",
+      aggregateId: paidBooking.id,
+      eventName: "booking.paid",
+      target: "KAFKA",
+      routingKey: "booking-events",
+      payload: paidEventPayload,
+      eventId: paidEventId,
+      occurredAt: paidOccurredAt
+    });
+
+    return {
+      booking: paidBooking,
+      transitioned: true
+    };
   });
 }
 
-export async function cancelBooking({ booking_code, email }) {
-  return transaction(async (client) => {
+export async function cancelBooking(
+  { booking_code, email },
+  { runQuery = query, runTransaction = transaction, getTripSnapshot = fetchTripSnapshot } = {}
+) {
+  const candidateResult = await runQuery(
+    `select id, trip_id, status from bookings where booking_code = $1 and lower(contact_email) = lower($2)`,
+    [booking_code, email]
+  );
+  const candidate = candidateResult.rows[0];
+  if (!candidate) {
+    fail("NOT_FOUND", "Booking not found");
+  }
+  if (!canCancel(candidate.status)) {
+    fail("BOOKING_STATE_INVALID", "Only PAID bookings can be cancelled");
+  }
+
+  const trip = await getTripSnapshot(candidate.trip_id);
+  if (!canCancelBeforeDeparture(trip.departureTime)) {
+    fail(
+      "BOOKING_STATE_INVALID",
+      "Cancellation is only allowed more than 24 hours before departure"
+    );
+  }
+
+  return runTransaction(async (client) => {
     const result = await client.query(
       `
-        select b.*, t.departure_time
-        from bookings b
-        join trips t on t.id = b.trip_id
-        where b.booking_code = $1 and lower(b.contact_email) = lower($2)
-        for update of b
+        select *
+        from bookings
+        where id = $1
+        for update
       `,
-      [booking_code, email]
+      [candidate.id]
     );
     const booking = result.rows[0];
     if (!booking) {
@@ -265,9 +461,6 @@ export async function cancelBooking({ booking_code, email }) {
     }
     if (!canCancel(booking.status)) {
       fail("BOOKING_STATE_INVALID", "Only PAID bookings can be cancelled");
-    }
-    if (new Date(booking.departure_time) <= new Date()) {
-      fail("BOOKING_STATE_INVALID", "Cannot cancel booking for a trip that has already departed");
     }
 
     await client.query(
@@ -280,22 +473,61 @@ export async function cancelBooking({ booking_code, email }) {
       "insert into event_logs (event_type, entity_type, entity_id, payload) values ($1, $2, $3, $4)",
       ["booking.cancelled", "booking", booking.id, JSON.stringify({ bookingCode: booking.booking_code })]
     );
+    const cancelledEventId = randomUUID();
+    const cancelledOccurredAt = new Date().toISOString();
+    await writeOutboxEvent(client, {
+      aggregateType: "booking",
+      aggregateId: booking.id,
+      eventName: "booking.cancelled",
+      target: "KAFKA",
+      routingKey: "booking-events",
+      payload: {
+        bookingId: booking.id,
+        bookingCode: booking.booking_code,
+        tripId: booking.trip_id
+      },
+      eventId: cancelledEventId,
+      occurredAt: cancelledOccurredAt
+    });
+    await writeOutboxEvent(client, {
+      aggregateType: "booking",
+      aggregateId: booking.id,
+      eventName: "booking.cancelled",
+      target: "RABBITMQ",
+      routingKey: "booking.cancelled",
+      payload: {
+        bookingId: booking.id,
+        bookingCode: booking.booking_code,
+        tripId: booking.trip_id,
+        contactEmail: booking.contact_email,
+        seatIds: (await client.query(
+          "select seat_label from booking_passengers where booking_id = $1 order by seat_label",
+          [booking.id]
+        )).rows.map((row) => row.seat_label)
+      },
+      eventId: cancelledEventId,
+      occurredAt: cancelledOccurredAt
+    });
 
     return fetchBookingById(booking.id, client);
   });
 }
 
-export async function expirePendingBookings(ageSeconds = 300) {
-  return transaction(async (client) => {
+export async function expirePendingBookings(
+  ageSeconds = 300,
+  { bookingIds = null, runTransaction = transaction } = {}
+) {
+  return runTransaction(async (client) => {
     const result = await client.query(
       `
-        select id, booking_code, trip_id, hold_token
+        select id, booking_code, trip_id, hold_token, contact_email
         from bookings
         where status = 'PENDING_PAYMENT'
           and created_at < now() - $1 * interval '1 second'
-        for update
+          and ($2::uuid[] is null or id = any($2::uuid[]))
+        for update skip locked
       `,
-      [ageSeconds]
+      [ageSeconds, bookingIds]
     );
 
     const expiredBookings = result.rows;
@@ -335,6 +567,7 @@ export async function expirePendingBookings(ageSeconds = 300) {
       bookingCode: b.booking_code,
       tripId: b.trip_id,
       holdToken: b.hold_token || "",
+      contactEmail: b.contact_email,
       seatIds: seatsByBooking.get(b.id) ?? []
     }));
 
@@ -351,35 +584,78 @@ export async function expirePendingBookings(ageSeconds = 300) {
           JSON.stringify({ bookingCode: b.bookingCode, seatIds: b.seatIds })
         ]
       );
+      await writeOutboxEvent(client, {
+        aggregateType: "booking",
+        aggregateId: b.bookingId,
+        eventName: "booking.expired",
+        target: "RABBITMQ",
+        routingKey: "booking.expired",
+        payload: {
+          bookingId: b.bookingId,
+          bookingCode: b.bookingCode,
+          tripId: b.tripId,
+          holdToken: b.holdToken,
+          contactEmail: b.contactEmail,
+          seatIds: b.seatIds
+        }
+      });
     }
 
     return expiredList;
   });
 }
 
-export async function checkInPassenger({ code, staff_user_id }) {
+export async function checkInPassenger(
+  { code, staff_user_id },
+  { runQuery = query, runTransaction = transaction, getTripSnapshot = fetchTripSnapshot } = {}
+) {
   if (!code) {
     fail("VALIDATION_ERROR", "code is required");
   }
 
-  return transaction(async (client) => {
-    // Postgres rejects DISTINCT together with FOR UPDATE, so resolve the
-    // booking id in a subquery and lock only the target bookings row.
+  const candidateResult = await runQuery(
+    `
+      select b.id, b.trip_id, b.status
+      from bookings b
+      where b.id = (
+        select b2.id
+        from bookings b2
+        left join tickets tk on tk.booking_id = b2.id
+        where b2.booking_code = $1 or tk.ticket_code = $1 or tk.qr_payload = $1
+        limit 1
+      )
+    `,
+    [code]
+  );
+  const candidate = candidateResult.rows[0];
+  if (!candidate) {
+    fail("NOT_FOUND", "Booking or ticket not found");
+  }
+
+  return runTransaction(async (client) => {
+    // Serialize with Trip Service status changes. If check-in wins, the
+    // subsequent trip.completed event sees CHECKED_IN; if completion wins,
+    // this fresh snapshot observes COMPLETED and rejects boarding.
+    await client.query(
+      "select pg_advisory_xact_lock(hashtext('trip-lifecycle'), hashtext($1))",
+      [candidate.trip_id]
+    );
+
+    if (candidate.status !== "CHECKED_IN") {
+      const trip = await getTripSnapshot(candidate.trip_id);
+      if (!canCheckInTripState(trip.status)) {
+        fail("BOOKING_STATE_INVALID", checkInTripStateError(trip.status));
+      }
+    }
+
     const result = await client.query(
       `
-        select b.*, t.status as trip_status
-        from bookings b
-        join trips t on t.id = b.trip_id
-        where b.id = (
-          select b2.id
-          from bookings b2
-          left join tickets tk on tk.booking_id = b2.id
-          where b2.booking_code = $1 or tk.ticket_code = $1 or tk.qr_payload = $1
-          limit 1
-        )
-        for update of b
+        select *
+        from bookings
+        where id = $1
+        for update
       `,
-      [code]
+      [candidate.id]
     );
     const booking = result.rows[0];
     if (!booking) {
@@ -390,9 +666,6 @@ export async function checkInPassenger({ code, staff_user_id }) {
     }
     if (!canCheckIn(booking.status)) {
       fail("BOOKING_STATE_INVALID", "Only TICKET_ISSUED bookings can be checked in");
-    }
-    if (!canCheckInTripState(booking.trip_status)) {
-      fail("BOOKING_STATE_INVALID", "Cannot check in a booking for a cancelled trip");
     }
 
     await client.query(
@@ -412,6 +685,18 @@ export async function checkInPassenger({ code, staff_user_id }) {
         JSON.stringify({ bookingCode: booking.booking_code, staffUserId: staff_user_id || null })
       ]
     );
+    await writeOutboxEvent(client, {
+      aggregateType: "booking",
+      aggregateId: booking.id,
+      eventName: "ticket.checked_in",
+      target: "KAFKA",
+      routingKey: "checkin-events",
+      payload: {
+        bookingId: booking.id,
+        bookingCode: booking.booking_code,
+        tripId: booking.trip_id
+      }
+    });
 
     return fetchBookingById(booking.id, client);
   });
@@ -503,13 +788,13 @@ export async function listEventLogs({ event_type, entity_type, limit = 20, offse
   };
 }
 
-export async function savePassengerProfile(input) {
+export async function savePassengerProfile(input, { runQuery = query } = {}) {
   if (!input.customer_user_id || !input.full_name) {
     fail("VALIDATION_ERROR", "customer_user_id and full_name are required");
   }
 
   const id = input.id || randomUUID();
-  const result = await query(
+  const result = await runQuery(
     `
       insert into saved_passengers (id, customer_user_id, full_name, phone, email, document_number)
       values ($1, $2, $3, $4, $5, $6)
@@ -518,6 +803,7 @@ export async function savePassengerProfile(input) {
           phone = excluded.phone,
           email = excluded.email,
           document_number = excluded.document_number
+      where saved_passengers.customer_user_id = excluded.customer_user_id
       returning *
     `,
     [
@@ -529,6 +815,11 @@ export async function savePassengerProfile(input) {
       input.document_number || null
     ]
   );
+  // Matches deletePassengerProfile's ownership scope: an id belonging to
+  // another customer is rejected instead of silently overwriting their row.
+  if (!result.rows[0]) {
+    fail("FORBIDDEN", "Passenger profile belongs to another customer");
+  }
   return { passenger: result.rows[0] };
 }
 
@@ -554,4 +845,44 @@ export async function listPassengerProfiles({ customer_user_id }) {
     [customer_user_id]
   );
   return { passengers: result.rows };
+}
+
+// Internal RPC for Analytics Service (see proto/booking.proto): the metrics
+// it needs to reverse a booking.cancelled aggregate, without a direct SQL
+// join into these tables from another service.
+export async function getBookingMetrics({ booking_id }) {
+  if (!booking_id) {
+    fail("VALIDATION_ERROR", "booking_id is required");
+  }
+
+  const result = await query(
+    `
+      select
+        b.total_amount as total_amount,
+        count(bp.id)::int as ticket_count,
+        (
+          select min(el.created_at)
+          from event_logs el
+          where el.event_type = 'booking.paid'
+            and el.entity_type = 'booking'
+            and el.entity_id = b.id
+        ) as paid_at
+      from bookings b
+      left join booking_passengers bp on bp.booking_id = b.id
+      where b.id = $1
+      group by b.id
+    `,
+    [booking_id]
+  );
+
+  const row = result.rows[0];
+  if (!row) {
+    return { total_amount: 0, ticket_count: 0, paid_at: "" };
+  }
+
+  return {
+    total_amount: Number(row.total_amount) || 0,
+    ticket_count: Number(row.ticket_count) || 0,
+    paid_at: row.paid_at ? new Date(row.paid_at).toISOString() : ""
+  };
 }

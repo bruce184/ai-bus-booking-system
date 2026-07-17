@@ -1,15 +1,20 @@
+import {
+  CANCELLATION_POLICY_TEXT,
+  CANCELLATION_POLICY_URI,
+  CHECKIN_POLICY_TEXT,
+  CHECKIN_POLICY_URI
+} from "@bus/shared/policies.js";
+
 export const resources = {
-  "bus://policy/cancellation": {
+  [CANCELLATION_POLICY_URI]: {
     name: "Cancellation policy",
     mimeType: "text/plain",
-    text:
-      "Theo chinh sach huy ve noi bo: khach co the huy ve khi booking dang PAID va chuyen xe chua khoi hanh. Phi va dieu kien huy duoc ap dung theo cau hinh demo cua nha xe."
+    text: CANCELLATION_POLICY_TEXT
   },
-  "bus://policy/checkin": {
+  [CHECKIN_POLICY_URI]: {
     name: "Check-in policy",
     mimeType: "text/plain",
-    text:
-      "Theo chinh sach check-in noi bo: hanh khach can co mat truoc gio khoi hanh 30 phut va cung cap ma dat cho, ma ve, hoac QR demo de nhan vien xac nhan."
+    text: CHECKIN_POLICY_TEXT
   },
   "bus://routes/popular": {
     name: "Popular demo routes",
@@ -17,8 +22,13 @@ export const resources = {
     text: "Cac tuyen demo pho bien: TP.HCM - Da Lat, TP.HCM - Nha Trang, Da Nang - Ha Noi."
   },
   "bus://system/health": {
-    name: "System health",
+    name: "MCP process health",
     mimeType: "application/json",
-    text: JSON.stringify({ service: "mcp-server", status: "ok" })
+    text: JSON.stringify({
+      service: "mcp-server",
+      status: "ready",
+      scope: "process",
+      dependenciesChecked: false
+    })
   }
 };

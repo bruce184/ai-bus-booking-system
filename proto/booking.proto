@@ -14,6 +14,10 @@ service BookingService {
   rpc DeletePassengerProfile(DeletePassengerProfileRequest) returns (DeletePassengerProfileResponse);
   rpc ListPassengerProfiles(ListPassengerProfilesRequest) returns (ListPassengerProfilesResponse);
   rpc ListEventLogs(ListEventLogsRequest) returns (ListEventLogsResponse);
+  // Internal, service-to-service only (not exposed through the GraphQL
+  // Gateway): lets Analytics Service reverse a booking.cancelled aggregate
+  // without a direct SQL join into Booking Service's tables.
+  rpc GetBookingMetrics(GetBookingMetricsRequest) returns (BookingMetricsResponse);
 }
 
 enum BookingStatus {
@@ -71,6 +75,7 @@ message ListBookingsResponse {
 message SimulatePaymentRequest {
   string booking_code = 1;
   bool success = 2;
+  string email = 3;
 }
 
 message CancelBookingRequest {
@@ -169,4 +174,15 @@ message EventLogResponse {
 
 message ListEventLogsResponse {
   repeated EventLogResponse logs = 1;
+}
+
+message GetBookingMetricsRequest {
+  string booking_id = 1;
+}
+
+message BookingMetricsResponse {
+  int32 total_amount = 1;
+  int32 ticket_count = 2;
+  // Empty string when the booking was never paid (no booking.paid event log).
+  string paid_at = 3;
 }

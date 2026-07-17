@@ -17,8 +17,13 @@ const databaseUrl =
   "postgresql://bus_app:change_me_local_only@localhost:5432/bus_booking";
 const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
 
+const testVehicleId = "22222222-2222-4222-8222-222222222222";
+const testVehicleCode = "SEAT-RACE-TEST-01";
 const tripId = "33333333-3333-3333-3333-333333333333";
 const seatId = "R01";
+const bookingId = "44444444-4444-4444-8444-444444444444";
+const bookingCode = "BKRACEATOMIC001";
+const missingSeatId = "R99";
 
 function createClient() {
   const packageDefinition = protoLoader.loadSync(protoPath, {
@@ -112,59 +117,155 @@ async function cleanupTripHolds(redis) {
   await redis.del(...keysToDelete, ...tokenKeys);
 }
 
+async function cleanupRaceFixture(client) {
+  await client.query(
+    "delete from bookings where id = $1::uuid or booking_code = $2",
+    [bookingId, bookingCode]
+  );
+  await client.query("delete from trip_seats where trip_id = $1::uuid", [tripId]);
+  await client.query("delete from trips where id = $1::uuid", [tripId]);
+  await client.query(
+    "delete from vehicles where id = $1::uuid or vehicle_code = $2",
+    [testVehicleId, testVehicleCode]
+  );
+}
+
 async function seedRaceTrip() {
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
 
-  await client.query(`
-    with route_seed as (
-      insert into routes (origin_location_id, destination_location_id, distance_km)
-      select origin.id, destination.id, 300
-      from locations origin, locations destination
-      where origin.name = 'TP.HCM'
-        and destination.name = 'Da Lat'
-      on conflict (origin_location_id, destination_location_id)
-      do update set distance_km = excluded.distance_km
-      returning id
-    ), selected_route as (
-      select id from route_seed
-      union all
-      select routes.id
-      from routes
-      join locations origin on origin.id = routes.origin_location_id
-      join locations destination on destination.id = routes.destination_location_id
-      where origin.name = 'TP.HCM'
-        and destination.name = 'Da Lat'
-      limit 1
-    ), selected_vehicle as (
-      select id from vehicles where vehicle_code = 'PT-SLEEPER-34-01' limit 1
-    ), trip_seed as (
-      insert into trips (id, route_id, vehicle_id, departure_time, arrival_time, price, status)
-      select '${tripId}'::uuid, selected_route.id, selected_vehicle.id,
-             now() + interval '1 day', now() + interval '1 day 7 hours',
-             280000, 'ACTIVE'
-      from selected_route, selected_vehicle
-      on conflict (id) do update set status = 'ACTIVE'
-      returning id, vehicle_id
-    ), vehicle_seat_seed as (
-      insert into vehicle_seats (vehicle_id, seat_label, deck, seat_row, seat_column)
-      select vehicle_id, '${seatId}', 1, 1, 1
-      from trip_seed
-      on conflict (vehicle_id, seat_label)
-      do update set deck = excluded.deck,
-                    seat_row = excluded.seat_row,
-                    seat_column = excluded.seat_column
-    )
-    insert into trip_seats (trip_id, seat_label, status, block_reason, booking_id)
-    values ('${tripId}'::uuid, '${seatId}', 'AVAILABLE', null, null)
-    on conflict (trip_id, seat_label)
-    do update set status = 'AVAILABLE',
-                  block_reason = null,
-                  booking_id = null,
-                  updated_at = now();
-  `);
+  try {
+    await client.query("begin");
+    await cleanupRaceFixture(client);
 
-  await client.end();
+    const routeResult = await client.query(
+      `
+        select routes.id
+        from routes
+        join locations origin on origin.id = routes.origin_location_id
+        join locations destination on destination.id = routes.destination_location_id
+        where origin.name = $1 and destination.name = $2
+        limit 1
+      `,
+      ["TP.HCM", "Da Lat"]
+    );
+
+    if (routeResult.rowCount !== 1) {
+      throw new Error(
+        "Race test requires the seeded TP.HCM -> Da Lat route; run npm run demo:reset"
+      );
+    }
+
+    const routeId = routeResult.rows[0].id;
+
+    await client.query(
+      `
+        insert into vehicles (
+          id, operator_name, vehicle_code, license_plate, vehicle_type, seat_count
+        )
+        values ($1::uuid, 'Seat Race Test', $2, 'TEST-RACE-01', 'seat_test_1', 1)
+      `,
+      [testVehicleId, testVehicleCode]
+    );
+
+    await client.query(
+      `
+        insert into vehicle_seats (
+          vehicle_id, seat_label, deck, seat_row, seat_column
+        )
+        values ($1::uuid, $2, 1, 1, 1)
+      `,
+      [testVehicleId, seatId]
+    );
+
+    await client.query(
+      `
+        insert into trips (
+          id, route_id, vehicle_id, departure_time, arrival_time, price, status
+        )
+        values (
+          $1::uuid, $2::uuid, $3::uuid,
+          now() + interval '1 day', now() + interval '1 day 7 hours',
+          280000, 'ACTIVE'
+        )
+      `,
+      [tripId, routeId, testVehicleId]
+    );
+
+    await client.query(
+      `
+        insert into trip_seats (
+          trip_id, seat_label, status, block_reason, booking_id
+        )
+        values ($1::uuid, $2, 'AVAILABLE', null, null)
+      `,
+      [tripId, seatId]
+    );
+
+    await client.query(
+      `
+        insert into bookings (
+          id, booking_code, trip_id, hold_token, contact_email, status, total_amount
+        )
+        values (
+          $1::uuid, $2, $3::uuid, 'race-hold-token',
+          'race@example.com', 'PENDING_PAYMENT', 280000
+        )
+      `,
+      [bookingId, bookingCode, tripId]
+    );
+
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+async function persistentSeatStatus() {
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    const result = await client.query(
+      "select status, booking_id from trip_seats where trip_id = $1::uuid and seat_label = $2",
+      [tripId, seatId]
+    );
+    return result.rows[0];
+  } finally {
+    await client.end();
+  }
+}
+
+async function cleanupRaceFixtureDatabase() {
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+
+  try {
+    await client.query("begin");
+    await cleanupRaceFixture(client);
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+async function expectRejected(work, expectedText) {
+  try {
+    await work();
+  } catch (error) {
+    const details = error.details ?? error.message;
+    if (!String(details).includes(expectedText)) {
+      throw new Error(`Expected rejection containing ${expectedText}, received: ${details}`);
+    }
+    return;
+  }
+
+  throw new Error(`Expected request to be rejected with ${expectedText}`);
 }
 
 async function main() {
@@ -218,10 +319,64 @@ async function main() {
       holdToken: successes[0].value.holdToken
     });
 
-    console.log("Race hold test passed");
+    await expectRejected(
+      () => call(client, "blockSeats", {
+        tripId,
+        seatIds: [seatId, missingSeatId],
+        reason: "atomic block test",
+        adminUserId: "55555555-5555-4555-8555-555555555555"
+      }),
+      missingSeatId
+    );
+    let persistentSeat = await persistentSeatStatus();
+    if (persistentSeat.status !== "AVAILABLE" || persistentSeat.booking_id) {
+      throw new Error("BlockSeats partially committed before reporting a missing seat");
+    }
+
+    const confirmationHold = await call(client, "holdSeats", {
+      tripId,
+      seatIds: [seatId],
+      requesterId: "atomic-confirm-user"
+    });
+    await expectRejected(
+      () => call(client, "confirmSeats", {
+        tripId,
+        seatIds: [seatId, missingSeatId],
+        holdToken: confirmationHold.holdToken,
+        bookingId
+      }),
+      missingSeatId
+    );
+    persistentSeat = await persistentSeatStatus();
+    if (persistentSeat.status !== "AVAILABLE" || persistentSeat.booking_id) {
+      throw new Error("ConfirmSeats partially committed before reporting a missing seat");
+    }
+
+    await call(client, "confirmSeats", {
+      tripId,
+      seatIds: [seatId],
+      holdToken: confirmationHold.holdToken,
+      bookingId
+    });
+    persistentSeat = await persistentSeatStatus();
+    if (persistentSeat.status !== "BOOKED" || persistentSeat.booking_id !== bookingId) {
+      throw new Error("ConfirmSeats did not persist the complete booking ownership");
+    }
+
+    // The first confirmation consumes Redis. The same booking must still be
+    // able to retry safely without an active hold or a duplicate transition.
+    await call(client, "confirmSeats", {
+      tripId,
+      seatIds: [seatId],
+      holdToken: confirmationHold.holdToken,
+      bookingId
+    });
+
+    console.log("Race, atomic transition, and idempotent confirmation tests passed");
   } finally {
     client.close();
     await cleanupTripHolds(redis);
+    await cleanupRaceFixtureDatabase();
     redis.disconnect();
   }
 }

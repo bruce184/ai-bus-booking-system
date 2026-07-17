@@ -8,17 +8,20 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const serviceRoot = path.resolve(here, '..');
 const repoRoot = path.resolve(serviceRoot, '..', '..');
 
-// Root first (shared defaults), then service-local (wins on conflicts).
+// Explicit process variables (including hermetic E2E ports) win. Service-local
+// values fill next, then the root file supplies shared defaults.
+dotenv.config({ path: path.join(serviceRoot, '.env') });
 dotenv.config({ path: path.join(repoRoot, '.env') });
-dotenv.config({ path: path.join(serviceRoot, '.env'), override: true });
 
 export const config = {
   port: Number(process.env.TRIP_SERVICE_PORT || 50051),
   host: process.env.TRIP_SERVICE_HOST || '0.0.0.0',
+  healthPort: Number(process.env.TRIP_SERVICE_HEALTH_PORT || 50151),
   databaseUrl:
     process.env.DATABASE_URL ||
     'postgresql://bus_app:change_me_local_only@localhost:5432/bus_booking',
   redisUrl: process.env.REDIS_URL || '',
+  analyticsBaseUrl: process.env.ANALYTICS_SERVICE_URL || 'http://localhost:50056',
   searchCacheTtlSeconds: Number(process.env.TRIP_SEARCH_CACHE_TTL_SECONDS || 60),
   kafkaBrokers: (process.env.KAFKA_BROKERS || '')
     .split(',')

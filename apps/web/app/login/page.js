@@ -3,27 +3,15 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { graphqlRequest } from "../../lib/graphql";
-
-const LOGIN = `
-  mutation Login($input: LoginInput!) {
-    login(input: $input) {
-      token
-      expiresAt
-      user {
-        id
-        email
-        fullName
-        role
-      }
-    }
-  }
-`;
+import { loginSession } from "../../lib/graphql";
+import { TopBar } from "../../src/components/TopBar.jsx";
 
 function LoginContent() {
   const router = useRouter();
   const params = useSearchParams();
-  const nextPath = params.get("next") || "/my-bookings";
+  // Chỉ nhận đường dẫn nội bộ để tránh open redirect qua ?next=
+  const rawNext = params.get("next") || "/my-bookings";
+  const nextPath = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/my-bookings";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -34,9 +22,7 @@ function LoginContent() {
     setLoading(true);
     setError("");
     try {
-      const data = await graphqlRequest(LOGIN, { input: { email, password } });
-      window.localStorage.setItem("customer_token", data.login.token);
-      window.localStorage.setItem("customer_user", JSON.stringify(data.login.user));
+      await loginSession({ email, password, portal: "customer" });
       router.push(nextPath);
     } catch (err) {
       setError(err.message);
@@ -47,17 +33,7 @@ function LoginContent() {
 
   return (
     <>
-      <header className="topbar">
-        <div className="logo-container">
-          <div className="logo-icon">🟢</div>
-          <span className="logo-text">EcoBus AI</span>
-        </div>
-        <nav className="nav">
-          <Link href="/">Trang chính</Link>
-          <Link href="/search">Tìm chuyến</Link>
-          <Link href="/lookup">Tra cứu vé</Link>
-        </nav>
-      </header>
+      <TopBar links={[{ href: "/", label: "Trang chính" }, { href: "/search", label: "Tìm chuyến" }, { href: "/lookup", label: "Tra cứu vé" }]} />
 
       <section className="grid">
         <form className="panel form" onSubmit={submit}>

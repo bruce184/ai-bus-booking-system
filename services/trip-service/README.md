@@ -6,9 +6,10 @@ gRPC service that owns the trip catalog and search. Implemented against
 ## Owns
 
 - Locations, Routes, Stops, Vehicles, Vehicle seat layouts, Trips
-- Trip search, search cache metadata, SEO metadata for popular route pages
+- Trip search with short-lived catalog caching and live seat-availability
+  revalidation, plus SEO metadata for popular route pages
 - Nearby-date suggestions for empty search results
-- Popular routes source data
+- Public popular-route ranking from the read-only analytics aggregate
 - Admin CRUD for route, stop, vehicle, seat layout, and trip records
 - Trip status changes: DRAFT, ACTIVE, LOCKED, DEPARTED, COMPLETED, CANCELLED
 
@@ -26,11 +27,13 @@ gRPC service that owns the trip catalog and search. Implemented against
 
 | Dependency | Required? | Used for |
 |---|---|---|
-| PostgreSQL | **Yes** | Source of truth for all trip-domain data |
-| Redis | Optional | Search-result cache + popular-route counters (degrades gracefully) |
+| PostgreSQL | **Yes** | Trip-domain source of truth plus read-only `analytics_daily.search_count` projection |
+| Redis | Optional | Search-result cache (degrades gracefully) |
 | Kafka | Optional | Publishes `trip.search_performed` to `search-events` (degrades gracefully) |
 
 If Redis or Kafka are down the service still serves search from PostgreSQL.
+Analytics Service remains the sole writer of `analytics_daily`; Trip Service
+only reads the popular-route projection.
 
 ## Source layout
 
@@ -40,9 +43,10 @@ src/
   server.js             # loads proto/trip.proto, binds every RPC to a handler
   config.js             # env config (reads repo-root .env then service .env)
   db.js                 # PostgreSQL pool
-  cache.js              # Redis search cache + popular routes (optional)
+  cache.js              # Redis search-result cache (optional)
   events.js             # Kafka producer for trip.search_performed (optional)
   mappers.js            # SQL row -> proto message mapping
+  searchRules.js        # deterministic sort and popular-route mapping rules
   tripQuery.js          # shared trip SELECT + row->Trip builder
   policies.js           # static demo cancellation/check-in policy text
   errors.js             # domain errors -> gRPC status codes
@@ -51,6 +55,8 @@ src/
     adminCatalog.js     # route/stop/vehicle/trip CRUD + ConfigureVehicleSeats + UpdateTripStatus
 scripts/
   test-client.js        # standalone gRPC client to verify the service end-to-end
+tests/
+  searchRules.test.js   # unit coverage for public search/catalog rules
 ```
 
 ## Run locally
@@ -80,9 +86,17 @@ npm run test:client
 node scripts/test-client.js "TP.HCM" "Da Lat" 2026-07-01
 ```
 
-Expected: autocomplete returns locations, `SearchTrips` returns the demo
-TP.HCM→Da Lat trips with an SEO title, `GetTripDetail` returns pickup/dropoff
-points + seat layout + policies, and `ListPopularRoutes` lists routes.
+Unit rules:
+
+```bash
+npm test
+```
+
+Expected integration result: autocomplete returns locations, `SearchTrips`
+returns the demo TP.HCM→Da Lat trips with an SEO title, `GetTripDetail` returns
+pickup/dropoff points + policies, and `ListPopularRoutes` lists routes from
+analytics search counts. The live seat map comes only from Seat Inventory
+Service through the GraphQL Gateway.
 
 ## Contract & integration
 

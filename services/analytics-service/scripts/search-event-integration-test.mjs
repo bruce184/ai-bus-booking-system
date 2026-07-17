@@ -1,0 +1,100 @@
+import { setTimeout as delay } from "node:timers/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import dotenv from "dotenv";
+import pg from "pg";
+
+import { toMetricDate } from "../src/utils/date.js";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(here, "..", "..", "..");
+dotenv.config({ path: path.join(repoRoot, ".env") });
+process.env.KAFKA_BROKERS ||= "localhost:9092";
+
+const {
+  closeEvents,
+  initEvents,
+  publishSearchPerformed
+} = await import("../../trip-service/src/events.js");
+
+const { Pool } = pg;
+const databaseUrl =
+  process.env.DATABASE_URL ??
+  "postgresql://bus_app:change_me_local_only@localhost:5432/bus_booking";
+const requestedTimeoutMs = Number.parseInt(
+  process.env.ANALYTICS_INTEGRATION_TIMEOUT_MS || "15000",
+  10
+);
+const timeoutMs = Number.isFinite(requestedTimeoutMs) && requestedTimeoutMs > 0
+  ? requestedTimeoutMs
+  : 15_000;
+const suffix = `${Date.now()}-${process.pid}`;
+const origin = `Integration Origin ${suffix}`;
+const destination = `Integration Destination ${suffix}`;
+const routeLabel = `${origin} -> ${destination}`;
+const metricDate = toMetricDate();
+const pool = new Pool({ connectionString: databaseUrl });
+
+async function removeTestProjection() {
+  await pool.query(
+    "delete from analytics_daily where metric_date = $1::date and route_label = $2",
+    [metricDate, routeLabel]
+  );
+}
+
+async function waitForProjection() {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const { rows } = await pool.query(
+      `select search_count
+         from analytics_daily
+        where metric_date = $1::date and route_label = $2`,
+      [metricDate, routeLabel]
+    );
+
+    if (Number(rows[0]?.search_count || 0) >= 1) {
+      return;
+    }
+
+    await delay(250);
+  }
+
+  throw new Error(
+    `Timed out after ${timeoutMs}ms waiting for Analytics Service to consume trip.search_performed`
+  );
+}
+
+async function verifyEventDeduplication() {
+  const { randomUUID } = await import("node:crypto");
+  const { markEventProcessed } = await import("../src/repository/analyticsRepository.js");
+  const eventId = randomUUID();
+
+  const first = await markEventProcessed(pool, eventId, "search-events");
+  const second = await markEventProcessed(pool, eventId, "search-events");
+
+  if (first !== true || second !== false) {
+    throw new Error(`Expected first=true second=false, got first=${first} second=${second}`);
+  }
+
+  await pool.query("delete from processed_events where event_id = $1", [eventId]);
+}
+
+try {
+  await removeTestProjection();
+  await verifyEventDeduplication();
+  await initEvents();
+  await publishSearchPerformed({
+    origin,
+    destination,
+    departureDate: metricDate,
+    resultCount: 1,
+    cacheHit: false
+  });
+  await waitForProjection();
+  console.log("Trip producer -> Analytics consumer integration test passed (incl. eventId dedup)");
+} finally {
+  await closeEvents();
+  await removeTestProjection().catch(() => {});
+  await pool.end();
+}

@@ -1,6 +1,7 @@
 // Shared trip SELECT and row->Trip builder, used by both search and admin RPCs.
 import { config } from './config.js';
 import { mapRoute, mapVehicle, mapTrip, buildSeoTitle } from './mappers.js';
+import { getHeldSeatCount } from './cache.js';
 
 export const TRIP_SELECT = `
   select
@@ -17,9 +18,25 @@ export const TRIP_SELECT = `
   join vehicles v on v.id = t.vehicle_id
 `;
 
-export function rowToTrip(row, stops = []) {
+// trip_seats.status only reflects Redis holds once Seat Inventory confirms
+// or releases them (see DATABASE_SCHEMA.md section 6) - while a hold is
+// active the row is still 'AVAILABLE', so the raw DB count overcounts.
+// Subtract currently-held seats so search/detail/admin listings agree with
+// what the seat map itself already shows.
+export async function correctedAvailableSeats(row) {
+  const held = await getHeldSeatCount(row.id);
+  return Math.max(0, Number(row.available_seats) - held);
+}
+
+export async function rowToTrip(row, stops = []) {
   const route = mapRoute(row, stops);
   const vehicle = mapVehicle(row, []);
   const seoTitle = buildSeoTitle(row.origin_name, row.destination_name, row.departure_time, config.timezone);
-  return mapTrip(row, { route, vehicle, availableSeats: row.available_seats, seoTitle });
+  return mapTrip(row, { route, vehicle, availableSeats: await correctedAvailableSeats(row), seoTitle });
+}
+
+export async function rowsToTrips(rows) {
+  // Array.map passes the numeric index as its second callback argument, while
+  // rowToTrip expects an optional route-stops array in that position.
+  return Promise.all(rows.map((row) => rowToTrip(row)));
 }

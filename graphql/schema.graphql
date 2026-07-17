@@ -285,6 +285,7 @@ input CreateBookingInput {
 input SimulatePaymentInput {
   bookingCode: String!
   success: Boolean!
+  email: String!
 }
 
 input CancelBookingInput {
@@ -326,7 +327,7 @@ input AdminTripInput {
   departureTime: DateTime!
   arrivalTime: DateTime!
   price: Int!
-  status: TripStatus = DRAFT
+  status: TripStatus
 }
 
 input AdminTripStatusInput {
@@ -415,5 +416,5 @@ type Mutation {
 
 type Subscription {
   seatStateChanged(tripId: ID!): Seat!
-  bookingUpdated(bookingCode: String!): Booking!
+  bookingUpdated(bookingCode: String!, email: String!): Booking!
 }

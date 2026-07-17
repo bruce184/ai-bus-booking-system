@@ -1,9 +1,24 @@
 "use client";
 
-import { Suspense, useMemo, useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { clearFlowContext, getFlowContext, storeFlowContext } from "../../lib/flow-context-client";
 import { graphqlRequest } from "../../lib/graphql";
+import { TopBar } from "../../src/components/TopBar.jsx";
+import { CountdownRing } from "../../src/components/ui/CountdownRing.jsx";
+
+const MY_SAVED_PASSENGERS = `
+  query MySavedPassengers {
+    mySavedPassengers {
+      id
+      fullName
+      phone
+      email
+      documentNumber
+    }
+  }
+`;
 
 const TRIP_MINI = `
   query TripMini($id: ID!) {
@@ -54,25 +69,90 @@ function formatFullDate(value) {
 
 function CheckoutContent() {
   const router = useRouter();
-  const params = useSearchParams();
-  const defaultSeats = useMemo(() => (params.get("seats") || "A01").split(","), [params]);
-  const fromSeatFlow = Boolean(params.get("tripId") && params.get("holdToken"));
-  const holdExpiresAt = params.get("expiresAt") || "";
-  const [tripId, setTripId] = useState(params.get("tripId") || "");
-  const [holdToken, setHoldToken] = useState(params.get("holdToken") || "");
+  const [flowContext, setFlowContext] = useState(null);
+  const [contextLoading, setContextLoading] = useState(true);
+  const defaultSeats = flowContext?.seats ?? [];
+  const tripId = flowContext?.tripId ?? "";
+  const holdToken = flowContext?.holdToken ?? "";
+  const holdExpiresAt = flowContext?.expiresAt ?? "";
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [note, setNote] = useState("");
-  const [passengers, setPassengers] = useState(
-    defaultSeats.map((seatId) => ({ fullName: "", phone: "", email: "", documentNumber: "", seatId }))
-  );
+  const [passengers, setPassengers] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState("momo");
+  const [savedPassengers, setSavedPassengers] = useState([]);
   const [tripDetail, setTripDetail] = useState(null);
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [remainingHoldSeconds, setRemainingHoldSeconds] = useState(null);
-  const holdExpired = fromSeatFlow && remainingHoldSeconds === 0;
+  const holdExpired = Boolean(flowContext) && remainingHoldSeconds === 0;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getFlowContext("checkout")
+      .then((context) => {
+        if (cancelled) {
+          return;
+        }
+        if (!context) {
+          setError("Phiên giữ ghế không hợp lệ hoặc đã hết hạn. Vui lòng chọn ghế lại.");
+          return;
+        }
+        setFlowContext(context);
+        setPassengers(
+          context.seats.map((seatId) => ({
+            fullName: "",
+            phone: "",
+            email: "",
+            documentNumber: "",
+            seatId
+          }))
+        );
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setContextLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Khách đã đăng nhập: nạp hồ sơ hành khách đã lưu để điền nhanh.
+  useEffect(() => {
+    graphqlRequest(MY_SAVED_PASSENGERS)
+      .then((data) => setSavedPassengers(data.mySavedPassengers ?? []))
+      .catch(() => setSavedPassengers([]));
+  }, []);
+
+  function applySavedPassenger(index, profileId) {
+    const profile = savedPassengers.find((p) => p.id === profileId);
+    if (!profile) {
+      return;
+    }
+    setPassengers((current) =>
+      current.map((passenger, i) =>
+        i === index
+          ? {
+              ...passenger,
+              fullName: profile.fullName,
+              phone: profile.phone ?? "",
+              email: profile.email ?? "",
+              documentNumber: profile.documentNumber ?? ""
+            }
+          : passenger
+      )
+    );
+  }
 
   // Fetch trip details to show summary
   useEffect(() => {
@@ -119,6 +199,10 @@ function CheckoutContent() {
 
   async function submit(event) {
     event.preventDefault();
+    if (!flowContext) {
+      setError("Phiên giữ ghế không hợp lệ hoặc đã hết hạn. Vui lòng chọn ghế lại.");
+      return;
+    }
     if (holdExpired) {
       setError("Mã giữ chỗ đã hết hạn. Vui lòng quay lại chọn ghế.");
       return;
@@ -130,8 +214,12 @@ function CheckoutContent() {
       const data = await graphqlRequest(CREATE_BOOKING, {
         input: { tripId, holdToken, contactEmail, contactPhone, passengers }
       });
-      // Pass checkout payment method preferences if needed, navigate to payment
-      router.push(`/payment?bookingCode=${data.createBooking.bookingCode}&email=${encodeURIComponent(contactEmail)}`);
+      await storeFlowContext("booking", {
+        bookingCode: data.createBooking.bookingCode,
+        email: data.createBooking.contactEmail
+      });
+      clearFlowContext("checkout").catch(() => {});
+      router.push("/payment");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -139,40 +227,25 @@ function CheckoutContent() {
     }
   }
 
+  if (contextLoading) {
+    return <section className="panel">Đang tải phiên giữ ghế...</section>;
+  }
+
+  if (!flowContext) {
+    return (
+      <>
+        <TopBar links={[{ href: "/", label: "Trang chính" }, { href: "/search", label: "Tìm chuyến" }]} />
+        <section className="panel">
+          <p className="error">{error}</p>
+          <Link className="button" href="/search">Quay lại tìm chuyến</Link>
+        </section>
+      </>
+    );
+  }
+
   return (
     <>
-      <header className="topbar">
-        <div className="logo-container">
-          <div className="logo-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'block' }}>
-              <path d="M17,8C8,10 5.9,16.17 3.82,21.34L5.71,22L7.33,18C12,18 16.6,15.25 18.66,13.25C22.66,9.25 22,2 22,2C22,2 14.75,1.34 10.75,5.34C9,7.09 6.25,12 6.25,12C8.75,9 13.5,8 17,8Z" />
-            </svg>
-          </div>
-          <span className="logo-text">EcoBus AI</span>
-        </div>
-        <nav className="nav">
-          <Link href="/">Trang chính</Link>
-          <Link href="/search">Tìm chuyến</Link>
-          <Link href="/lookup">Tra cứu vé</Link>
-          <div style={{
-            width: "36px",
-            height: "36px",
-            borderRadius: "50%",
-            backgroundColor: "var(--surface-soft)",
-            border: "1px solid var(--line)",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "var(--muted)",
-            marginLeft: "8px"
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-          </div>
-        </nav>
-      </header>
+      <TopBar links={[{ href: "/", label: "Trang chính" }, { href: "/search", label: "Tìm chuyến" }, { href: "/lookup", label: "Tra cứu vé" }]} showUserBadge />
 
       <div className="breadcrumbs animate-fade-in" style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "20px" }}>
         <Link href="/">Trang chủ</Link> &gt; <Link href="/search">Tìm chuyến</Link> &gt; <span style={{ color: "var(--text)", fontWeight: "500" }}>Thông tin đặt vé</span>
@@ -192,31 +265,21 @@ function CheckoutContent() {
                 <span className="status">{passengers.length} ghế</span>
               </div>
 
-              {fromSeatFlow ? (
-                <div className="notice" style={{ marginBottom: "20px" }}>
-                  {remainingHoldSeconds !== null ? (
-                    <span>Thời gian còn lại: <strong>{remainingHoldSeconds}s</strong>. </span>
+              {flowContext ? (
+                <div className="notice" style={{ marginBottom: "20px", display: "flex", alignItems: "center", gap: "12px" }}>
+                  {remainingHoldSeconds !== null && !holdExpired ? (
+                    <CountdownRing remainingSeconds={remainingHoldSeconds} />
                   ) : null}
-                  {holdExpired ? (
-                    <span>Mã giữ chỗ đã hết hạn, vui lòng quay lại chọn ghế. </span>
-                  ) : null}
-                  Ghế <strong>{defaultSeats.join(", ")}</strong> đang được giữ cho bạn. Hoàn tất thông tin bên dưới trước khi hết thời gian giữ ghế.
+                  <span>
+                    {holdExpired ? (
+                      <span>Mã giữ chỗ đã hết hạn, vui lòng quay lại chọn ghế. </span>
+                    ) : null}
+                    Ghế <strong>{defaultSeats.join(", ")}</strong> đang được giữ cho bạn. Hoàn tất thông tin bên dưới trước khi hết thời gian giữ ghế.
+                  </span>
                 </div>
               ) : null}
 
               <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
-                {fromSeatFlow ? null : (
-                  <>
-                    <div className="field">
-                      <label>Mã chuyến xe (Trip ID)</label>
-                      <input value={tripId} onChange={(event) => setTripId(event.target.value)} placeholder="trip-demo-001" required />
-                    </div>
-                    <div className="field">
-                      <label>Mã giữ chỗ (Hold token)</label>
-                      <input value={holdToken} onChange={(event) => setHoldToken(event.target.value)} placeholder="Mã giữ chỗ Redis" required />
-                    </div>
-                  </>
-                )}
                 <div className="field">
                   <label>Email liên hệ</label>
                   <input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} placeholder="guest@example.com" required />
@@ -237,6 +300,17 @@ function CheckoutContent() {
                       <strong style={{ fontSize: "15px", color: "var(--brand)" }}>Ghế {passenger.seatId}</strong>
                       <span className="status" style={{ fontSize: "12px" }}>Hành khách {index + 1}</span>
                     </div>
+                    {savedPassengers.length > 0 ? (
+                      <div className="field" style={{ marginBottom: "12px" }}>
+                        <label>Điền nhanh từ hành khách đã lưu</label>
+                        <select defaultValue="" onChange={(event) => applySavedPassenger(index, event.target.value)}>
+                          <option value="">-- Chọn hồ sơ --</option>
+                          {savedPassengers.map((profile) => (
+                            <option key={profile.id} value={profile.id}>{profile.fullName}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
                     <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                       <div className="field">
                         <label>Họ tên</label>
@@ -379,9 +453,5 @@ function CheckoutContent() {
 }
 
 export default function CheckoutPage() {
-  return (
-    <Suspense fallback={<section className="panel">Đang tải checkout...</section>}>
-      <CheckoutContent />
-    </Suspense>
-  );
+  return <CheckoutContent />;
 }

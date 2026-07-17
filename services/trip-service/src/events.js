@@ -1,21 +1,24 @@
 // Kafka producer for analytics search events.
 // Optional dependency: search must never fail because Kafka is down, so all
 // publish errors are swallowed with a warning.
-import { Kafka } from 'kafkajs';
-import { config } from './config.js';
-import { logger } from './logger.js';
+import { randomUUID } from "node:crypto";
+import { Kafka } from "kafkajs";
+import { config } from "./config.js";
+import { logger } from "./logger.js";
 
 let producer = null;
 let ready = false;
 
 export async function initEvents() {
   if (!config.kafkaBrokers.length) {
-    logger.warn('KAFKA_BROKERS not set; trip.search_performed events are disabled');
+    logger.warn(
+      "KAFKA_BROKERS not set; trip.search_performed events are disabled",
+    );
     return;
   }
   try {
     const kafka = new Kafka({
-      clientId: 'trip-service',
+      clientId: "trip-service",
       brokers: config.kafkaBrokers,
       retry: { retries: 2 },
       logLevel: 1, // ERROR only
@@ -23,10 +26,13 @@ export async function initEvents() {
     producer = kafka.producer();
     await producer.connect();
     ready = true;
-    logger.info('Kafka producer connected');
+    logger.info("Kafka producer connected");
   } catch (err) {
     ready = false;
-    logger.warn('Kafka unavailable; continuing without search events', err.message);
+    logger.warn(
+      "Kafka unavailable; continuing without search events",
+      err.message,
+    );
   }
 }
 
@@ -39,7 +45,8 @@ export async function publishSearchPerformed(payload) {
         {
           key: `${payload.origin}=>${payload.destination}`,
           value: JSON.stringify({
-            eventName: 'trip.search_performed',
+            eventId: randomUUID(),
+            eventName: "trip.search_performed",
             payload: {
               origin: payload.origin,
               destination: payload.destination,
@@ -53,7 +60,7 @@ export async function publishSearchPerformed(payload) {
       ],
     });
   } catch (err) {
-    logger.warn('Failed to publish trip.search_performed', err.message);
+    logger.warn("Failed to publish trip.search_performed", err.message);
   }
 }
 

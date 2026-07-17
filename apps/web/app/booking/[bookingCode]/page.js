@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { graphqlRequest } from "../../../lib/graphql";
+import { cookies } from "next/headers";
+import QRCode from "qrcode";
+import { BOOKING_FLOW_COOKIE, readFlowContext } from "../../../lib/server/flow-context";
+import { requestGatewayData } from "../../../lib/server/gateway";
+import PrintTicketButton from "./_PrintTicketButton.jsx";
+import { TopBar } from "../../../src/components/TopBar.jsx";
 
 const BOOKING_STATUS = `
   query BookingStatus($bookingCode: String!, $email: String!) {
@@ -44,58 +49,42 @@ function formatFullDate(value) {
   });
 }
 
-export default async function BookingConfirmationPage({ params, searchParams }) {
+export default async function BookingConfirmationPage({ params }) {
   const resolvedParams = await params;
-  const resolvedSearchParams = await searchParams;
   const bookingCode = resolvedParams.bookingCode;
-  const email = resolvedSearchParams.email || "";
+  const cookieStore = await cookies();
+  const flowContext = readFlowContext(
+    "booking",
+    cookieStore.get(BOOKING_FLOW_COOKIE)?.value
+  );
+  const email =
+    flowContext?.bookingCode === bookingCode ? flowContext.email : "";
   let booking;
   let error = "";
 
   try {
     if (!email) {
-      throw new Error("Cần email để tra cứu booking.");
+      throw new Error("Phiên tra cứu không hợp lệ hoặc đã hết hạn. Vui lòng nhập lại mã booking và email.");
     }
-    const data = await graphqlRequest(BOOKING_STATUS, { bookingCode, email });
+    const data = await requestGatewayData(BOOKING_STATUS, { bookingCode, email });
     booking = data.bookingStatus;
   } catch (err) {
     error = err.message;
   }
 
+  // QR mô phỏng theo spec (`bookingCode-ticketId`) render thành ảnh thật.
+  const qrByTicketId = {};
+  if (booking?.tickets?.length) {
+    await Promise.all(
+      booking.tickets.map(async (ticket) => {
+        qrByTicketId[ticket.id] = await QRCode.toDataURL(ticket.qrPayload, { margin: 1, width: 120 });
+      })
+    );
+  }
+
   return (
     <>
-      <header className="topbar">
-        <div className="logo-container">
-          <div className="logo-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'block' }}>
-              <path d="M17,8C8,10 5.9,16.17 3.82,21.34L5.71,22L7.33,18C12,18 16.6,15.25 18.66,13.25C22.66,9.25 22,2 22,2C22,2 14.75,1.34 10.75,5.34C9,7.09 6.25,12 6.25,12C8.75,9 13.5,8 17,8Z" />
-            </svg>
-          </div>
-          <span className="logo-text">EcoBus AI</span>
-        </div>
-        <nav className="nav">
-          <Link href="/">Trang chính</Link>
-          <Link href="/search">Tìm chuyến</Link>
-          <Link href="/lookup">Tra cứu vé</Link>
-          <div style={{
-            width: "36px",
-            height: "36px",
-            borderRadius: "50%",
-            backgroundColor: "var(--surface-soft)",
-            border: "1px solid var(--line)",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "var(--muted)",
-            marginLeft: "8px"
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-          </div>
-        </nav>
-      </header>
+      <TopBar links={[{ href: "/", label: "Trang chính" }, { href: "/search", label: "Tìm chuyến" }, { href: "/lookup", label: "Tra cứu vé" }]} showUserBadge />
 
       <div className="breadcrumbs animate-fade-in" style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "20px" }}>
         <Link href="/">Trang chủ</Link> &gt; <Link href="/search">Tìm chuyến</Link> &gt; <span style={{ color: "var(--text)", fontWeight: "500" }}>Hoàn tất đặt vé</span>
@@ -176,6 +165,20 @@ export default async function BookingConfirmationPage({ params, searchParams }) 
                         <span className="muted" style={{ fontSize: "11px", display: "block" }}>Xe</span>
                         <strong style={{ fontSize: "13px" }}>Mã số {ticket.vehicleCode}</strong>
                       </div>
+                      <div>
+                        <span className="muted" style={{ fontSize: "11px", display: "block" }}>Mã booking</span>
+                        <strong style={{ fontSize: "13px", color: "var(--brand-dark)" }}>{booking.bookingCode}</strong>
+                      </div>
+                      <div>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={qrByTicketId[ticket.id]}
+                          alt={`QR check-in ${ticket.qrPayload}`}
+                          width={96}
+                          height={96}
+                          style={{ borderRadius: "6px", border: "1px solid var(--line)", background: "white" }}
+                        />
+                      </div>
                     </div>
                   </article>
                 ))}
@@ -224,9 +227,7 @@ export default async function BookingConfirmationPage({ params, searchParams }) 
             <Link className="button" href="/my-bookings" style={{ minWidth: "120px" }}>
               Vé của tôi
             </Link>
-            <button className="primary" onClick={() => window.print()} style={{ minWidth: "120px" }}>
-              Tải vé PDF
-            </button>
+            <PrintTicketButton />
           </div>
         </div>
       )}

@@ -3,11 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
   "exports": {
     "./db.js": "./src/db.js",
+    "./correlation.js": "./src/correlation.js",
     "./events.js": "./src/events.js",
+    "./health.js": "./src/health.js",
+    "./outbox.js": "./src/outbox.js",
     "./grpc.js": "./src/grpc.js",
-    "./errors.js": "./src/errors.js"
+    "./errors.js": "./src/errors.js",
+    "./date.js": "./src/date.js",
+    "./idempotency.js": "./src/idempotency.js",
+    "./policies.js": "./src/policies.js",
+    "./http.js": "./src/http.js",
+    "./admin-contract.js": "./src/admin-contract.js"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.13.4",

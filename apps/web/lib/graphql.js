@@ -1,49 +1,54 @@
-const endpoint = process.env.NEXT_PUBLIC_GRAPHQL_URL || "http://localhost:4000/graphql";
+import { fetchWithTimeout } from "@bus/shared/http.js";
 
-export const GRAPHQL_ENDPOINT = endpoint;
+export const GRAPHQL_ENDPOINT = "/api/graphql";
 
-export function getCustomerToken() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  return window.localStorage.getItem("customer_token");
-}
-
-export function getCustomerUser() {
-  if (typeof window === "undefined") {
-    return null;
-  }
+async function readJson(response) {
   try {
-    return JSON.parse(window.localStorage.getItem("customer_user") || "null");
+    return await response.json();
   } catch {
-    return null;
+    throw new Error(`Request failed with HTTP ${response.status}`);
   }
-}
-
-export function clearCustomerSession() {
-  if (typeof window === "undefined") {
-    return;
-  }
-  window.localStorage.removeItem("customer_token");
-  window.localStorage.removeItem("customer_user");
 }
 
 export async function graphqlRequest(query, variables = {}) {
-  const headers = { "content-type": "application/json" };
-  const token = getCustomerToken();
-  if (token) {
-    headers.authorization = `Bearer ${token}`;
-  }
-
-  const response = await fetch(endpoint, {
+  const response = await fetchWithTimeout(GRAPHQL_ENDPOINT, {
     method: "POST",
-    headers,
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({ query, variables }),
     cache: "no-store"
   });
-  const payload = await response.json();
+  const payload = await readJson(response);
   if (!response.ok || payload.errors?.length) {
-    throw new Error(payload.errors?.[0]?.message || `GraphQL request failed with ${response.status}`);
+    throw new Error(payload.errors?.[0]?.message || `GraphQL request failed with HTTP ${response.status}`);
   }
   return payload.data;
+}
+
+export async function loginSession({ email, password, portal }) {
+  const response = await fetchWithTimeout("/api/auth/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email, password, portal })
+  });
+  const payload = await readJson(response);
+  if (!response.ok) {
+    throw new Error(payload.error || "Login failed");
+  }
+  return payload.user;
+}
+
+export async function getSession() {
+  const response = await fetchWithTimeout("/api/auth/session", { cache: "no-store" });
+  const payload = await readJson(response);
+  if (response.status === 401) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(payload.error || "Unable to verify session");
+  }
+  return payload.user;
+}
+
+export async function clearSession() {
+  await fetchWithTimeout("/api/auth/session", { method: "DELETE" });
 }

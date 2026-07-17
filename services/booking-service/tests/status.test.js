@@ -5,8 +5,10 @@ import {
   BOOKING_STATUSES,
   assertPendingPayment,
   canCancel,
+  canCancelBeforeDeparture,
   canCheckIn,
-  canCheckInTripState
+  canCheckInTripState,
+  checkInTripStateError
 } from "../src/status.js";
 
 test("booking status set matches documented state names", () => {
@@ -45,10 +47,23 @@ test("check-in follows TICKET_ISSUED to CHECKED_IN transition", () => {
   assert.equal(canCheckIn("CANCELLED"), false);
 });
 
-test("check-in is rejected for cancelled trips only", () => {
-  assert.equal(canCheckInTripState("CANCELLED"), false);
+test("cancellation window matches the 24h-before-departure refund policy", () => {
+  const now = new Date("2026-06-20T12:00:00.000Z");
+
+  assert.equal(canCancelBeforeDeparture("2026-06-22T12:00:00.000Z", now), true); // 48h out
+  assert.equal(canCancelBeforeDeparture("2026-06-21T13:00:00.000Z", now), true); // just over 24h
+  assert.equal(canCancelBeforeDeparture("2026-06-21T12:00:00.000Z", now), true); // exactly 24h
+  assert.equal(canCancelBeforeDeparture("2026-06-21T00:00:00.000Z", now), false); // 12h out
+  assert.equal(canCancelBeforeDeparture("2026-06-19T12:00:00.000Z", now), false); // already departed
+});
+
+test("check-in only allows ACTIVE and DEPARTED trips", () => {
   assert.equal(canCheckInTripState("ACTIVE"), true);
-  assert.equal(canCheckInTripState("LOCKED"), true);
   assert.equal(canCheckInTripState("DEPARTED"), true);
-  assert.equal(canCheckInTripState("COMPLETED"), true);
+  assert.equal(canCheckInTripState("DRAFT"), false);
+  assert.equal(canCheckInTripState("LOCKED"), false);
+  assert.equal(canCheckInTripState("COMPLETED"), false);
+  assert.equal(canCheckInTripState("CANCELLED"), false);
+  assert.equal(checkInTripStateError("LOCKED"), "Cannot check in while trip is LOCKED");
+  assert.equal(checkInTripStateError("CANCELLED"), "Cannot check in while trip is CANCELLED");
 });

@@ -3,7 +3,7 @@
 Copy this template when assigning work to a developer or AI Agent.
 
 ```text
-You are working in the Intercity Bus Booking AI repository.
+You are working in the AI Bus Booking System repository.
 
 Read first:
 - AGENTS.md

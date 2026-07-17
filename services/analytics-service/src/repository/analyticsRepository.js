@@ -1,4 +1,24 @@
 import { pool } from "../db/postgres.js";
+import { getTripRouteLabel } from "../trip-client.js";
+import { getBookingMetrics as fetchBookingMetrics } from "../booking-client.js";
+
+/**
+ * Consumer idempotency (Tuan04): records the eventId in the same transaction
+ * as the handler's aggregate write, so a crash or thrown error mid-handler
+ * rolls back the marker too and the event is retried instead of silently
+ * marked-but-never-applied. Returns false when the event was already
+ * processed, so Kafka redeliveries (rebalance, offset replay) cannot
+ * double-count aggregates.
+ */
+export async function markEventProcessed(client, eventId, topic) {
+  const { rowCount } = await client.query(
+    `insert into processed_events (event_id, topic)
+     values ($1, $2)
+     on conflict (event_id) do nothing`,
+    [eventId, topic]
+  );
+  return rowCount > 0;
+}
 
 /**
  * Increments `search_count` for (metric_date, route_label) by 1 and
@@ -6,8 +26,8 @@ import { pool } from "../db/postgres.js";
  * `paid_booking_count`. Atomic single-statement upsert; safe under concurrent
  * writers because Postgres serializes conflicting upserts per row.
  */
-export async function upsertSearchCount({ metricDate, routeLabel }) {
-  const { rows } = await pool.query(
+export async function upsertSearchCount(client, { metricDate, routeLabel }) {
+  const { rows } = await client.query(
     `insert into analytics_daily (metric_date, route_label, search_count)
      values ($1, $2, 1)
      on conflict (metric_date, route_label)
@@ -31,14 +51,14 @@ export async function upsertSearchCount({ metricDate, routeLabel }) {
  * Deltas are clamped at 0 so out-of-order or partial demo events can never
  * push a metric negative.
  */
-export async function applyPaidBookingDelta({
+export async function applyPaidBookingDelta(client, {
   metricDate,
   routeLabel,
   paidBookingDelta = 0,
   revenueDelta = 0,
   ticketsSoldDelta = 0
 }) {
-  const { rows } = await pool.query(
+  const { rows } = await client.query(
     `insert into analytics_daily (metric_date, route_label, paid_booking_count, revenue, tickets_sold)
      values ($1, $2, greatest($3, 0), greatest($4, 0), greatest($5, 0))
      on conflict (metric_date, route_label)
@@ -58,64 +78,54 @@ export async function applyPaidBookingDelta({
 }
 
 /**
- * Reads-only join to build a human-readable route label ("Origin -> Destination")
- * from a trip id, matching the label format the search-events handler builds
- * from raw origin/destination search strings. Trip Service owns trips/routes/
- * locations; this is a read-only cross-service lookup for analytics enrichment,
- * not a write.
+ * Human-readable route label ("Origin -> Destination") for a trip id,
+ * matching the label format the search-events handler builds from raw
+ * origin/destination search strings. Trip Service owns trips/routes/
+ * locations (database-per-service - docs/ARCHITECTURE.md section 11), so
+ * this calls its GetTripDetail RPC instead of joining those tables directly.
+ *
+ * booking.paid and booking.cancelled each resolve this independently (there
+ * is no per-booking record of which label the original credit used), so a
+ * one-off Trip Service blip here can misroute a cancellation's reversal to
+ * a different analytics_daily row than the one that received the credit.
+ * One short retry closes most of that window.
+ * ponytail: retry-then-"Unknown Route", not a stored per-booking label -
+ * upgrade to persisting the label at payment time if this ever needs to be
+ * exact rather than best-effort.
  */
 export async function getRouteLabelForTrip(tripId) {
-  const { rows } = await pool.query(
-    `select ol.name as origin_name, dl.name as destination_name
-     from trips t
-     join routes r on r.id = t.route_id
-     join locations ol on ol.id = r.origin_location_id
-     join locations dl on dl.id = r.destination_location_id
-     where t.id = $1`,
-    [tripId]
-  );
-
-  if (rows.length === 0) {
-    return null;
+  try {
+    return await getTripRouteLabel(tripId);
+  } catch (firstError) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    try {
+      return await getTripRouteLabel(tripId);
+    } catch (secondError) {
+      console.warn(`[analytics-service] Trip Service lookup failed for ${tripId}: ${secondError.message}`);
+      return null;
+    }
   }
-
-  const { origin_name: originName, destination_name: destinationName } = rows[0];
-  return `${originName} -> ${destinationName}`;
 }
 
 /**
  * Reads the values originally applied by `booking.paid`, including the
  * transactionally recorded payment time. This lets cancellation reverse the
- * exact daily aggregate row that received the payment.
+ * exact daily aggregate row that received the payment. Booking Service owns
+ * bookings/booking_passengers/event_logs, so this calls its internal
+ * GetBookingMetrics RPC instead of joining those tables directly.
+ *
+ * A `booking.cancelled` event only ever fires for a booking that was PAID
+ * (booking-service's canCancel gate), so a real, successful call always
+ * finds a paid_at - there is no legitimate "never paid" case here, only a
+ * failed RPC. Let that propagate instead of swallowing it to a zeroed
+ * result: consumer.js marks the event processed in the same DB transaction
+ * as the handler, so swallowing here would commit the event as done while
+ * silently skipping the revenue/ticket reversal forever. Throwing rolls
+ * that transaction back and Kafka redelivers, same as any other handler
+ * failure.
  */
 export async function getBookingCancellationMetrics(bookingId) {
-  const { rows } = await pool.query(
-    `select
-       b.total_amount as total_amount,
-       count(bp.id)::int as ticket_count,
-       (
-         select min(el.created_at)
-         from event_logs el
-         where el.event_type = 'booking.paid'
-           and el.entity_type = 'booking'
-           and el.entity_id = b.id
-       ) as paid_at
-     from bookings b
-     left join booking_passengers bp on bp.booking_id = b.id
-     where b.id = $1
-     group by b.total_amount`,
-    [bookingId]
-  );
-
-  if (rows.length === 0) {
-    return { totalAmount: 0, ticketCount: 0, paidAt: null };
-  }
-
-  return {
-    totalAmount: Number(rows[0].total_amount) || 0,
-    ticketCount: Number(rows[0].ticket_count) || 0,
-    paidAt: rows[0].paid_at ?? null
-  };
+  return fetchBookingMetrics(bookingId);
 }
 
 export async function getRevenueSummary({ from, to }) {

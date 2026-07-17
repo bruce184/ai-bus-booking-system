@@ -127,6 +127,11 @@ export const tripResolvers = {
   `INTERNAL`. Translate to the API_CONTRACT codes: `NOT_FOUND`,
   `VALIDATION_ERROR`, `INTERNAL_ERROR`.
 - **`TripSearchResult`** maps directly: `{ trips, suggestedDates, seoTitle, cacheHit }`.
+- **`ListPopularRoutes`** is a Trip Service RPC backed by a read-only
+  `analytics_daily.search_count` projection. Analytics Service remains the
+  sole writer of those aggregates.
+- **Search analytics events** use the canonical
+  `{ eventName, payload, occurredAt }` envelope.
 
 ## 5. Not owned by Trip Service
 

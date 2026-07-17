@@ -3,7 +3,16 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { queryGraphQL } from '../graphql.js';
+import {
+  Bus,
+  CalendarDays,
+  LayoutDashboard,
+  MapPin,
+  Route as RouteIcon,
+  ScrollText,
+  Ticket
+} from 'lucide-react';
+import { clearSession, getSession } from '../../lib/graphql.js';
 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
@@ -11,9 +20,8 @@ export default function AdminLayout({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const handleLogout = () => {
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_user');
+  const handleLogout = async () => {
+    await clearSession();
     router.push('/admin/login');
   };
 
@@ -23,42 +31,21 @@ export default function AdminLayout({ children }) {
       return;
     }
 
-    const token = localStorage.getItem('admin_token');
-    const userJson = localStorage.getItem('admin_user');
-
-    if (!token || !userJson) {
-      router.push('/admin/login');
-      return;
-    }
-
-    // Verify token with backend
     const verifyToken = async () => {
       try {
-        const data = await queryGraphQL(`
-          query Me {
-            me {
-              id
-              role
-            }
-          }
-        `);
-        if (!data.me || (data.me.role !== 'ADMIN' && data.me.role !== 'STAFF')) {
-          handleLogout();
+        const verifiedUser = await getSession();
+        if (!verifiedUser || (verifiedUser.role !== 'ADMIN' && verifiedUser.role !== 'STAFF')) {
+          await handleLogout();
         } else {
-          setUser(data.me);
+          setUser(verifiedUser);
         }
-      } catch (err) {
-        // Offline or error fallback to localStorage
-        try {
-          const parsedUser = JSON.parse(userJson);
-          if (parsedUser.role !== 'ADMIN' && parsedUser.role !== 'STAFF') {
-            handleLogout();
-          } else {
-            setUser(parsedUser);
-          }
-        } catch (e) {
-          handleLogout();
-        }
+      } catch {
+        // getSession() only returns null/a user for a definitive answer (401
+        // means the session route already invalidated the cookie); it throws
+        // for a transient failure (gateway down, network blip), which the
+        // session route deliberately does NOT clear the cookie for. Do not
+        // force-logout a possibly-still-valid admin/staff session for that -
+        // the next navigation's verifyToken retries.
       } finally {
         setLoading(false);
       }
@@ -67,6 +54,12 @@ export default function AdminLayout({ children }) {
     verifyToken();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, router]);
+
+  useEffect(() => {
+    if (user?.role === 'STAFF' && pathname !== '/admin/login' && pathname !== '/admin/bookings') {
+      router.replace('/admin/bookings');
+    }
+  }, [pathname, router, user]);
 
   if (loading) {
     return (
@@ -86,15 +79,18 @@ export default function AdminLayout({ children }) {
     return <>{children}</>;
   }
 
-  const menuItems = [
-    { name: 'Dashboard', href: '/admin/dashboard', icon: '📊' },
-    { name: 'Trips', href: '/admin/trips', icon: '🗓️' },
-    { name: 'Routes', href: '/admin/routes', icon: '🛣️' },
-    { name: 'Stops', href: '/admin/stops', icon: '📍' },
-    { name: 'Vehicles', href: '/admin/vehicles', icon: '🚌' },
-    { name: 'Bookings', href: '/admin/bookings', icon: '🎟️' },
-    { name: 'Event Logs', href: '/admin/event-logs', icon: '📜' }
+  const adminMenuItems = [
+    { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+    { name: 'Trips', href: '/admin/trips', icon: CalendarDays },
+    { name: 'Routes', href: '/admin/routes', icon: RouteIcon },
+    { name: 'Stops', href: '/admin/stops', icon: MapPin },
+    { name: 'Vehicles', href: '/admin/vehicles', icon: Bus },
+    { name: 'Bookings', href: '/admin/bookings', icon: Ticket },
+    { name: 'Event Logs', href: '/admin/event-logs', icon: ScrollText }
   ];
+  const menuItems = user?.role === 'STAFF'
+    ? adminMenuItems.filter((item) => item.href === '/admin/bookings')
+    : adminMenuItems;
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-main)' }}>
@@ -110,8 +106,8 @@ export default function AdminLayout({ children }) {
         flexShrink: 0
       }}>
         <div>
-          <h2 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--primary)' }}>
-            🚌 BusBooking AI
+          <h2 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Bus size={22} aria-hidden="true" /> EcoBus AI
           </h2>
           <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>ADMIN MANAGEMENT</span>
         </div>
@@ -131,7 +127,7 @@ export default function AdminLayout({ children }) {
                 fontWeight: isActive ? '600' : '500',
                 transition: 'all 0.2s ease'
               }}>
-                <span>{item.icon}</span>
+                <item.icon size={17} strokeWidth={2} aria-hidden="true" />
                 <span>{item.name}</span>
               </Link>
             );

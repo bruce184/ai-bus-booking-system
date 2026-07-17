@@ -1,4 +1,4 @@
-# README SETUP - Intercity Bus Booking AI
+# README SETUP - AI Bus Booking System
 
 ## 1. Purpose
 
@@ -13,7 +13,7 @@ Use this file when:
 
 ## 2. Project Summary
 
-Intercity Bus Booking AI lets customers search trips, select seats, hold seats, checkout, receive e-tickets, and ask an AI chatbot for trip/policy/booking help. Admin users manage routes, stops, vehicles, seat layouts, trips, bookings, check-in, seat blocks, logs, and reports. External AI clients can use the MCP Server tools.
+AI Bus Booking System lets customers search trips, select seats, hold seats, checkout, receive e-tickets, and ask an AI chatbot for trip/policy/booking help. Admin users manage routes, stops, vehicles, seat layouts, trips, bookings, check-in, seat blocks, logs, and reports. External AI clients can use the MCP Server tools.
 
 Current repository status:
 
@@ -100,6 +100,8 @@ docs/                        Source-of-truth docs
 ## 6. Environment Setup
 
 Create local `.env` files from `.env.example` for local service runs.
+Set `FLOW_CONTEXT_SECRET` to a distinct random value outside the disposable
+local demo; it encrypts the short-lived checkout/payment/lookup context cookie.
 
 Do not commit real `.env` files.
 
@@ -141,10 +143,26 @@ Start infrastructure:
 docker compose up -d postgres redis rabbitmq zookeeper kafka nginx
 ```
 
+`npm run infra:up` uses Compose `--wait` and returns only after configured
+health checks pass. `npm run dev:all` prints the READY banner only after
+bounded semantic probes succeed: a public GraphQL query, direct Trip/Seat/
+Booking gRPC calls against deterministic seed records, and explicit HTTP
+health responses. An open port or a GraphQL HTTP 200 containing resolver
+errors is not considered ready. Run `npm run demo:reset` if those canonical
+seed records were removed from a disposable local database.
+
 Stop infrastructure:
 
 ```bash
 docker compose down
+```
+
+Reset and MCP demo commands:
+
+```bash
+npm run demo:reset:data  # canonical SQL seed + Redis; stop services first
+npm run demo:reset       # safest reset: recreates every infra volume
+npm run demo:mcp         # official SDK lifecycle against the running MCP server
 ```
 
 Use fake demo data only.
@@ -152,11 +170,15 @@ Use fake demo data only.
 The B-3 seed includes deterministic fake data for the local demo:
 
 ```text
-3 users, 12 locations/stations, 3 vehicle layouts, 5 routes, 12 trips,
+3 users, 12 locations/stations, 3 vehicle layouts, 5 routes, 20 trips
+(12 historical/state examples + 8 rolling upcoming demo trips),
 8 bookings, 6 tickets, saved passengers, event logs, and 7 analytics rows.
 ```
 
-If the local PostgreSQL volume was created before B-3, Docker will not rerun `database/seed.sql` automatically. For a disposable local demo database, reset the compose volume before starting Postgres again.
+If the local PostgreSQL volume was created before B-3 or before the current
+admin catalog constraints, Docker will not retrofit `database/schema.sql` or
+rerun `database/seed.sql` automatically. For a disposable local demo
+database, run `npm run demo:reset` before starting the demo.
 
 ## 8. Baseline Verification
 
@@ -185,10 +207,24 @@ Implemented test targets:
 | Gateway unit / whitebox | `npm run test:gateway` | Auth, JWT, role helpers, and context factory |
 | Gateway integration | `npm run test:gateway:integration` | Starts a real gateway on port `4100` and calls GraphQL over HTTP |
 | Booking service unit | `npm run test:booking` | Booking state machine and service client request contracts |
+| Seat Inventory unit | `npm run test:seat` | ACTIVE-trip guard, post-write race rollback, Redis hold lifecycle, and persistent seat invariants |
+| Payment service unit | `npm run test:payment` | Payment result and Kafka-outage isolation |
+| Email worker unit | `npm run test:email-worker` | Consumer idempotency and normalized simulated delivery |
+| Trip service unit | `npm run test:trip` | Admin input/state invariants, vehicle-layout locks, trip lifecycle/outbox rules, sort aliases, and popular-route mapping |
+| Analytics service unit | `npm run test:analytics` | Canonical and legacy search-event envelope compatibility |
+| Search analytics integration | `npm run test:analytics:integration` | Requires PostgreSQL, Kafka, and Analytics Service; bounded to 15 seconds and cleans test data |
 | Gateway API / contract smoke | `npm run test:gateway:api` | Requires a gateway already running on `http://localhost:4000/graphql` |
 | Gateway performance | `npm run test:gateway:perf` | Requires Apache JMeter on `PATH` |
 | Web lint | `npm --prefix apps/web run lint` | Next.js/React lint |
-| Web admin E2E | `npm run test:web:e2e` | Uses Playwright and starts configured dev servers |
+| Web auth/flow unit tests | `npm run test:web:unit` | BFF portal-role, encrypted flow-context, expiry, tamper rejection, and no-sensitive-URL invariants |
+| Web admin/customer E2E | `npm run test:web:e2e` | Uses isolated Compose ports/volume, starts non-reused app servers, and always removes E2E infrastructure in a final cleanup step |
+| Source integrity | `npm run check:source` | Syntax-checks non-Next Node files, resolves relative imports, rejects raw runtime `fetch()` without the shared deadline wrapper, and validates dependencies; Next JSX is covered by lint/build |
+| Full release gate | `npm run release:check` | Runs docs/source/Compose checks, unit and integration suites, then the hermetic web E2E suite |
+
+The E2E wrapper uses a dedicated Compose project, disposable database volume,
+and non-default host ports. It always executes `docker compose down -v
+--remove-orphans`, including after Playwright failure. Override ports only
+with `E2E_*_PORT`; ordinary demo ports remain unchanged.
 
 ## 9. Local Run Targets
 
@@ -214,6 +250,11 @@ npm run dev:payment
 npm run dev:ticket-worker
 npm run dev:email-worker
 ```
+
+The Gateway realtime bridge requires RabbitMQ in the integrated demo. Gateway
+unit/integration tests and intentionally isolated local runs must set
+`DISABLE_RABBITMQ=true`; this disables cross-process subscription propagation
+and must not be used for the full demo.
 
 For local service-only smoke tests without RabbitMQ/Kafka/Seat Inventory running, use:
 
@@ -292,6 +333,13 @@ Check:
 - `SEAT_HOLD_TTL_SECONDS`
 - Seat key format in `docs/API_CONTRACT.md`
 - Seat Inventory Service writes to Redis atomically
+
+### HTTP request times out
+
+The shared deadline defaults to 5 seconds. For a deliberately slower local
+environment, set `HTTP_REQUEST_TIMEOUT_MS` (100..120000 ms) consistently
+before starting the affected processes; do not replace the shared wrapper with
+an unbounded `fetch()`.
 
 ### GraphQL and gRPC contracts drift
 

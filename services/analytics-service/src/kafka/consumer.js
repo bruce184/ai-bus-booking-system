@@ -1,9 +1,13 @@
 import { Kafka } from "kafkajs";
+import { runWithCorrelationId } from "@bus/shared/correlation.js";
 import { config } from "../config.js";
 import { handleSearchEvent } from "./handlers/searchEventsHandler.js";
 import { handleBookingEvent } from "./handlers/bookingEventsHandler.js";
 import { handlePaymentEvent } from "./handlers/paymentEventsHandler.js";
 import { handleCheckinEvent } from "./handlers/checkinEventsHandler.js";
+import { parseAnalyticsEvent } from "./eventEnvelope.js";
+import { markEventProcessed } from "../repository/analyticsRepository.js";
+import { transaction } from "../db/postgres.js";
 
 const TOPIC_HANDLERS = {
   [config.topics.search]: handleSearchEvent,
@@ -14,30 +18,65 @@ const TOPIC_HANDLERS = {
 
 let consumer;
 
-/**
- * Normalizes the two message envelope shapes producers use in this repo:
- *
- * - packages/shared/src/events.js (booking-service, payment-service):
- *     { eventName, payload, occurredAt }
- * - services/trip-service/src/events.js (search-events only):
- *     { event, ...payloadFields, occurredAt }
- *
- * This inconsistency is a pre-existing cross-service issue, not something
- * introduced or fixed here (see completion report "Out-of-scope issues found").
- */
-function parseMessage(topic, rawValue) {
-  const parsed = JSON.parse(rawValue);
-
-  if (topic === config.topics.search) {
-    const { event: eventName, occurredAt, ...payload } = parsed;
-    return { eventName, payload, occurredAt };
+export async function processAnalyticsMessage(
+  { topic, message },
+  {
+    handlers = TOPIC_HANDLERS,
+    parseEvent = parseAnalyticsEvent,
+    runTransaction = transaction,
+    markProcessed = markEventProcessed,
+    logger = console
+  } = {}
+) {
+  if (!message.value) {
+    return { status: "ignored", reason: "empty-message" };
   }
 
-  return {
-    eventName: parsed.eventName,
-    payload: parsed.payload ?? {},
-    occurredAt: parsed.occurredAt
-  };
+  let event;
+  try {
+    event = parseEvent(message.value.toString("utf8"), {
+      allowLegacyFlat: topic === config.topics.search
+    });
+  } catch (error) {
+    // A malformed envelope is deterministic: retrying the same Kafka record
+    // cannot repair it. Resolve the handler so the partition can progress,
+    // while keeping the rejection visible in the service log.
+    logger.error(`[analytics-service] rejected malformed message on topic ${topic}`, error);
+    return { status: "rejected", reason: "malformed-envelope" };
+  }
+
+  const handler = handlers[topic];
+  if (!handler) {
+    logger.warn(`[analytics-service] no handler registered for topic ${topic}`);
+    return { status: "ignored", reason: "unknown-topic" };
+  }
+
+  const { eventId, eventName, payload, occurredAt, correlationId } = event;
+
+  try {
+    let duplicate = false;
+    await runWithCorrelationId(correlationId, () => runTransaction(async (client) => {
+      if (eventId && !(await markProcessed(client, eventId, topic))) {
+        duplicate = true;
+        return;
+      }
+
+      await handler({ eventName, payload, occurredAt, client });
+    }));
+
+    if (duplicate) {
+      logger.log(`[analytics-service] skipping duplicate event ${eventId} on ${topic}`);
+      return { status: "ignored", reason: "duplicate-event" };
+    }
+
+    return { status: "processed" };
+  } catch (error) {
+    // Reject the eachMessage promise for transient processing failures. KafkaJS
+    // must not auto-commit this offset; after the transaction rolls back, the
+    // same canonical eventId makes the eventual retry idempotent.
+    logger.error(`[analytics-service] failed to process message on topic ${topic}`, error);
+    throw error;
+  }
 }
 
 export async function startAnalyticsConsumer() {
@@ -61,25 +100,7 @@ export async function startAnalyticsConsumer() {
   }
 
   await consumer.run({
-    eachMessage: async ({ topic, message }) => {
-      if (!message.value) {
-        return;
-      }
-
-      try {
-        const { eventName, payload, occurredAt } = parseMessage(topic, message.value.toString("utf8"));
-        const handler = TOPIC_HANDLERS[topic];
-
-        if (!handler) {
-          console.warn(`[analytics-service] no handler registered for topic ${topic}`);
-          return;
-        }
-
-        await handler({ eventName, payload, occurredAt });
-      } catch (error) {
-        console.error(`[analytics-service] failed to process message on topic ${topic}`, error);
-      }
-    }
+    eachMessage: processAnalyticsMessage
   });
 
   console.log(`[analytics-service] consuming Kafka topics: ${topics.join(", ")}`);

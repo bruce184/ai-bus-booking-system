@@ -1,5 +1,6 @@
 import http from "node:http";
-import { publishKafkaEvent } from "@bus/shared/events.js";
+import { CORRELATION_METADATA_KEY, runWithCorrelationId } from "@bus/shared/correlation.js";
+import { processPaymentSimulation } from "./simulation.js";
 
 const port = Number(process.env.PAYMENT_SERVICE_PORT || 5010);
 
@@ -19,7 +20,12 @@ function readJson(request) {
   });
 }
 
-const server = http.createServer(async (request, response) => {
+const server = http.createServer((request, response) => {
+  const correlationId = request.headers[CORRELATION_METADATA_KEY] || null;
+  return runWithCorrelationId(correlationId, () => handleRequest(request, response));
+});
+
+async function handleRequest(request, response) {
   if (request.method === "GET" && request.url === "/health") {
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify({ ok: true, service: "payment-service" }));
@@ -40,29 +46,16 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    const eventName = body.success ? "payment.simulated_success" : "payment.simulated_failure";
-    await publishKafkaEvent("payment-events", eventName, {
-      bookingId: body.bookingId || null,
-      bookingCode: body.bookingCode,
-      tripId: body.tripId || null,
-      amount: Number(body.amount || 0),
-      success: Boolean(body.success)
-    });
+    const payment = processPaymentSimulation(body);
 
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({
-      bookingId: body.bookingId || null,
-      bookingCode: body.bookingCode,
-      tripId: body.tripId || null,
-      amount: Number(body.amount || 0),
-      success: Boolean(body.success)
-    }));
+    response.end(JSON.stringify(payment));
   } catch (error) {
     console.error("[payment-service]", error);
     response.writeHead(500, { "content-type": "application/json" });
     response.end(JSON.stringify({ error: "INTERNAL_ERROR" }));
   }
-});
+}
 
 server.listen(port, () => {
   console.log(`[payment-service] HTTP listening on http://localhost:${port}`);

@@ -1,4 +1,4 @@
-# Agent Prompt Router - Intercity Bus Booking AI
+# Agent Prompt Router - AI Bus Booking System
 
 Use this file as the parent prompt for AI Agents working on this repository.
 

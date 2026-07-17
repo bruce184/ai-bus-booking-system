@@ -35,6 +35,8 @@ docs/.md
 docs/TEAM_ASSIGNMENTS.md
 .claude/
 .serena/
+Handoff.md
+theory_mapping.md
 
 # Test and performance output
 apps/web/test-results/

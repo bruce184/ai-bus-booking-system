@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { paymentServiceUrl, simulatePaymentRequest } from "../src/payment-client.js";
+import {
+  paymentServiceUrl,
+  paymentTransportError,
+  simulatePaymentRequest
+} from "../src/payment-client.js";
 
 test("payment client prefers the documented service URL env var", () => {
   assert.equal(
@@ -45,4 +49,11 @@ test("payment simulation request uses booking-service field names", () => {
       success: true
     }
   );
+});
+
+test("payment client maps HTTP abort deadlines to SERVICE_TIMEOUT", () => {
+  assert.deepEqual(paymentTransportError({ name: "TimeoutError" }), {
+    code: "SERVICE_TIMEOUT",
+    message: "Payment Service timed out during booking settlement"
+  });
 });

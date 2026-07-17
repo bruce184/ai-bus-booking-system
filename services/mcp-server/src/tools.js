@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "@bus/shared/http.js";
+
 import { config } from "./config.js";
 import { graphqlRequest } from "./graphqlClient.js";
 
@@ -42,11 +44,10 @@ export const toolDefinitions = [
     description: "Admin-only revenue summary.",
     inputSchema: {
       type: "object",
-      required: ["from", "to", "adminToken"],
+      required: ["from", "to"],
       properties: {
         from: { type: "string" },
-        to: { type: "string" },
-        adminToken: { type: "string" }
+        to: { type: "string" }
       }
     }
   },
@@ -60,7 +61,7 @@ export const toolDefinitions = [
   }
 ];
 
-export async function callTool(name, args = {}) {
+export async function callTool(name, args = {}, { adminToken = "" } = {}) {
   switch (name) {
     case "search_trips":
       requireFields(args, ["origin", "destination", "departureDate"]);
@@ -87,9 +88,9 @@ export async function callTool(name, args = {}) {
         url: config.bookingServiceGraphqlUrl || config.graphqlUrl
       });
     case "get_revenue_summary":
-      requireFields(args, ["from", "to", "adminToken"]);
-      if (!config.adminToken || args.adminToken !== config.adminToken) {
-        throw Object.assign(new Error("Admin token is required for get_revenue_summary"), {
+      requireFields(args, ["from", "to"]);
+      if (!config.adminToken || adminToken !== config.adminToken) {
+        throw Object.assign(new Error("Valid bearer authentication is required for get_revenue_summary"), {
           code: "FORBIDDEN"
         });
       }
@@ -132,7 +133,7 @@ async function fetchAnalyticsJson(path, params = {}) {
     }
   }
 
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url);
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(body.message ?? "Analytics Service request failed");

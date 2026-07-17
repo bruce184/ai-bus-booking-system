@@ -1,4 +1,4 @@
-# DEV WORKFLOW - Intercity Bus Booking AI
+# DEV WORKFLOW - AI Bus Booking System
 
 ## 1. Purpose
 
@@ -18,7 +18,7 @@ It explains how to:
 
 | Item | Value |
 |---|---|
-| Project name | Intercity Bus Booking AI |
+| Project name | AI Bus Booking System |
 | Product type | Microservices web app |
 | Main users | Guest customer, registered customer, admin, check-in staff |
 | Main goal | Book intercity bus tickets with AI and MCP support |
@@ -171,8 +171,13 @@ Minimum verification by task type:
 | GraphQL performance | `npm run test:gateway:perf` when Apache JMeter is installed |
 | gRPC | Proto lint/generation once tooling exists |
 | Database | Apply schema to local Postgres once migrations exist |
-| Frontend | `npm run test:web:e2e` for admin E2E when browser dependencies are installed |
-| Worker | Unit/manual event test once worker exists |
+| Trip search/catalog | `npm run test:trip`; with seeded PostgreSQL and Trip Service running, `npm --prefix services/trip-service run test:client` |
+| Analytics event envelope | `npm run test:analytics`; with PostgreSQL/Kafka and Analytics Service running, `npm run test:analytics:integration` |
+| Booking invariants | `npm run test:booking`; with seeded PostgreSQL, `npm --prefix services/booking-service run test:integration` |
+| Payment simulation | `npm run test:payment` |
+| Seat transition invariants | `npm --prefix services/seat-inventory-service test`; with Seat Inventory running, `npm run test:seat:race` |
+| Frontend | `npm run test:web:e2e`; starts healthy infra and all core E2E service dependencies when browser dependencies are installed |
+| Worker | `npm run test:ticket-worker` and `npm run test:email-worker` |
 
 ## 8. Module Ownership Suggestions
 

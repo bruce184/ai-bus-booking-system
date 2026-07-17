@@ -6,9 +6,9 @@ import { signDemoJwt } from "../auth/jwt.js";
 import { findDemoUserByCredentials } from "../auth/users.js";
 import { adminMutationResolvers } from "./adminResolvers.js";
 import { callGrpc } from "../grpc/call.js";
-import { requireAdmin } from "../auth/authorization.js";
+import { requireAdmin, requireUser } from "../auth/authorization.js";
 import { publishSeatStateChanged, subscribeSeatStateChanged } from "./seatStatePubSub.js";
-import { publishBookingUpdated, subscribeBookingUpdated } from "./bookingUpdatedPubSub.js";
+import { subscribeBookingUpdated } from "./bookingUpdatedPubSub.js";
 
 function requesterIdFromContext(context) {
   return context.user?.id ?? context.requestId ?? "guest";
@@ -102,7 +102,7 @@ export const resolvers = {
       );
     },
     myBookings: async (_parent, _args, context) => {
-      const customerId = context.user?.id ?? "";
+      const customerId = requireUser(context).id;
       const response = await callGrpc(
         context.grpc.booking,
         "listCustomerBookings",
@@ -111,7 +111,7 @@ export const resolvers = {
       return response.bookings || [];
     },
     mySavedPassengers: async (_parent, _args, context) => {
-      const customerId = context.user?.id ?? "";
+      const customerId = requireUser(context).id;
       const response = await callGrpc(
         context.grpc.booking,
         "listPassengerProfiles",
@@ -315,45 +315,24 @@ export const resolvers = {
     },
 
     simulatePayment: async (_parent, args, context) => {
-      const booking = await callGrpc(context.grpc.booking, "simulatePayment", {
+      return callGrpc(context.grpc.booking, "simulatePayment", {
         bookingCode: args.input.bookingCode,
-        success: args.input.success
+        success: args.input.success,
+        email: args.input.email
       });
-
-      if (args.input.success && booking) {
-        await publishSeatStates(
-          context,
-          booking.tripId,
-          (booking.passengers || []).map((p) => p.seatId)
-        );
-        publishBookingUpdated(booking);
-      }
-
-      return booking;
     },
 
     cancelBooking: async (_parent, args, context) => {
-      const booking = await callGrpc(context.grpc.booking, "cancelBooking", {
+      return callGrpc(context.grpc.booking, "cancelBooking", {
         bookingCode: args.input.bookingCode,
         email: args.input.email
       });
-
-      if (booking) {
-        await publishSeatStates(
-          context,
-          booking.tripId,
-          (booking.passengers || []).map((p) => p.seatId)
-        );
-        publishBookingUpdated(booking);
-      }
-
-      return booking;
     },
 
     savePassengerProfile: async (_parent, args, context) => {
       const input = args.input;
       const response = await callGrpc(context.grpc.booking, "savePassengerProfile", {
-        customerUserId: context.user?.id ?? "",
+        customerUserId: requireUser(context).id,
         fullName: input.fullName,
         phone: input.phone ?? "",
         email: input.email ?? "",
@@ -364,23 +343,21 @@ export const resolvers = {
 
     deleteSavedPassenger: async (_parent, args, context) => {
       const response = await callGrpc(context.grpc.booking, "deletePassengerProfile", {
-        customerUserId: context.user?.id ?? "",
+        customerUserId: requireUser(context).id,
         id: args.id
       });
       return response.deleted;
     }
   },
   Booking: {
+    // Batched through tripLoader (see server/loaders.js): myBookings/
+    // adminBookings resolve N bookings' trips in one GetTripsByIds call
+    // instead of N GetTripDetail calls.
     trip: async (parent, _args, context) => {
       if (!parent.tripId) {
         return null;
       }
-      const response = await callGrpc(
-        context.grpc.trip,
-        "getTripDetail",
-        { tripId: parent.tripId }
-      );
-      return response.trip;
+      return context.loaders.tripLoader.load(parent.tripId);
     }
   },
   TripDetail: {
@@ -398,7 +375,15 @@ export const resolvers = {
       subscribe: (_parent, args) => subscribeSeatStateChanged(args.tripId)
     },
     bookingUpdated: {
-      subscribe: (_parent, args) => subscribeBookingUpdated(args.bookingCode)
+      // Same bookingCode+email pairing as the bookingStatus query: proves the
+      // subscriber actually knows the booking before it can stream its PII.
+      subscribe: async (_parent, args, context) => {
+        await callGrpc(context.grpc.booking, "getBookingStatus", {
+          bookingCode: args.bookingCode,
+          email: args.email
+        });
+        return subscribeBookingUpdated(args.bookingCode);
+      }
     }
   }
 };

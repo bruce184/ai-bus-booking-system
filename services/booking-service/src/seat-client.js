@@ -1,15 +1,10 @@
-import { fail } from "@bus/shared/errors.js";
-import { createInsecureClient, grpc, loadProto, promisifyGrpc } from "@bus/shared/grpc.js";
+import { fail, isServiceErrorCode } from "@bus/shared/errors.js";
+import { correlationMetadata, createInsecureClient, grpc, loadProto } from "@bus/shared/grpc.js";
+import { getCorrelationId } from "@bus/shared/correlation.js";
 
 let seatClient;
 
-const STANDARD_ERROR_CODES = new Set([
-  "VALIDATION_ERROR",
-  "NOT_FOUND",
-  "SEAT_NOT_AVAILABLE",
-  "HOLD_EXPIRED",
-  "INTERNAL_ERROR"
-]);
+const SEAT_INVENTORY_TIMEOUT_MS = 10_000;
 
 export function seatInventoryAddress(env = process.env) {
   return (
@@ -62,7 +57,7 @@ function client() {
 }
 
 function normalizeErrorCode(value) {
-  if (typeof value === "string" && STANDARD_ERROR_CODES.has(value)) {
+  if (isServiceErrorCode(value)) {
     return value;
   }
 
@@ -90,7 +85,7 @@ function readPrefixedErrorCode(error) {
   return normalizeErrorCode(prefix);
 }
 
-function mapSeatInventoryErrorCode(error) {
+export function mapSeatInventoryErrorCode(error) {
   const explicitCode = readMetadataErrorCode(error) || readPrefixedErrorCode(error);
 
   if (explicitCode) {
@@ -102,6 +97,8 @@ function mapSeatInventoryErrorCode(error) {
       return "VALIDATION_ERROR";
     case grpc.status.NOT_FOUND:
       return "NOT_FOUND";
+    case grpc.status.DEADLINE_EXCEEDED:
+      return "SERVICE_TIMEOUT";
     default:
       return null;
   }
@@ -116,7 +113,22 @@ function mapSeatInventoryErrorMessage(error, code) {
 
 async function callSeatInventory(method, request) {
   try {
-    return await promisifyGrpc(client(), method, request);
+    return await new Promise((resolve, reject) => {
+      const callback = (error, response) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(response);
+      };
+      const options = { deadline: Date.now() + SEAT_INVENTORY_TIMEOUT_MS };
+
+      if (getCorrelationId()) {
+        client()[method](request, correlationMetadata(), options, callback);
+      } else {
+        client()[method](request, options, callback);
+      }
+    });
   } catch (error) {
     const code = mapSeatInventoryErrorCode(error);
 

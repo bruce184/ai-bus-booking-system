@@ -1,15 +1,16 @@
 // Public search & catalog RPCs: AutocompleteLocations, SearchTrips,
 // GetTripDetail, ListPopularRoutes.
-import { query } from '../db.js';
+import { query } from "../db.js";
+import { getCachedSearch, setCachedSearch } from "../cache.js";
+import { publishSearchPerformed } from "../events.js";
+import { config } from "../config.js";
+import { notFound, invalidArgument } from "../errors.js";
+import { CANCELLATION_POLICY, CHECKIN_POLICY } from "../policies.js";
 import {
-  getCachedSearch,
-  setCachedSearch,
-} from '../cache.js';
-import { publishSearchPerformed } from '../events.js';
-import { config } from '../config.js';
-import { notFound, invalidArgument } from '../errors.js';
-import { CANCELLATION_POLICY, CHECKIN_POLICY } from '../policies.js';
-import { TRIP_SELECT, rowToTrip } from '../tripQuery.js';
+  TRIP_SELECT,
+  rowsToTrips,
+  correctedAvailableSeats,
+} from "../tripQuery.js";
 import {
   mapLocation,
   mapStop,
@@ -17,37 +18,12 @@ import {
   mapVehicle,
   mapTrip,
   buildSeoTitle,
-} from '../mappers.js';
-
-const DEPARTURE_ASC = 't.departure_time asc';
-const DURATION = '(t.arrival_time - t.departure_time)';
-
-// Accepts both the snake_case names in the proto and the hyphenated names the
-// web client uses ("price-asc"). Unknown values fall back to earliest departure.
-const SORT_OPTIONS = {
-  price: 't.price asc',
-  price_asc: 't.price asc',
-  lowest_price: 't.price asc',
-  price_desc: 't.price desc',
-  highest_price: 't.price desc',
-  duration: `${DURATION} asc`,
-  shortest_duration: `${DURATION} asc`,
-  longest_duration: `${DURATION} desc`,
-  departure: DEPARTURE_ASC,
-  earliest: DEPARTURE_ASC,
-  earliest_departure: DEPARTURE_ASC,
-  latest_departure: 't.departure_time desc',
-};
-
-function resolveSortBy(sortBy) {
-  const key = String(sortBy || '').trim().toLowerCase().replace(/-/g, '_');
-  // t.id breaks ties so equal-priced trips keep a stable order across requests
-  // (otherwise a cached page and a fresh one can disagree).
-  return `${SORT_OPTIONS[key] || DEPARTURE_ASC}, t.id asc`;
-}
+} from "../mappers.js";
+import { resolveSortBy } from "../searchRules.js";
+import { fetchPopularRoutes } from "../analytics-client.js";
 
 export async function autocompleteLocations(call) {
-  const keyword = (call.request.keyword || '').trim();
+  const keyword = (call.request.keyword || "").trim();
   if (!keyword) return { locations: [] };
   const { rows } = await query(
     `select id, name, type, address from locations
@@ -61,11 +37,13 @@ export async function autocompleteLocations(call) {
 
 export async function searchTrips(call) {
   const req = call.request;
-  const origin = (req.origin || '').trim();
-  const destination = (req.destination || '').trim();
-  const departureDate = (req.departure_date || '').trim();
+  const origin = (req.origin || "").trim();
+  const destination = (req.destination || "").trim();
+  const departureDate = (req.departure_date || "").trim();
   if (!origin || !destination || !departureDate) {
-    throw invalidArgument('origin, destination and departure_date are required');
+    throw invalidArgument(
+      "origin, destination and departure_date are required",
+    );
   }
 
   // Normalized cache key (ignores ephemeral fields).
@@ -73,26 +51,41 @@ export async function searchTrips(call) {
     origin: origin.toLowerCase(),
     destination: destination.toLowerCase(),
     departureDate,
-    departureTimeFrom: req.departure_time_from || '',
-    departureTimeTo: req.departure_time_to || '',
+    departureTimeFrom: req.departure_time_from || "",
+    departureTimeTo: req.departure_time_to || "",
     minPrice: req.min_price || 0,
     maxPrice: req.max_price || 0,
-    operatorName: req.operator_name || '',
-    vehicleType: req.vehicle_type || '',
+    operatorName: req.operator_name || "",
+    vehicleType: req.vehicle_type || "",
     minAvailableSeats: req.min_available_seats || 0,
-    sortBy: req.sort_by || '',
+    sortBy: req.sort_by || "",
   };
 
   const cached = await getCachedSearch(cacheParams);
   if (cached) {
+    const refreshedTrips = await refreshCachedTrips(cached.trips);
+    const trips = filterByMinimumAvailability(
+      refreshedTrips,
+      req.min_available_seats,
+    );
+    const suggestedDates =
+      trips.length === 0
+        ? await findNearbyDates(origin, destination, departureDate)
+        : cached.suggested_dates;
+
     await publishSearchPerformed({
       origin,
       destination,
       departureDate,
-      resultCount: cached.trips.length,
+      resultCount: trips.length,
       cacheHit: true,
     });
-    return { ...cached, cache_hit: true };
+    return {
+      ...cached,
+      trips,
+      suggested_dates: suggestedDates,
+      cache_hit: true,
+    };
   }
 
   const params = [origin, destination, departureDate, config.timezone];
@@ -107,34 +100,116 @@ export async function searchTrips(call) {
     params.push(value);
     return `$${params.length}`;
   };
-  if (req.departure_time_from) where.push(`(t.departure_time at time zone $4)::time >= ${addParam(req.departure_time_from)}::time`);
-  if (req.departure_time_to) where.push(`(t.departure_time at time zone $4)::time <= ${addParam(req.departure_time_to)}::time`);
+  if (req.departure_time_from)
+    where.push(
+      `(t.departure_time at time zone $4)::time >= ${addParam(req.departure_time_from)}::time`,
+    );
+  if (req.departure_time_to)
+    where.push(
+      `(t.departure_time at time zone $4)::time <= ${addParam(req.departure_time_to)}::time`,
+    );
   if (req.min_price) where.push(`t.price >= ${addParam(req.min_price)}`);
   if (req.max_price) where.push(`t.price <= ${addParam(req.max_price)}`);
-  if (req.operator_name) where.push(`v.operator_name ilike ${addParam(`%${req.operator_name}%`)}`);
-  if (req.vehicle_type) where.push(`v.vehicle_type = ${addParam(req.vehicle_type)}`);
+  if (req.operator_name)
+    where.push(`v.operator_name ilike ${addParam(`%${req.operator_name}%`)}`);
+  if (req.vehicle_type)
+    where.push(`v.vehicle_type = ${addParam(req.vehicle_type)}`);
 
   const { rows } = await query(
-    `${TRIP_SELECT} where ${where.join(' and ')} order by ${resolveSortBy(req.sort_by)}`,
+    `${TRIP_SELECT} where ${where.join(" and ")} order by ${resolveSortBy(req.sort_by)}`,
     params,
   );
 
-  let trips = rows.map(rowToTrip);
-  if (req.min_available_seats) {
-    trips = trips.filter((t) => t.available_seats >= req.min_available_seats);
-  }
+  const catalogTrips = await rowsToTrips(rows);
+  const trips = filterByMinimumAvailability(
+    catalogTrips,
+    req.min_available_seats,
+  );
 
-  const seoTitle = buildSeoTitle(origin, destination, `${departureDate}T00:00:00`, config.timezone);
+  const seoTitle = buildSeoTitle(
+    origin,
+    destination,
+    `${departureDate}T00:00:00`,
+    config.timezone,
+  );
 
   let suggestedDates = [];
   if (trips.length === 0) {
     suggestedDates = await findNearbyDates(origin, destination, departureDate);
   }
 
-  const response = { trips, suggested_dates: suggestedDates, seo_title: seoTitle, cache_hit: false };
-  await setCachedSearch(cacheParams, { trips, suggested_dates: suggestedDates, seo_title: seoTitle });
-  await publishSearchPerformed({ origin, destination, departureDate, resultCount: trips.length, cacheHit: false });
+  const response = {
+    trips,
+    suggested_dates: suggestedDates,
+    seo_title: seoTitle,
+    cache_hit: false,
+  };
+  // Cache the static catalog candidates, not the filtered availability view.
+  // A cache hit rehydrates ACTIVE status and available_seats so Redis holds,
+  // releases, confirmations, and trip-state changes are reflected immediately.
+  await setCachedSearch(cacheParams, {
+    trips: catalogTrips,
+    suggested_dates: suggestedDates,
+    seo_title: seoTitle,
+  });
+  await publishSearchPerformed({
+    origin,
+    destination,
+    departureDate,
+    resultCount: trips.length,
+    cacheHit: false,
+  });
   return response;
+}
+
+export function filterByMinimumAvailability(trips, minimumAvailableSeats) {
+  const minimum = Number(minimumAvailableSeats) || 0;
+  return minimum > 0
+    ? trips.filter((trip) => trip.available_seats >= minimum)
+    : trips;
+}
+
+export async function refreshCachedTrips(
+  cachedTrips,
+  { runQuery = query, readAvailableSeats = correctedAvailableSeats } = {},
+) {
+  if (!Array.isArray(cachedTrips) || cachedTrips.length === 0) {
+    return [];
+  }
+
+  const tripIds = cachedTrips.map((trip) => trip.id).filter(Boolean);
+  if (tripIds.length === 0) {
+    return [];
+  }
+
+  const { rows } = await runQuery(
+    `select
+       t.id,
+       t.status,
+       (select count(*) from trip_seats ts
+         where ts.trip_id = t.id and ts.status = 'AVAILABLE')::int as available_seats
+     from trips t
+     where t.id = any($1::uuid[])`,
+    [tripIds],
+  );
+  const liveRows = new Map(rows.map((row) => [row.id, row]));
+
+  const refreshed = await Promise.all(
+    cachedTrips.map(async (trip) => {
+      const liveRow = liveRows.get(trip.id);
+      if (!liveRow || liveRow.status !== "ACTIVE") {
+        return null;
+      }
+
+      return {
+        ...trip,
+        status: liveRow.status,
+        available_seats: await readAvailableSeats(liveRow),
+      };
+    }),
+  );
+
+  return refreshed.filter(Boolean);
 }
 
 // Nearby active departure dates (within +/- 7 days) for empty results.
@@ -159,10 +234,10 @@ async function findNearbyDates(origin, destination, departureDate) {
 
 export async function getTripDetail(call) {
   const tripId = call.request.trip_id;
-  if (!tripId) throw invalidArgument('trip_id is required');
+  if (!tripId) throw invalidArgument("trip_id is required");
 
   const { rows } = await query(`${TRIP_SELECT} where t.id = $1`, [tripId]);
-  if (rows.length === 0) throw notFound('Trip not found');
+  if (rows.length === 0) throw notFound("Trip not found");
   const row = rows[0];
 
   const stopsRes = await query(
@@ -178,37 +253,58 @@ export async function getTripDetail(call) {
   const stops = stopsRes.rows.map(mapStop);
   const route = mapRoute(row, stops);
   const vehicle = mapVehicle(row, []);
-  const seoTitle = buildSeoTitle(row.origin_name, row.destination_name, row.departure_time, config.timezone);
-  const trip = mapTrip(row, { route, vehicle, availableSeats: row.available_seats, seoTitle });
+  const seoTitle = buildSeoTitle(
+    row.origin_name,
+    row.destination_name,
+    row.departure_time,
+    config.timezone,
+  );
+  const trip = mapTrip(row, {
+    route,
+    vehicle,
+    availableSeats: await correctedAvailableSeats(row),
+    seoTitle,
+  });
 
   return {
     trip,
-    pickup_points: stops.filter((s) => s.stop_type === 'PICKUP'),
-    dropoff_points: stops.filter((s) => s.stop_type === 'DROPOFF'),
+    pickup_points: stops.filter((s) => s.stop_type === "PICKUP"),
+    dropoff_points: stops.filter((s) => s.stop_type === "DROPOFF"),
     cancellation_policy: CANCELLATION_POLICY,
     checkin_policy: CHECKIN_POLICY,
   };
 }
 
+// Batched counterpart to getTripDetail (proto/trip.proto GetTripsByIds):
+// lets gateway resolvers load N trips in one round-trip via a DataLoader
+// instead of N (Week 1 slide 24/25 - see resolvers.js Booking.trip).
+export async function getTripsByIds(call) {
+  const tripIds = [...new Set((call.request.trip_ids || []).filter(Boolean))];
+  if (tripIds.length === 0) {
+    return { trips: [] };
+  }
+
+  const { rows } = await query(`${TRIP_SELECT} where t.id = any($1::uuid[])`, [
+    tripIds,
+  ]);
+  return { trips: await rowsToTrips(rows) };
+}
+
 export async function listPopularRoutes(call) {
   const limit = Math.min(Math.max(call.request.limit || 5, 1), 50);
 
-  const { rows } = await query(
-    `select coalesce(route_label, 'Unknown Route') as route_label,
-            coalesce(sum(search_count), 0)::int as total_searches
-       from analytics_daily
-      where route_label is not null
-      group by route_label
-      having sum(search_count) > 0
-      order by total_searches desc
-      limit $1`,
-    [limit],
-  );
+  // Analytics Service is the sole writer of analytics_daily. Trip Service owns
+  // the public ListPopularRoutes RPC but reads this aggregate through
+  // Analytics Service's own API instead of querying its table directly.
+  const routes = await fetchPopularRoutes(limit);
 
   return {
-    routes: rows.map((r) => {
-      const [origin = '', destination = ''] = String(r.route_label).split(' -> ');
-      return { origin: origin.trim(), destination: destination.trim(), search_count: r.total_searches };
-    }),
+    routes: routes
+      .filter((r) => r.origin && r.destination)
+      .map((r) => ({
+        origin: r.origin,
+        destination: r.destination,
+        search_count: Number(r.searchCount) || 0,
+      })),
   };
 }

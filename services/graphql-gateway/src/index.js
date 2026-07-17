@@ -1,5 +1,7 @@
 import "dotenv/config";
 import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
+import { runWithCorrelationId } from "@bus/shared/correlation.js";
 import { ApolloServer } from "@apollo/server";
 import { expressMiddleware } from "@as-integrations/express4";
 import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
@@ -12,7 +14,9 @@ import { useServer } from "graphql-ws/use/ws";
 import { loadGatewayConfig } from "./config/env.js";
 import { closeGrpcClients, createGrpcClients } from "./grpc/clients.js";
 import { loadTypeDefs } from "./graphql/schema.js";
+import { startRealtimeWorkflowBridge } from "./events/workflowBridge.js";
 import { createContextFactory } from "./server/context.js";
+import { createLoaders } from "./server/loaders.js";
 import { resolvers } from "./server/resolvers.js";
 
 async function main() {
@@ -20,10 +24,27 @@ async function main() {
   const typeDefs = await loadTypeDefs();
   const grpcClients = createGrpcClients(config);
 
+  if (config.workflowEventsEnabled) {
+    await startRealtimeWorkflowBridge(grpcClients);
+  }
+
   const schema = makeExecutableSchema({ typeDefs, resolvers });
 
   const app = express();
   const httpServer = createServer(app);
+
+  app.get("/health", (_req, res) => {
+    res.json({ ok: true, service: "graphql-gateway", scope: "process", dependenciesChecked: false });
+  });
+
+  // Accept an upstream correlation id (e.g. from a future edge proxy) or mint
+  // one here, so every downstream gRPC call/event this request triggers can
+  // be tied back to it (week02 gRPC metadata, week04 event correlationId).
+  function correlationMiddleware(req, res, next) {
+    const correlationId = req.headers["x-correlation-id"] || randomUUID();
+    res.setHeader("x-correlation-id", correlationId);
+    runWithCorrelationId(correlationId, next);
+  }
 
   const wsServer = new WebSocketServer({
     server: httpServer,
@@ -36,7 +57,8 @@ async function main() {
       context: () => {
         return {
           config,
-          grpc: grpcClients
+          grpc: grpcClients,
+          loaders: createLoaders(grpcClients)
         };
       }
     },
@@ -64,6 +86,7 @@ async function main() {
   app.use(
     "/graphql",
     cors(),
+    correlationMiddleware,
     express.json(),
     expressMiddleware(server, {
       context: createContextFactory(config, grpcClients)

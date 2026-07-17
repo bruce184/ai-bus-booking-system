@@ -22,6 +22,9 @@ Next.js Web
 - Analytics Service consumes Kafka events.
 - MCP Server exposes approved tools/resources to external AI clients.
 
+Trip Service may read the analytics search-count projection for its public
+popular-route catalog, but Analytics Service remains the sole aggregate writer.
+
 ## Do Not Bypass
 
 - Frontend must not call internal gRPC services directly.
@@ -29,3 +32,7 @@ Next.js Web
 - Seat hold must not be frontend-only.
 - Booking state transitions must not be duplicated across unrelated services.
 - Admin CRUD must stay in the service that owns the underlying domain data.
+- Admin input normalization is shared across web/Gateway/Trip boundaries, but
+  Trip Service remains authoritative and PostgreSQL repeats durable invariants.
+- Trip status changes use only `adminUpdateTripStatus`; generic trip CRUD
+  cannot skip or reverse the documented state transitions.

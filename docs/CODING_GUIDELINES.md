@@ -1,4 +1,4 @@
-# CODING GUIDELINES - Intercity Bus Booking AI
+# CODING GUIDELINES - AI Bus Booking System
 
 ## 1. Purpose
 
@@ -141,7 +141,7 @@ Rules:
 
 1. Use Next.js routes/pages according to the implementation choice.
 2. Show loading, empty, error, success, and expired-hold states.
-3. Use GraphQL client functions instead of scattered raw fetch calls.
+3. Use the GraphQL/flow client functions and `@bus/shared/http.js`; runtime code must not call raw `fetch()`.
 4. Seat map must show `AVAILABLE`, `HELD`, `BOOKED`, `BLOCKED`.
 5. Checkout must require passenger details per seat.
 6. Booking lookup must require booking code and email.
@@ -169,6 +169,8 @@ Rules:
 6. Do not invent live data in AI or MCP responses.
 7. Ticket output must include the fields documented in `docs/API_CONTRACT.md`.
 8. Admin operations must respect role boundaries and service ownership.
+9. Seat Inventory must verify Trip Service reports `ACTIVE` before and after creating a Redis hold.
+10. Use `@bus/shared/http.js` for bounded HTTP calls; document any timeout override.
 
 ## 9. Database Rules
 
@@ -203,9 +205,16 @@ Baseline:
 ```bash
 npm run check:docs
 docker compose config
+npm run test:trip
+npm run test:analytics
 ```
 
-When services are implemented, add service-specific checks to this file and `docs/DEV_WORKFLOW.md`.
+Trip integration additionally uses
+`npm --prefix services/trip-service run test:client` with seeded PostgreSQL and
+the Trip Service running. Search-event integration uses
+`npm run test:analytics:integration` with PostgreSQL, Kafka, and Analytics
+Service running. Keep service-specific checks synchronized with
+`docs/DEV_WORKFLOW.md`.
 
 ## 12. Documentation Workflow
 

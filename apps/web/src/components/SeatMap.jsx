@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import { Lock, LifeBuoy } from "lucide-react";
 import {
   holdSeats,
   releaseSeatHold
 } from "../graphql/seatOperations.js";
+import { subscribeSeatStateChanged } from "../graphql/wsClient.js";
+import { CountdownRing } from "./ui/CountdownRing.jsx";
+import { MAX_CHECKOUT_SEATS } from "../../lib/flow-context-client.js";
+
+const HOLD_TTL_SECONDS = 300;
 
 const seatStatusLabel = {
   AVAILABLE: "Trống",
@@ -35,20 +41,58 @@ function sortSeatLayout(seats) {
   return [...seats].sort((a, b) => a.row - b.row || a.column - b.column || a.label.localeCompare(b.label));
 }
 
+/**
+ * Chèn "lối đi" giữa xe: thêm một track hẹp vào grid sau cột giữa,
+ * ghế bên phải lối đi dịch sang 1 cột trong grid.
+ */
+function buildAisleLayout(deckSeats) {
+  const maxColumn = Math.max(1, ...deckSeats.map((seat) => seat.column));
+  const aisleAfter = maxColumn >= 2 ? Math.floor(maxColumn / 2) : 0;
+  const tracks = [];
+  for (let column = 1; column <= maxColumn; column += 1) {
+    tracks.push("52px");
+    if (column === aisleAfter) {
+      tracks.push("26px");
+    }
+  }
+  return {
+    gridTemplateColumns: tracks.join(" "),
+    gridColumnFor: (column) => (aisleAfter && column > aisleAfter ? column + 1 : column)
+  };
+}
+
 export function SeatMap({ graphqlUrl, tripId, seats, price = 220000, onHoldCreated }) {
   const [selectedSeatIds, setSelectedSeatIds] = useState([]);
   const [activeHold, setActiveHold] = useState(null);
   const [remainingSeconds, setRemainingSeconds] = useState(null);
   const [isHolding, setIsHolding] = useState(false);
   const [error, setError] = useState(null);
+  // Cập nhật realtime qua subscription, lưu theo seat id rồi merge với props
+  // bằng useMemo — không cần đồng bộ props vào state.
+  const [liveUpdates, setLiveUpdates] = useState(() => new Map());
 
-  const seatsByDeck = useMemo(() => groupSeatsByDeck(seats), [seats]);
+  useEffect(() => {
+    return subscribeSeatStateChanged(tripId, (seat) => {
+      setLiveUpdates((current) => new Map(current).set(seat.id, seat));
+      if (seat.status !== "AVAILABLE") {
+        // Ghế vừa bị người khác giữ/đặt/khóa thì bỏ khỏi lựa chọn hiện tại.
+        setSelectedSeatIds((current) => current.filter((seatId) => seatId !== seat.id));
+      }
+    });
+  }, [tripId]);
+
+  const liveSeats = useMemo(
+    () => seats.map((seat) => (liveUpdates.has(seat.id) ? { ...seat, ...liveUpdates.get(seat.id) } : seat)),
+    [seats, liveUpdates]
+  );
+
+  const seatsByDeck = useMemo(() => groupSeatsByDeck(liveSeats), [liveSeats]);
 
   const selectedSeatsLabels = useMemo(() => {
-    return seats
+    return liveSeats
       .filter((s) => selectedSeatIds.includes(s.id))
       .map((s) => s.label);
-  }, [seats, selectedSeatIds]);
+  }, [liveSeats, selectedSeatIds]);
 
   useEffect(() => {
     if (!activeHold) {
@@ -109,9 +153,18 @@ export function SeatMap({ graphqlUrl, tripId, seats, price = 220000, onHoldCreat
       return;
     }
 
+    const alreadySelected = selectedSeatIds.includes(seat.id);
+    if (!alreadySelected && selectedSeatIds.length >= MAX_CHECKOUT_SEATS) {
+      // Checkout's flow-context store rejects a hold over this size (see
+      // lib/server/flow-context.js); block it here instead of creating a
+      // hold that can never reach checkout.
+      setError(`Chỉ được chọn tối đa ${MAX_CHECKOUT_SEATS} ghế trong một lần đặt.`);
+      return;
+    }
+
     setError(null);
     setSelectedSeatIds((current) =>
-      current.includes(seat.id)
+      alreadySelected
         ? current.filter((seatId) => seatId !== seat.id)
         : [...current, seat.id]
     );
@@ -153,41 +206,54 @@ export function SeatMap({ graphqlUrl, tripId, seats, price = 220000, onHoldCreat
 
       {activeHold && remainingSeconds !== null ? (
         <div className="seat-hold-countdown" role="status" style={{ marginBottom: "16px" }}>
-          Giữ ghế còn {remainingSeconds}s
+          <CountdownRing remainingSeconds={remainingSeconds} totalSeconds={HOLD_TTL_SECONDS} />
+          <span>Ghế đang được giữ cho bạn</span>
         </div>
       ) : null}
 
       <div className="seat-decks-container">
-        {Array.from(seatsByDeck.entries()).map(([deck, deckSeats]) => (
-          <div className="seat-deck animate-fade-in" key={deck}>
-            <h3 style={{ fontSize: "16px", fontWeight: "800", color: "var(--brand)", marginBottom: "16px", textAlign: "center" }}>
-              Tầng {deck}
-            </h3>
-            <div className="seat-grid">
-              {sortSeatLayout(deckSeats).map((seat) => {
-                const selected = selectedSeatIds.includes(seat.id);
+        {Array.from(seatsByDeck.entries()).map(([deck, deckSeats]) => {
+          const layout = buildAisleLayout(deckSeats);
+          return (
+            <div className="seat-deck animate-fade-in" key={deck}>
+              <h3 style={{ fontSize: "16px", fontWeight: "800", color: "var(--brand)", marginBottom: "12px", textAlign: "center" }}>
+                {seatsByDeck.size > 1 ? `Tầng ${deck}` : "Sơ đồ xe"}
+              </h3>
+              <div className="bus-frame">
+                {deck === 1 ? (
+                  <div className="bus-driver" aria-hidden="true">
+                    <LifeBuoy size={22} strokeWidth={1.8} />
+                    <span>Tài xế</span>
+                  </div>
+                ) : null}
+                <div className="seat-grid" style={{ gridTemplateColumns: layout.gridTemplateColumns }}>
+                  {sortSeatLayout(deckSeats).map((seat) => {
+                    const selected = selectedSeatIds.includes(seat.id);
 
-                return (
-                  <button
-                    aria-pressed={selected}
-                    className={`${seatClassName[seat.status]}${selected ? " seat-selected" : ""}`}
-                    disabled={!isSelectable(seat) || isHolding}
-                    key={seat.id}
-                    onClick={() => toggleSeat(seat)}
-                    style={{
-                      gridColumn: seat.column,
-                      gridRow: seat.row
-                    }}
-                    title={`${seat.label} - ${seatStatusLabel[seat.status]}`}
-                    type="button"
-                  >
-                    {seat.label}
-                  </button>
-                );
-              })}
+                    return (
+                      <button
+                        aria-pressed={selected}
+                        className={`${seatClassName[seat.status]}${selected ? " seat-selected" : ""}`}
+                        disabled={!isSelectable(seat) || isHolding}
+                        key={seat.id}
+                        onClick={() => toggleSeat(seat)}
+                        style={{
+                          gridColumn: layout.gridColumnFor(seat.column),
+                          gridRow: seat.row
+                        }}
+                        title={`${seat.label} - ${seatStatusLabel[seat.status]}`}
+                        type="button"
+                      >
+                        {seat.status === "BLOCKED" ? <Lock size={11} aria-hidden="true" /> : null}
+                        {seat.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {error ? <p className="seat-map-error" style={{ marginTop: "16px" }}>{error}</p> : null}

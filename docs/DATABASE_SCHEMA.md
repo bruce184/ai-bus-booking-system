@@ -1,4 +1,4 @@
-# DATABASE SCHEMA - Intercity Bus Booking AI
+# DATABASE SCHEMA - AI Bus Booking System
 
 ## 1. Purpose
 
@@ -22,6 +22,11 @@ The repository currently includes merged service runtimes plus the expanded B-3 
 | Date/time type | `timestamptz` |
 | Display timezone | Asia/Ho_Chi_Minh |
 | Demo data | Fake data only |
+
+Calendar dates used by search defaults, analytics metrics, booking codes, and
+ticket codes are derived in `Asia/Ho_Chi_Minh`. They must not be obtained by
+slicing a UTC ISO timestamp because that returns the previous business date
+between local midnight and 06:59.
 
 Required extension:
 
@@ -47,6 +52,9 @@ create extension if not exists pgcrypto;
 | `tickets` | Issued e-tickets, QR payload, check-in policy snapshot, optional HTML/PDF output |
 | `event_logs` | Main operational logs |
 | `analytics_daily` | Demo aggregate reporting |
+| `processed_events` | Kafka consumer idempotency (dedup by `eventId`) |
+| `workflow_processed_events` | RabbitMQ consumer idempotency keyed by consumer name + canonical `eventId` |
+| `outbox_events` | Transactional outbox: events queued with stable `event_id`/`occurred_at` in the same DB transaction as the business write, dispatched by a confirmed publisher; cross-broker copies share identity |
 
 ## 4. Roles
 
@@ -73,7 +81,37 @@ COMPLETED
 CANCELLED
 ```
 
-Admin can activate or lock a trip, mark it departed/completed, or cancel it according to the assigned task.
+Trip Service accepts only these transitions:
+
+```text
+DRAFT -> ACTIVE | CANCELLED
+ACTIVE -> LOCKED | CANCELLED
+LOCKED -> ACTIVE | DEPARTED | CANCELLED
+DEPARTED -> COMPLETED
+COMPLETED and CANCELLED are terminal
+```
+
+New trips may start only as `DRAFT` or `ACTIVE`. Generic trip CRUD cannot
+change status; `adminUpdateTripStatus` is the only workflow entry point.
+
+### Admin catalog invariants
+
+The shared admin contract and Trip Service enforce these rules; PostgreSQL repeats every row-local rule and unique key that it can represent:
+
+- route origin and destination differ; optional distance is positive
+- stop order and declared vehicle capacity are positive integers
+- a vehicle layout contains 1..200 seats with unique case-insensitive labels,
+  unique coordinates, deck 1..2, row 1..20, and column 1..10
+- `vehicles.seat_count` is derived from a configured layout once that layout
+  exists and cannot diverge from it
+- a trip cannot be created or moved to a vehicle until that vehicle has a
+  non-empty, count-consistent layout
+- trip price is positive and arrival is strictly after departure
+
+These checks intentionally exist at the web/Gateway boundary, in Trip Service,
+and as stable PostgreSQL constraints where representable. Existing disposable
+volumes created before these checks must use `npm run demo:reset` so
+`database/schema.sql` is applied to a fresh database.
 
 ## 6. Seat Status
 
@@ -119,15 +157,67 @@ PENDING_PAYMENT -> EXPIRED
 PAID -> CANCELLED
 ```
 
+`COMPLETED` is retained for lecturer-contract compatibility and historical
+seed rows. Booking Service consumes the transactional `trip.completed`
+workflow event and advances only `CHECKED_IN` bookings to `COMPLETED`
+idempotently; other booking states are left unchanged.
+
 ## 8. Ownership and Privacy
 
 1. Registered customer bookings link to `users.id`.
 2. Guest bookings use contact email and phone.
-3. `bookings.hold_token` stores the internal Seat Inventory hold token captured at checkout so payment confirmation can call `ConfirmSeats`; it is not exposed through public GraphQL or gRPC responses.
+3. `bookings.hold_token` stores the internal Seat Inventory hold token captured at checkout so payment confirmation can call `ConfirmSeats`; it is not exposed through public GraphQL or gRPC responses. It carries a `unique` constraint (NULLs excepted) so two bookings can never bind to the same hold.
 4. Public booking lookup requires `booking_code` and `contact_email`.
 5. Admin/staff check-in may use booking code, ticket code, or simulated QR payload.
 6. Saved passenger profiles belong to a registered customer.
 7. Do not store real personal data in seed files.
+
+### Database per service
+
+`bookings.customer_user_id`, `bookings.trip_id`, `trip_seats.trip_id`,
+`trip_seats.booking_id`, `tickets.booking_id`, `tickets.passenger_id`, and
+`saved_passengers.customer_user_id` are references, not physical foreign
+keys. All tables still live in one PostgreSQL instance for this local
+deployment. Business-critical references do not rely on a shared-schema
+constraint: Trip/Booking/Analytics decisions use service APIs as listed below.
+The Ticket/Email workflow, `trip_seats` materialized projection, and shared
+`event_logs` sink remain explicit local-demo shared-database compromises; see
+`docs/ARCHITECTURE.md` section 3. Instead of physical cross-service FKs:
+
+- `bookings.trip_id` is unauthenticated client input, so Booking Service
+  verifies existence/price/status/departure time through Trip Service's
+  `GetTripDetail` RPC (`services/booking-service/src/trip-client.js`) before
+  creating, cancelling, or checking in a booking.
+- `bookings.customer_user_id` / `saved_passengers.customer_user_id` are
+  trusted from the GraphQL Gateway's already-authenticated caller (the
+  gateway issues the id after verifying the demo JWT), not re-checked
+  against a `users` table by the service that receives them.
+- `trip_seats.booking_id` is trusted from Booking Service's own
+  `ConfirmSeats`/`ReleaseBookedSeats` calls to Seat Inventory Service.
+- `vehicle_seats` is mutable only until a trip references its vehicle.
+  Vehicle layout configuration and trip create/vehicle-change transactions
+  share the `vehicle-layout` advisory-lock namespace so every `trip_seats`
+  snapshot comes from one committed layout.
+- `trip_seats.trip_id` is initialized from Trip Service's trip/vehicle
+  projection. Trip deletion and Booking Service creation serialize on a shared
+  transaction-scoped advisory lock keyed by `tripId`; deletion rejects any
+  logical `bookings.trip_id` reference before explicitly removing projection
+  rows because there is no cross-service cascade. Trip deletion rejects
+  existing Redis holds under the same maintenance lease before removing the
+  projection. Trip vehicle replacement additionally holds the Redis `seat-maintenance:{tripId}` coordinator until
+  the rebuilt projection commits and row-locks the prior projection so
+  concurrent confirm/block operations cannot be lost.
+- `tickets.booking_id` / `tickets.passenger_id` come from Ticket Worker's
+  canonical `booking.paid` event context and have no physical constraint into
+  Booking Service tables.
+- Analytics Service resolves a trip's route label via Trip Service's
+  `GetTripDetail` RPC and a booking's cancellation metrics via Booking
+  Service's internal `GetBookingMetrics` RPC, instead of joining into
+  `trips`/`routes`/`locations` or `bookings`/`booking_passengers`/`event_logs`
+  directly. Trip Service's `ListPopularRoutes` reads Analytics Service's
+  `GET /popular-routes` HTTP endpoint instead of querying `analytics_daily`
+  directly (see `docs/ARCHITECTURE.md` section 3 for the existing read-only
+  `analytics_daily` projection precedent this replaces).
 
 ## 9. Ticket Data
 
@@ -156,7 +246,10 @@ No production file storage is required for the MVP unless an assigned task adds 
 - revenue
 - search-to-paid booking rate
 
-Analytics Service owns updating this table from Kafka events.
+Analytics Service is the sole writer of this table and updates it from Kafka
+events. Trip Service may read the `route_label` and `search_count` aggregate as
+a projection for its public `ListPopularRoutes` RPC; it must not mutate
+analytics rows.
 
 ## 11. Index Requirements
 
@@ -165,6 +258,7 @@ Minimum indexes:
 ```text
 locations.name
 routes.origin_location_id + routes.destination_location_id
+vehicle_seats.vehicle_id + lower(seat_label) (unique)
 trips.route_id + trips.departure_time
 trip_seats.trip_id + trip_seats.seat_label
 bookings.booking_code
@@ -202,7 +296,10 @@ Phuong Trang Demo, Thanh Buoi Demo, Kumho Demo
 seat_29, sleeper_34, limousine_22
 ```
 
-The current `database/seed.sql` includes the B-3 deterministic demo dataset: 3 users, 12 locations/stations, 3 vehicles with generated seat layouts, 5 routes, 12 trips, 8 bookings, 6 tickets, saved passengers, event logs, and 7 analytics rows.
+The current `database/seed.sql` includes 3 users, 12 locations/stations, 3
+vehicles with generated seat layouts, 5 routes, 20 trips (12 deterministic
+historical/state examples plus 8 rolling upcoming demo trips), 8 bookings, 6
+tickets, saved passengers, event logs, and 7 analytics rows.
 
 ## 13. Schema Change Rule
 
