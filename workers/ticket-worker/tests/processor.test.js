@@ -72,6 +72,41 @@ test("ticket rows, state, log, and ticket.issued outbox event share one transact
 });
 
 
+test("a ticket_code unique-constraint collision is retried with a fresh code instead of aborting", async () => {
+  const statements = [];
+  let ticketInsertAttempts = 0;
+  const client = {
+    async query(text) {
+      const sql = text.replace(/\s+/g, " ").trim().toLowerCase();
+      statements.push(sql);
+      if (sql.startsWith("insert into workflow_processed_events")) return { rowCount: 1, rows: [] };
+      if (sql.startsWith("select status from bookings")) return { rows: [{ status: "PAID" }] };
+      if (sql.startsWith("select * from tickets")) return { rows: [] };
+      if (sql.startsWith("insert into tickets")) {
+        ticketInsertAttempts += 1;
+        if (ticketInsertAttempts === 1) {
+          const error = new Error('duplicate key value violates unique constraint "tickets_ticket_code_key"');
+          error.code = "23505";
+          throw error;
+        }
+        return { rows: [{ id: "ticket-1" }] };
+      }
+      return { rowCount: 1, rows: [] };
+    }
+  };
+
+  const outcome = await issueTickets(
+    { eventId: "event-collision", eventName: "booking.paid", payload: { bookingId: booking.id } },
+    { loadContext, runTransaction: (work) => work(client) }
+  );
+
+  assert.equal(outcome.skipped, false);
+  assert.equal(outcome.tickets.length, 1);
+  assert.equal(ticketInsertAttempts, 2);
+  assert.equal(statements.some((sql) => sql === "rollback to savepoint ticket_code_attempt"), true);
+  assert.equal(statements.some((sql) => sql.startsWith("update bookings")), true);
+});
+
 test("cancellation that wins the row lock prevents every ticket side effect", async () => {
   const statements = [];
   const client = {

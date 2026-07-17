@@ -106,27 +106,47 @@ export async function issueTickets(
       }
 
       const ticketId = randomUUID();
-      const code = ticketCode(index);
-      const qr = qrPayload(booking.booking_code, ticketId);
-      const insert = await client.query(
-        `
-          insert into tickets (
-            id, booking_id, passenger_id, ticket_code, qr_payload, ticket_html, checkin_policy_snapshot
-          )
-          values ($1, $2, $3, $4, $5, $6, $7)
-          returning *
-        `,
-        [
-          ticketId,
-          bookingId,
-          passenger.id,
-          code,
-          qr,
-          ticketHtml({ booking, passenger, trip: booking, qrPayload: qr, ticketCode: code }),
-          CHECKIN_POLICY
-        ]
-      );
-      tickets.push(insert.rows[0]);
+
+      // ticket_code's random suffix has only 9000 values per (day, seat
+      // index) bucket, a real collision risk once many bookings share a
+      // day (see createBooking's identical savepoint-retry for booking_code
+      // collisions). Retry with a freshly-generated code instead of failing
+      // the whole transaction on a unique-constraint hit.
+      let insertedTicket;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await client.query("savepoint ticket_code_attempt");
+        const code = ticketCode(index);
+        const qr = qrPayload(booking.booking_code, ticketId);
+        try {
+          const insert = await client.query(
+            `
+              insert into tickets (
+                id, booking_id, passenger_id, ticket_code, qr_payload, ticket_html, checkin_policy_snapshot
+              )
+              values ($1, $2, $3, $4, $5, $6, $7)
+              returning *
+            `,
+            [
+              ticketId,
+              bookingId,
+              passenger.id,
+              code,
+              qr,
+              ticketHtml({ booking, passenger, trip: booking, qrPayload: qr, ticketCode: code }),
+              CHECKIN_POLICY
+            ]
+          );
+          insertedTicket = insert.rows[0];
+          await client.query("release savepoint ticket_code_attempt");
+          break;
+        } catch (error) {
+          await client.query("rollback to savepoint ticket_code_attempt");
+          if (error.code !== "23505" || attempt === 2) {
+            throw error;
+          }
+        }
+      }
+      tickets.push(insertedTicket);
     }
 
     const stateUpdate = await client.query(
