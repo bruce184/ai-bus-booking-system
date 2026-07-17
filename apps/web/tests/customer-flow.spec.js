@@ -219,4 +219,105 @@ test.describe('Customer Booking Flow E2E (Sec 3.1-3.3)', () => {
     expect(optionValues).toContain('E2E-FRESH-SUGGESTION');
     expect(optionValues).not.toContain('E2E-STALE-SUGGESTION');
   });
+
+  test('booking confirmation page renders a real QR ticket once the ticket worker issues it', async ({ page }) => {
+    const contactEmail = `e2e-${Date.now()}@example.com`;
+
+    await page.goto(`/search?from=${SEARCH.from}&to=${encodeURIComponent(SEARCH.to)}&date=${SEARCH.date}`);
+    await page.getByRole('link', { name: 'Chọn ghế' }).first().click();
+    const seat = page.locator('button.seat-available').first();
+    await expect(seat).toBeVisible({ timeout: 15000 });
+    await seat.click();
+    await page.locator('button.seat-hold-button').click();
+    await expect(page).toHaveURL(/\/checkout$/, { timeout: 15000 });
+
+    await page.locator('input[type="email"]').first().fill(contactEmail);
+    await page.locator('input[placeholder="Nguyễn Văn A"]').first().fill('E2E Ticket');
+    await page.locator('input[placeholder="0900000000"]').first().fill('0900000003');
+    await page.locator('button[type="submit"]').click();
+    await expect(page).toHaveURL(/\/payment$/, { timeout: 15000 });
+    await page.getByRole('button', { name: 'Thanh toán thành công' }).click();
+    await expect(page).toHaveURL(/\/booking\//, { timeout: 15000 });
+
+    // ticket-worker issues tickets asynchronously off the outbox/RabbitMQ
+    // consumer after payment; booking/[bookingCode]/page.js shows a "đang
+    // phát hành" notice until tickets exist, so poll with reloads instead
+    // of asserting once.
+    const qrImage = page.locator('img[alt^="QR check-in"]').first();
+    await expect(async () => {
+      await page.reload();
+      await expect(qrImage).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 20000 });
+
+    await expect(page.getByText(/^TK\d+/).first()).toBeVisible();
+    await expect(page.getByText('Mã vé (Ticket code)').first()).toBeVisible();
+    await expect(page.getByText('E2E Ticket', { exact: false }).first()).toBeVisible();
+  });
+
+  test('customer cancels a PAID booking from "Vé của tôi" and sees status flip to CANCELLED', async ({ page }) => {
+    const contactEmail = `e2e-${Date.now()}@example.com`;
+
+    await page.goto('/login');
+    await page.locator('input[type="email"]').fill('customer@example.com');
+    await page.locator('input[type="password"]').fill('customer123');
+    await page.getByRole('button', { name: 'Đăng nhập' }).click();
+    await expect(page).toHaveURL(/\/my-bookings/);
+
+    await page.goto(`/search?from=${SEARCH.from}&to=${encodeURIComponent(SEARCH.to)}&date=${SEARCH.date}`);
+    await page.getByRole('link', { name: 'Chọn ghế' }).first().click();
+    const seat = page.locator('button.seat-available').first();
+    await expect(seat).toBeVisible({ timeout: 15000 });
+    await seat.click();
+    await page.locator('button.seat-hold-button').click();
+    await expect(page).toHaveURL(/\/checkout$/, { timeout: 15000 });
+
+    await page.locator('input[type="email"]').first().fill(contactEmail);
+    await page.locator('input[placeholder="Nguyễn Văn A"]').first().fill('E2E Cancel');
+    await page.locator('input[placeholder="0900000000"]').first().fill('0900000004');
+    await page.locator('button[type="submit"]').click();
+    await expect(page).toHaveURL(/\/payment$/, { timeout: 15000 });
+    await page.getByRole('button', { name: 'Thanh toán thành công' }).click();
+    await expect(page).toHaveURL(/\/booking\//, { timeout: 15000 });
+    const bookingCode = await page.getByText(/BK\d+/).first().innerText();
+
+    // canCancel() (services/booking-service/src/status.js) only allows PAID
+    // bookings, and ticket-worker flips PAID -> TICKET_ISSUED asynchronously
+    // within a few seconds - head to my-bookings immediately instead of
+    // lingering on the confirmation page so the cancel button is still there.
+    await page.goto('/my-bookings');
+    const bookingCard = page.locator('article').filter({ hasText: bookingCode });
+    await expect(bookingCard).toBeVisible({ timeout: 15000 });
+    await expect(bookingCard.getByText('PAID', { exact: true })).toBeVisible({ timeout: 10000 });
+
+    page.once('dialog', (dialog) => dialog.accept());
+    await bookingCard.getByRole('button', { name: 'Hủy vé' }).click();
+
+    await expect(page.getByText(`Đã hủy booking ${bookingCode}.`)).toBeVisible({ timeout: 10000 });
+    await expect(bookingCard.getByText('CANCELLED', { exact: true })).toBeVisible();
+    await expect(bookingCard.getByRole('button', { name: 'Hủy vé' })).toHaveCount(0);
+  });
+
+  test('EcoBus AI assistant panel answers via its read-only tools (search, policy, booking lookup)', async ({ page }) => {
+    await page.goto('/');
+    const answer = page.locator('.chatbot-answer');
+
+    // ChatbotPanel.jsx's default search (TP.HCM / Da Lat / tomorrow) matches
+    // this file's own SEARCH constant, so the seeded demo trip is findable.
+    await page.getByRole('button', { name: 'Tìm chuyến' }).click();
+    await expect(answer).toContainText('searchTrips result', { timeout: 15000 });
+    await expect(answer).toContainText('operatorName');
+
+    await page.getByRole('button', { name: 'Hủy vé' }).click();
+    await expect(answer).toContainText('bus://policy/cancellation', { timeout: 15000 });
+
+    await page.getByRole('button', { name: 'Check-in' }).click();
+    await expect(answer).toContainText('bus://policy/checkin', { timeout: 15000 });
+
+    // Seeded demo booking (database/seed.sql) - read-only lookup, no mutation.
+    await page.getByLabel('Mã đặt chỗ').fill('BK202606240001');
+    await page.getByLabel('Email đặt chỗ').fill('guest.anna@example.com');
+    await page.getByRole('button', { name: 'Tra cứu booking' }).click();
+    await expect(answer).toContainText('getBookingStatus result', { timeout: 15000 });
+    await expect(answer).toContainText('guest.anna@example.com');
+  });
 });
