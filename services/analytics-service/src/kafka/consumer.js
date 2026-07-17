@@ -1,4 +1,5 @@
 import { Kafka } from "kafkajs";
+import { runWithCorrelationId } from "@bus/shared/correlation.js";
 import { config } from "../config.js";
 import { handleSearchEvent } from "./handlers/searchEventsHandler.js";
 import { handleBookingEvent } from "./handlers/bookingEventsHandler.js";
@@ -50,18 +51,18 @@ export async function processAnalyticsMessage(
     return { status: "ignored", reason: "unknown-topic" };
   }
 
-  const { eventId, eventName, payload, occurredAt } = event;
+  const { eventId, eventName, payload, occurredAt, correlationId } = event;
 
   try {
     let duplicate = false;
-    await runTransaction(async (client) => {
+    await runWithCorrelationId(correlationId, () => runTransaction(async (client) => {
       if (eventId && !(await markProcessed(client, eventId, topic))) {
         duplicate = true;
         return;
       }
 
       await handler({ eventName, payload, occurredAt, client });
-    });
+    }));
 
     if (duplicate) {
       logger.log(`[analytics-service] skipping duplicate event ${eventId} on ${topic}`);

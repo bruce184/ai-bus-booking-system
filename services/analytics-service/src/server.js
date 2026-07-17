@@ -1,4 +1,5 @@
 import http from "node:http";
+import { CORRELATION_METADATA_KEY, runWithCorrelationId } from "@bus/shared/correlation.js";
 import {
   getDailyRevenue,
   getPopularRoutes,
@@ -26,55 +27,60 @@ function getDateRange(searchParams) {
 }
 
 export function createAnalyticsServer() {
-  return http.createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-
-    try {
-      if (req.method === "GET" && url.pathname === "/health") {
-        const postgres = await checkPostgres();
-        json(res, 200, { ok: true, service: "analytics-service", postgres });
-        return;
-      }
-
-      if (req.method === "GET" && url.pathname === "/admin/revenue-summary") {
-        json(res, 200, await getRevenueSummary(getDateRange(url.searchParams)));
-        return;
-      }
-
-      if (req.method === "GET" && url.pathname === "/admin/dashboard") {
-        const range = getDateRange(url.searchParams);
-        const [revenueSummary, dailyRevenue, ticketsByRoute, popularRoutes] = await Promise.all([
-          getRevenueSummary(range),
-          getDailyRevenue(range),
-          getTicketsByRoute(range),
-          getPopularRoutes({ ...range, limit: 5 })
-        ]);
-
-        json(res, 200, {
-          revenueSummary,
-          dailyRevenue,
-          ticketsByRoute,
-          popularRoutes
-        });
-        return;
-      }
-
-      if (req.method === "GET" && url.pathname === "/popular-routes") {
-        const range = {
-          from: url.searchParams.get("from") ?? "1970-01-01",
-          to: url.searchParams.get("to") ?? "2999-12-31",
-          limit: Number.parseInt(url.searchParams.get("limit") ?? "5", 10)
-        };
-        json(res, 200, await getPopularRoutes(range));
-        return;
-      }
-
-      json(res, 404, { error: "NOT_FOUND" });
-    } catch (error) {
-      json(res, error.statusCode ?? 500, {
-        error: error.statusCode === 400 ? "VALIDATION_ERROR" : "INTERNAL_ERROR",
-        message: error.message
-      });
-    }
+  return http.createServer((req, res) => {
+    const correlationId = req.headers[CORRELATION_METADATA_KEY] || null;
+    return runWithCorrelationId(correlationId, () => handleRequest(req, res));
   });
+}
+
+async function handleRequest(req, res) {
+  const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+
+  try {
+    if (req.method === "GET" && url.pathname === "/health") {
+      const postgres = await checkPostgres();
+      json(res, 200, { ok: true, service: "analytics-service", postgres });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/admin/revenue-summary") {
+      json(res, 200, await getRevenueSummary(getDateRange(url.searchParams)));
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/admin/dashboard") {
+      const range = getDateRange(url.searchParams);
+      const [revenueSummary, dailyRevenue, ticketsByRoute, popularRoutes] = await Promise.all([
+        getRevenueSummary(range),
+        getDailyRevenue(range),
+        getTicketsByRoute(range),
+        getPopularRoutes({ ...range, limit: 5 })
+      ]);
+
+      json(res, 200, {
+        revenueSummary,
+        dailyRevenue,
+        ticketsByRoute,
+        popularRoutes
+      });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/popular-routes") {
+      const range = {
+        from: url.searchParams.get("from") ?? "1970-01-01",
+        to: url.searchParams.get("to") ?? "2999-12-31",
+        limit: Number.parseInt(url.searchParams.get("limit") ?? "5", 10)
+      };
+      json(res, 200, await getPopularRoutes(range));
+      return;
+    }
+
+    json(res, 404, { error: "NOT_FOUND" });
+  } catch (error) {
+    json(res, error.statusCode ?? 500, {
+      error: error.statusCode === 400 ? "VALIDATION_ERROR" : "INTERNAL_ERROR",
+      message: error.message
+    });
+  }
 }

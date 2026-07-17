@@ -1,4 +1,5 @@
-import { createInsecureClient, loadProto } from "./grpc-client.js";
+import { getCorrelationId } from "@bus/shared/correlation.js";
+import { correlationMetadata, createInsecureClient, loadProto } from "./grpc-client.js";
 
 let bookingClient;
 const BOOKING_SERVICE_TIMEOUT_MS = 5_000;
@@ -22,17 +23,20 @@ function client() {
 // public GraphQL surface.
 export async function getBookingMetrics(bookingId) {
   const response = await new Promise((resolve, reject) => {
-    client().GetBookingMetrics(
-      { booking_id: bookingId },
-      { deadline: Date.now() + BOOKING_SERVICE_TIMEOUT_MS },
-      (error, value) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(value);
+    const callback = (error, value) => {
+      if (error) {
+        reject(error);
+        return;
       }
-    );
+      resolve(value);
+    };
+    const options = { deadline: Date.now() + BOOKING_SERVICE_TIMEOUT_MS };
+
+    if (getCorrelationId()) {
+      client().GetBookingMetrics({ booking_id: bookingId }, correlationMetadata(), options, callback);
+    } else {
+      client().GetBookingMetrics({ booking_id: bookingId }, options, callback);
+    }
   });
 
   return {

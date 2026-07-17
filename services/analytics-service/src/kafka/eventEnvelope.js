@@ -23,13 +23,22 @@ export function parseAnalyticsEvent(rawValue, { allowLegacyFlat = false } = {}) 
       eventId: typeof parsed.eventId === "string" && parsed.eventId.trim() ? parsed.eventId : null,
       eventName: parsed.eventName,
       payload: parsed.payload,
-      occurredAt: parsed.occurredAt
+      occurredAt: parsed.occurredAt,
+      correlationId: typeof parsed.correlationId === "string" && parsed.correlationId.trim()
+        ? parsed.correlationId
+        : null
     };
   }
 
   if (allowLegacyFlat && typeof parsed.event === "string" && parsed.event.trim()) {
-    const { event: eventName, occurredAt, ...payload } = parsed;
-    return { eventId: null, eventName, payload, occurredAt };
+    const { event: eventName, occurredAt, correlationId, ...payload } = parsed;
+    return {
+      eventId: null,
+      eventName,
+      payload,
+      occurredAt,
+      correlationId: typeof correlationId === "string" && correlationId.trim() ? correlationId : null
+    };
   }
 
   throw new Error("Unsupported analytics event envelope");

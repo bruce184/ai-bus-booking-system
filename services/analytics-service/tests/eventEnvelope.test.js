@@ -47,7 +47,8 @@ test("accepts the legacy flat search envelope only when compatibility is enabled
       resultCount: 2,
       cacheHit: true
     },
-    occurredAt: "2026-07-11T01:00:00.000Z"
+    occurredAt: "2026-07-11T01:00:00.000Z",
+    correlationId: null
   });
 });
 

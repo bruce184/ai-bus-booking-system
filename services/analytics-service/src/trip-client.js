@@ -1,4 +1,5 @@
-import { createInsecureClient, loadProto } from "./grpc-client.js";
+import { getCorrelationId } from "@bus/shared/correlation.js";
+import { correlationMetadata, createInsecureClient, loadProto } from "./grpc-client.js";
 
 let tripClient;
 const TRIP_SERVICE_TIMEOUT_MS = 5_000;
@@ -20,17 +21,20 @@ function client() {
 // getRouteLabelForTrip used to run into trips/routes/locations.
 export async function getTripRouteLabel(tripId) {
   const response = await new Promise((resolve, reject) => {
-    client().GetTripDetail(
-      { trip_id: tripId },
-      { deadline: Date.now() + TRIP_SERVICE_TIMEOUT_MS },
-      (error, value) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(value);
+    const callback = (error, value) => {
+      if (error) {
+        reject(error);
+        return;
       }
-    );
+      resolve(value);
+    };
+    const options = { deadline: Date.now() + TRIP_SERVICE_TIMEOUT_MS };
+
+    if (getCorrelationId()) {
+      client().GetTripDetail({ trip_id: tripId }, correlationMetadata(), options, callback);
+    } else {
+      client().GetTripDetail({ trip_id: tripId }, options, callback);
+    }
   });
 
   const route = response.trip?.route;
